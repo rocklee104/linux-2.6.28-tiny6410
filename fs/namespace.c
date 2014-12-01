@@ -1414,7 +1414,7 @@ static int attach_recursive_mnt(struct vfsmount *source_mnt,
 		if (err)
 			goto out;
 	}
-//将所有propagation的mnt加入tree_list
+    //将所有propagation的mnt加入tree_list
 	err = propagate_mnt(dest_mnt, dest_dentry, source_mnt, &tree_list);
 	if (err)
 		goto out_cleanup_ids;
@@ -1484,7 +1484,10 @@ static int graft_tree(struct vfsmount *mnt, struct path *path)
 
 	err = -ENOENT;
 	if (IS_ROOT(path->dentry) || !d_unhashed(path->dentry))
-        //如果path->dentry是mount的根目录或者path->dentry已经在hash表中了
+        /*
+         * 如果path->dentry是mount的根目录或者path->dentry已经在hash表中了,
+         * 正常情况下path->dentry一定是mount的根目录
+        */
 		err = attach_recursive_mnt(mnt, path, NULL);
 out_unlock:
 	mutex_unlock(&path->dentry->d_inode->i_mutex);

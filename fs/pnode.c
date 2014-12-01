@@ -152,7 +152,8 @@ void change_mnt_propagation(struct vfsmount *mnt, int type)
  * origin中的挂载能够传播的是origin的peer,origin的slave及slave的n级slave.
  * peer的slave及peer的n级slave.
  * 
- * NOTE:origin的slave的peer一定也是origin的slave
+ * NOTE:origin的slave的peer一定也是origin的slave.
+ * 		如果m不在origin的propagation tree中,外部使用propagation_next循环就可能出现死循环
  */
 static struct vfsmount *propagation_next(struct vfsmount *m,
 					 struct vfsmount *origin)
@@ -306,6 +307,7 @@ int propagate_mnt(struct vfsmount *dest_mnt, struct dentry *dest_dentry,
 			 * This can happen if the parent mount was bind mounted
 			 * on some subdirectory of a shared/slave mount.
 			 */
+			//I cannot get the possibility
 			list_add_tail(&child->mnt_hash, &tmp_list);
 		}
         //向下一个peer/slave移动
