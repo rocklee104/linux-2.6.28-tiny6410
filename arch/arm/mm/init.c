@@ -41,6 +41,7 @@ static void __init early_initrd(char **p)
 		phys_initrd_size = size;
 	}
 }
+//"initrd=" and early_initrd are stored in .early_param.init section
 __early_param("initrd=", early_initrd);
 
 static int __init parse_tag_initrd(const struct tag *tag)

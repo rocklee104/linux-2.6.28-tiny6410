@@ -112,19 +112,35 @@ extern int dir_notify_enable;
 /*
  * These are the fs-independent mount-flags: up to 32 flags are supported
  */
+//指定文件系统为只读
 #define MS_RDONLY	 1	/* Mount read-only */
+//执行程序时，不遵照set-user-ID和set-group-ID位
 #define MS_NOSUID	 2	/* Ignore suid and sgid bits */
+//不允许访问设备文件
 #define MS_NODEV	 4	/* Disallow access to device special files */
+//不允许在挂上的文件系统上执行程序
 #define MS_NOEXEC	 8	/* Disallow program execution */
+//同步文件的更新
 #define MS_SYNCHRONOUS	16	/* Writes are synced at once */
+//重新加载文件系统。这允许你改变现存文件系统的mountflag和数据，而无需使用先卸载，再挂上文件系统的方式
 #define MS_REMOUNT	32	/* Alter flags of a mounted FS */
+//允许在文件上执行强制锁
 #define MS_MANDLOCK	64	/* Allow mandatory locks on an FS */
+//同步目录的更新
 #define MS_DIRSYNC	128	/* Directory modifications are synchronous */
+//不要更新文件上的访问时间
 #define MS_NOATIME	1024	/* Do not update access times. */
+//不允许更新目录上的访问时间。
 #define MS_NODIRATIME	2048	/* Do not update directory access times */
+//执行bind挂载，使文件或者子目录树在文件系统内的另一个点上可视。
+//1<<12
 #define MS_BIND		4096
+//移动子目录树
+//1<<13
 #define MS_MOVE		8192
+//1<<14
 #define MS_REC		16384
+//1<<15
 #define MS_VERBOSE	32768	/* War is peace. Verbosity is silence.
 				   MS_VERBOSE is deprecated. */
 #define MS_SILENT	32768
@@ -555,6 +571,7 @@ struct address_space {
 
 struct block_device {
 	dev_t			bd_dev;  /* not a kdev_t - it's a search key */
+    //bdevfs中的inode
 	struct inode *		bd_inode;	/* will die */
 	int			bd_openers;
 	struct mutex		bd_mutex;	/* open/close mutex */
@@ -635,6 +652,7 @@ struct inode {
 	gid_t			i_gid;
 	dev_t			i_rdev;
 	u64			i_version;
+	//如果这个inode是bdev_inode的成员,i_size在bd_set_size中被设置成块设备的大小
 	loff_t			i_size;
 #ifdef __NEED_I_SIZE_ORDERED
 	seqcount_t		i_size_seqcount;
@@ -1097,8 +1115,14 @@ extern int send_sigurg(struct fown_struct *fown);
  *	Umount options
  */
 
+//强制卸载，即使文件系统处于忙状态
 #define MNT_FORCE	0x00000001	/* Attempt to forcibily umount */
+/*
+ * Perform  a  lazy  unmount: make the mount point unavailable for new accesses,
+ * and actually perform the unmount when the mount point ceases to be busy.
+*/
 #define MNT_DETACH	0x00000002	/* Just detach from the tree */
+//将挂载点标志为过时
 #define MNT_EXPIRE	0x00000004	/* Mark for expiry */
 
 extern struct list_head super_blocks;
@@ -1121,8 +1145,10 @@ struct super_block {
 	unsigned long		s_flags;
 	unsigned long		s_magic;
 	struct dentry		*s_root;
+	//the semaphore which is used in umounting
 	struct rw_semaphore	s_umount;
 	struct mutex		s_lock;
+    //keep the value with 0x40000000, when s_active bigger than 0
 	int			s_count;
 	int			s_need_sync_fs;
 	atomic_t		s_active;
@@ -1538,8 +1564,10 @@ int sync_inode(struct inode *inode, struct writeback_control *wbc);
 struct file_system_type {
 	const char *name;
 	int fs_flags;
+	//must be defined, it is be used in vfs_kern_mount
 	int (*get_sb) (struct file_system_type *, int,
 		       const char *, void *, struct vfsmount *);
+	//must be defined, it is be used in deactivate_super
 	void (*kill_sb) (struct super_block *);
 	struct module *owner;
 	struct file_system_type * next;

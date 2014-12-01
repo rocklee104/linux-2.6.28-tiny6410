@@ -290,7 +290,9 @@ static void dispose_list(struct list_head *head)
 	while (!list_empty(head)) {
 		struct inode *inode;
 
+		//get the first inode
 		inode = list_first_entry(head, struct inode, i_list);
+		//remove the inode from inode_in_use
 		list_del(&inode->i_list);
 
 		if (inode->i_data.nrpages)
@@ -298,7 +300,9 @@ static void dispose_list(struct list_head *head)
 		clear_inode(inode);
 
 		spin_lock(&inode_lock);
+		//remove the inode from hash table
 		hlist_del_init(&inode->i_hash);
+        //remove the inode from inode_in_use
 		list_del_init(&inode->i_sb_list);
 		spin_unlock(&inode_lock);
 
@@ -307,6 +311,7 @@ static void dispose_list(struct list_head *head)
 		nr_disposed++;
 	}
 	spin_lock(&inode_lock);
+	//decrease the number of inode in system
 	inodes_stat.nr_inodes -= nr_disposed;
 	spin_unlock(&inode_lock);
 }
@@ -330,13 +335,16 @@ static int invalidate_list(struct list_head *head, struct list_head *dispose)
 		 * change during umount anymore, and because iprune_mutex keeps
 		 * shrink_icache_memory() away.
 		 */
+		//i don't understand
 		cond_resched_lock(&inode_lock);
 
 		next = next->next;
+		//if there is no node in the list
 		if (tmp == head)
 			break;
 		inode = list_entry(tmp, struct inode, i_sb_list);
 		invalidate_inode_buffers(inode);
+		//if there is no refcount in inode
 		if (!atomic_read(&inode->i_count)) {
 			list_move(&inode->i_list, dispose);
 			inode->i_state |= I_FREEING;
@@ -1039,9 +1047,13 @@ void generic_delete_inode(struct inode *inode)
 {
 	const struct super_operations *op = inode->i_sb->s_op;
 
+    //delete the inode from usage list
 	list_del_init(&inode->i_list);
+    //delete the inode from sb->s_inodes
 	list_del_init(&inode->i_sb_list);
+    //the state of this inode is freeing
 	inode->i_state |= I_FREEING;
+    //decrease the number of inodes in system 
 	inodes_stat.nr_inodes--;
 	spin_unlock(&inode_lock);
 

@@ -46,6 +46,7 @@ struct vfsmount {
 	int mnt_flags;
 	/* 4 bytes hole on 64bits arches */
 	const char *mnt_devname;	/* Name of device e.g. /dev/dsk/hda1 */
+    //链表元素, 链表头是namespace->list
 	struct list_head mnt_list;
 	struct list_head mnt_expire;	/* link in fs-specific expiry list */
 	struct list_head mnt_share;	/* circular list of shared mounts */

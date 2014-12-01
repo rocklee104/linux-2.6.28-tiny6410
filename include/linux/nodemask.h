@@ -360,6 +360,7 @@ static inline void __nodes_fold(nodemask_t *dstp, const nodemask_t *origp,
 /*
  * Bitmasks that are kept for all the nodes.
  */
+//N_POSSIBLE, N_ONLINE, N_CPU are used for cpu & memory hot plugin
 enum node_states {
 	N_POSSIBLE,		/* The node could become online at some point */
 	N_ONLINE,		/* The node is online */
@@ -380,6 +381,7 @@ enum node_states {
 
 extern nodemask_t node_states[NR_NODE_STATES];
 
+//if system has more than one node
 #if MAX_NUMNODES > 1
 static inline int node_state(int node, enum node_states state)
 {
@@ -388,6 +390,7 @@ static inline int node_state(int node, enum node_states state)
 
 static inline void node_set_state(int node, enum node_states state)
 {
+    //node_states is global variable defined in page_alloc.c
 	__node_set(node, &node_states[state]);
 }
 

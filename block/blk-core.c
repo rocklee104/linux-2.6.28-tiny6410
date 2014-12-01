@@ -1139,11 +1139,16 @@ static int __make_request(struct request_queue *q, struct bio *bio)
 	 * certain limit bounced to low memory (ie for highmem, or even
 	 * ISA dma in theory)
 	 */
+    /* 
+    *如果需要,调用blk_queue_bounce建立一个回弹缓冲区,如果回弹缓冲区被建立,
+    * __make_request将对该缓冲区而不是原先的bio进行操作
+    */
 	blk_queue_bounce(q, &bio);
 
 	barrier = bio_barrier(bio);
 	if (unlikely(barrier) && bio_has_data(bio) &&
 	    (q->next_ordered == QUEUE_ORDERED_NONE)) {
+        //bio要求barrier,但是请求队列不支持barrier
 		err = -EOPNOTSUPP;
 		goto end_io;
 	}
@@ -1157,11 +1162,17 @@ static int __make_request(struct request_queue *q, struct bio *bio)
 	spin_lock_irq(q->queue_lock);
 
 	if (unlikely(barrier) || elv_queue_empty(q))
+    /*
+     * 如果设置barrier表示队列中的请求顺序执行,不需要合并操作了.
+     * 如果队列为空,也没必要合并
+     */
 		goto get_rq;
 
+    /*试图将传入的bio和之前的请求合并*/
 	el_ret = elv_merge(q, &req, bio);
 	switch (el_ret) {
 	case ELEVATOR_BACK_MERGE:
+        /*后向合并,合并成功后还可检查是否新填入的bio正好填补了空缺,可以再次合并一下*/
 		BUG_ON(!rq_mergeable(req));
 
 		if (!ll_back_merge_fn(q, req, bio))
@@ -1176,11 +1187,13 @@ static int __make_request(struct request_queue *q, struct bio *bio)
 		if (!blk_rq_cpu_valid(req))
 			req->cpu = bio->bi_comp_cpu;
 		drive_stat_acct(req, 0);
+        /*新合并的bio填补空缺口,正好后向的请求连成一片*/
 		if (!attempt_back_merge(q, req))
 			elv_merged_request(q, req, el_ret);
 		goto out;
 
 	case ELEVATOR_FRONT_MERGE:
+        /*前向合并,并检查新合并的bio是否正好填补了空缺和前面的请求连成了一片*/
 		BUG_ON(!rq_mergeable(req));
 
 		if (!ll_front_merge_fn(q, req, bio))
@@ -1206,11 +1219,13 @@ static int __make_request(struct request_queue *q, struct bio *bio)
 			req->cpu = bio->bi_comp_cpu;
 		drive_stat_acct(req, 0);
 		if (!attempt_front_merge(q, req))
+            /*试图再次前向合并*/
 			elv_merged_request(q, req, el_ret);
 		goto out;
 
 	/* ELV_NO_MERGE: elevator says don't/can't merge. */
 	default:
+        //不能合并，需要新创一个request
 		;
 	}
 
@@ -1228,6 +1243,7 @@ get_rq:
 	 * Grab a free request. This is might sleep but can not fail.
 	 * Returns with the queue unlocked.
 	 */
+    /*不能合并的情况,申请新的request结构,放入到队列中去*/
 	req = get_request_wait(q, rw_flags, bio);
 
 	/*
@@ -1243,13 +1259,22 @@ get_rq:
 	    bio_flagged(bio, BIO_CPU_AFFINE))
 		req->cpu = blk_cpu_to_group(smp_processor_id());
 	if (elv_queue_empty(q))
+        /*空队列,拔出设备,暂时缓存request请求*/
 		blk_plug_device(q);
+    /*将请求加入到队列*/
 	add_request(q, req);
 out:
 	if (sync)
 		__generic_unplug_device(q);
 	spin_unlock_irq(q->queue_lock);
 	return 0;
+/* 
+ * 块驱动尽量的想收集多个bio一起出来，所以映入了plug和unplug这两个概念 
+ * blk_plug_device 塞住设备plug，并设置一个定时器，等待一段时间再unplug设备 
+ * 如果发送的请求太多，也会触发实际的写入操作， elv_insert函数中 
+ *       if (nrq >= q->unplug_thresh) 
+ *        __generic_unplug_device(q); 
+ */
 
 end_io:
 	bio_endio(bio, err);
@@ -1389,6 +1414,7 @@ static inline void __generic_make_request(struct bio *bio)
 
 	might_sleep();
 
+    //确保读取的数据不会超过设备大小
 	if (bio_check_eod(bio, nr_sectors))
 		goto end_io;
 
@@ -1472,9 +1498,19 @@ end_io:
  * then a make_request is active, and new requests should be added
  * at the tail
  */
+/*
+ * 我们只希望在某一时刻只有一个make_request_fn被激活,否则stacked devices
+ * 的stack使用过程就会有问题.所以使用current->bio_{list,tail}来维护每一个make_request_fn
+ * 提交的请求组成的链表.current->bio_tail同时也用来判断generic_make_request
+ * 是否被激活的标志.如果current->bio_tail非空,说明make_request是处于激活状态.新的
+ * request应该被添加到list尾部
+*/
+//对于基于栈的设备,md,dm,for instance,就用current->bio_list来维护反复make_request_fn提交的请求
 void generic_make_request(struct bio *bio)
 {
+	//防止递归调用
 	if (current->bio_tail) {
+		//如果current->bio_tail不为NULL,说明make_request是active的
 		/* make_request is active */
 		*(current->bio_tail) = bio;
 		bio->bi_next = NULL;
@@ -1499,10 +1535,22 @@ void generic_make_request(struct bio *bio)
 	 * __generic_make_request (which is important as it is large and
 	 * inlined) and to keep the structure simple.
 	 */
+    /*
+     * 下面的loop的意图可能有些不是很明显,所以需要做一些解释.
+     * 在进入loop之前,bio->bi_next是NULL(这是所有的调用者必须保证的),这样我们有了一个
+     * 只含有一个bio的list.假设我们刚从一个较长的list中取下一个bio,我们分配bio_list去
+	 * 记录bio->next,分配bio_tail去记录&bio_list.因此,新的bio的bio_list就要被添加.
+	 * 实际上,__generic_make_request可能会通过递归调用添加更多的bio到generic_make_request.
+	 * 如果情况是这样子的,我们在bio_list中找到一个非空的值然后再次从本函数的开始进入循环.
+	 * 这种情况下我们就真的需要获取list中的bio(不是假设),然后处理好bio_list和bio_tail或者bi_next,
+	 * 接着再次调用__generic_make_request.
+    */
+    /*调用者要保证bio->bi_next为空*/
 	BUG_ON(bio->bi_next);
 	do {
 		current->bio_list = bio->bi_next;
 		if (bio->bi_next == NULL)
+			//bio_tail用于记录bio_list的地址
 			current->bio_tail = &current->bio_list;
 		else
 			bio->bi_next = NULL;

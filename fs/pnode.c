@@ -148,6 +148,12 @@ void change_mnt_propagation(struct vfsmount *mnt, int type)
  * @m: the mount seen last
  * @origin: the original mount from where the tree walk initiated
  */
+/* 
+ * origin中的挂载能够传播的是origin的peer,origin的slave及slave的n级slave.
+ * peer的slave及peer的n级slave.
+ * 
+ * NOTE:origin的slave的peer一定也是origin的slave
+ */
 static struct vfsmount *propagation_next(struct vfsmount *m,
 					 struct vfsmount *origin)
 {
@@ -160,9 +166,21 @@ static struct vfsmount *propagation_next(struct vfsmount *m,
 		struct vfsmount *master = m->mnt_master;
 
 		if (master == origin->mnt_master) {
+            /* 
+             * Note:以下m表示最开始调用propagation_next时传入的m,m'表示最后进入这个if语句中的m.
+             * 
+             * 如果m在slave tree中一直向master追溯,最终找到一个节点m'的master和origin的master
+             * 指针指向同一个master,这时候m'和origin可能存在三种关系:
+             *   1.m'->master和origin的master都为NULL,m'和origin是peer的关系
+             *   2.m'->master和origin的master不为NULL,m'和origin都是其master的slave
+             *   3.m'和origin都是master的slave并m'和origin同为peer
+            */
+            //如果是上述的第1,3种关系m的peer指向其peer, 如果是第2种,peer指向自己
 			next = next_peer(m);
+            //如果next == origin表示peer遍历完成
 			return ((next == origin) ? NULL : next);
 		} else if (m->mnt_slave.next != &master->mnt_slave_list)
+            //如果m不是其master的mnt_slave_list链表中最后一个slave,就返回其master的下个slave
 			return next_slave(m);
 
 		/* back at master */
@@ -179,6 +197,12 @@ static struct vfsmount *propagation_next(struct vfsmount *m,
  * @type	return CL_SLAVE if the new mount has to be
  * 		cloned as a slave.
  */
+/* 
+ * 返回一个vfsmnt,供dest的peer clone, 被clone对象的要求:
+ * 1.如果dest和last_dest是peer关系(slave & shared也属于这种情况),那么被clone的对象就是last_src.
+ * 2.如果last_dest是dest的master,那么被clone的对象就是last_src.
+ * 3.如果dest和last_dest仅仅只是slave,那么被clone的对象是master的那个last_src
+*/
 static struct vfsmount *get_source(struct vfsmount *dest,
 					struct vfsmount *last_dest,
 					struct vfsmount *last_src,
@@ -189,9 +213,14 @@ static struct vfsmount *get_source(struct vfsmount *dest,
 	*type = CL_PROPAGATION;
 
 	if (IS_MNT_SHARED(dest))
+        /* 
+         * 如果dest有共享标志,返回的type中也需要添加共享标志,接下使用copy_tree时,
+         * 即使source中没有共享标志,在copy_tree返回的mnt也会有被设置此标志
+         */
 		*type |= CL_MAKE_SHARED;
 
 	while (last_dest != dest->mnt_master) {
+        //last_dest和dest是peer,或者last_dest和dest只是slave
 		p_last_dest = last_dest;
 		p_last_src = last_src;
 		last_dest = last_dest->mnt_master;
@@ -200,11 +229,16 @@ static struct vfsmount *get_source(struct vfsmount *dest,
 
 	if (p_last_dest) {
 		do {
+            //找到下一个不为new的peer
 			p_last_dest = next_peer(p_last_dest);
 		} while (IS_MNT_NEW(p_last_dest));
 	}
 
 	if (dest != p_last_dest) {
+        /* 
+         * 如果dest和p_last_dest不相等,说明dest和p_last_dest只是单纯的slave,不具有share属性.
+         * type设置CL_SLAVE标志,在后续clone_mnt调用时,新创建的mnt就是last_src的slave了.
+         */
 		*type |= CL_SLAVE;
 		return last_src;
 	} else
@@ -242,16 +276,30 @@ int propagate_mnt(struct vfsmount *dest_mnt, struct dentry *dest_dentry,
 		if (IS_MNT_NEW(m))
 			continue;
 
-		source =  get_source(m, prev_dest_mnt, prev_src_mnt, &type);
+       /* 
+        * 获取需要clone的mnt,如果prev_dest_mnt是m的peer,source就是prev_src_mnt.
+        * 如果prev_dest_mnt是m的master,source就是prev_src_mnt.
+        * 如果prev_dest_mnt和m仅仅是slave,那么需要找到其master的“prev_src_mnt”
+        */
+        source =  get_source(m, prev_dest_mnt, prev_src_mnt, &type); 
 
+        //clone source的整个mnt tree
 		if (!(child = copy_tree(source, source->mnt_root, type))) {
 			ret = -ENOMEM;
+            //只要copy_tree失败一次,就需要将以前copy成功的mnt tree全部释放掉
 			list_splice(tree_list, tmp_list.prev);
 			goto out;
 		}
 
 		if (is_subdir(dest_dentry, m->mnt_root)) {
+            /* 
+             * 一般情况下m是dest_mnt的peer或者slave,这样的话m->mnt_root和dest_mnt->mnt_root指向
+             * 同一个dentry,dest_dentry是dest_mnt->mnt_root的子目录,故dest_dentry也应该是m->mnt_root
+             * 的子目录
+             */
+             
 			mnt_set_mountpoint(m, dest_dentry, child);
+            //添加到处理propagation的链表中
 			list_add_tail(&child->mnt_hash, tree_list);
 		} else {
 			/*
@@ -260,6 +308,7 @@ int propagate_mnt(struct vfsmount *dest_mnt, struct dentry *dest_dentry,
 			 */
 			list_add_tail(&child->mnt_hash, &tmp_list);
 		}
+        //向下一个peer/slave移动
 		prev_dest_mnt = m;
 		prev_src_mnt  = child;
 	}

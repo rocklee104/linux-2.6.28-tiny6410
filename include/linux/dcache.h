@@ -110,6 +110,7 @@ struct dentry {
 #ifdef CONFIG_PROFILING
 	struct dcookie_struct *d_cookie; /* cookie, if any */
 #endif
+    //有多少mnt的mount point指向这个dentry
 	int d_mounted;
 	unsigned char d_iname[DNAME_INLINE_LEN_MIN];	/* small names */
 };

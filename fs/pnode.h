@@ -17,6 +17,7 @@
 #define CLEAR_MNT_SHARED(mnt) (mnt->mnt_flags &= ~MNT_SHARED)
 #define IS_MNT_UNBINDABLE(mnt) (mnt->mnt_flags & MNT_UNBINDABLE)
 
+//clone±Í÷æ
 #define CL_EXPIRE    		0x01
 #define CL_SLAVE     		0x02
 #define CL_COPY_ALL 		0x04

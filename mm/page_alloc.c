@@ -54,6 +54,7 @@
 /*
  * Array of node states.
  */
+//Global bitmap
 nodemask_t node_states[NR_NODE_STATES] __read_mostly = {
 	[N_POSSIBLE] = NODE_MASK_ALL,
 	[N_ONLINE] = { { [0] = 1UL } },
@@ -118,6 +119,7 @@ static char * const zone_names[MAX_NR_ZONES] = {
 	 "Movable",
 };
 
+//minimum memory space that must remain free for critical allocations
 int min_free_kbytes = 1024;
 
 unsigned long __meminitdata nr_kernel_pages;

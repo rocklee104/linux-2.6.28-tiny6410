@@ -65,6 +65,7 @@ struct bio {
 	struct bio		*bi_next;	/* request queue link */
 	struct block_device	*bi_bdev;
 	unsigned long		bi_flags;	/* status, command, etc */
+	//io操作标志,如BIO_RW,低16位是读写标志,高16位是优先级标志
 	unsigned long		bi_rw;		/* bottom bits READ/WRITE,
 						 * top bits priority
 						 */

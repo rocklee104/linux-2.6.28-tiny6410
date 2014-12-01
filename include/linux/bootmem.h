@@ -28,9 +28,25 @@ extern unsigned long saved_max_pfn;
  * memory pages (including holes) on the node.
  */
 typedef struct bootmem_data {
+	//node_min_pfn holds the number of the first page in the system;this is zero for most architectures.
 	unsigned long node_min_pfn;
+	/*
+	 * node_low_pfn is the number of the last page of the physical address space
+	 * that can be managed directly,in other words,it is the end of ZONE_NORMAL.
+	*/
 	unsigned long node_low_pfn;
+	/* 
+	 * node_bootmem_map is a pointer to the memory area in which the allocation 
+	 * bitmap is stored. On IA-32 systems,the memory area immediately following 
+	 * the kernel image is used for this purpose.The corresponding address is 
+	 * held in the _end variable,which is automatically pathed into the kernel 
+	 * image during linking. 
+	*/
 	void *node_bootmem_map;
+	/*
+	 * last_end_off is used as an offset of last successful allocation within
+	 * the page
+	*/
 	unsigned long last_end_off;
 	unsigned long hint_idx;
 	struct list_head list;

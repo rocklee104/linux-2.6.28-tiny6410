@@ -415,8 +415,14 @@ __early_param("mem=", early_mem);
 /*
  * Initial parsing of the command line.
  */
+
+/*
+ * This function copies normal parameters from FROM to cmdline_p and executes
+ * the functions against early paramers
+*/
 static void __init parse_cmdline(char **cmdline_p, char *from)
 {
+    //command_line only contains normal parameters
 	char c = ' ', *to = command_line;
 	int len = 0;
 
@@ -425,13 +431,17 @@ static void __init parse_cmdline(char **cmdline_p, char *from)
 			extern struct early_params __early_begin, __early_end;
 			struct early_params *p;
 
+            //Parse early parameters and do the function associated with those parameters
 			for (p = &__early_begin; p < &__early_end; p++) {
 				int arglen = strlen(p->arg);
 
 				if (memcmp(from, p->arg, arglen) == 0) {
+                    //Key word matches
 					if (to != command_line)
 						to -= 1;
+                    //FROM points to argue value now
 					from += arglen;
+                    //deal with the argue value
 					p->fn(&from);
 
 					while (*from != ' ' && *from != '\0')
@@ -445,6 +455,7 @@ static void __init parse_cmdline(char **cmdline_p, char *from)
 			break;
 		if (COMMAND_LINE_SIZE <= ++len)
 			break;
+        //Copies cmdline char by char to command_line
 		*to++ = c;
 	}
 	*to = '\0';
@@ -716,6 +727,7 @@ void __init setup_arch(char **cmdline_p)
 	init_mm.brk	   = (unsigned long) &_end;
 
 	memcpy(boot_command_line, from, COMMAND_LINE_SIZE);
+    //From now on, boot_command_line holds the cmdline
 	boot_command_line[COMMAND_LINE_SIZE-1] = '\0';
 	parse_cmdline(cmdline_p, from);
 	paging_init(&meminfo, mdesc);

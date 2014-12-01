@@ -148,6 +148,7 @@ static void dentry_lru_del(struct dentry *dentry)
 	}
 }
 
+//remove dentry from lru list
 static void dentry_lru_del_init(struct dentry *dentry)
 {
 	if (likely(!list_empty(&dentry->d_lru))) {
@@ -616,16 +617,21 @@ void shrink_dcache_sb(struct super_block * sb)
  * - see the comments on shrink_dcache_for_umount() for a description of the
  *   locking
  */
+//dcache has two parts:1.hlist 2.lru list
+//always find and delete the left-most(first child) dentry
 static void shrink_dcache_for_umount_subtree(struct dentry *dentry)
 {
 	struct dentry *parent;
+    //record the number of freed dentries
 	unsigned detached = 0;
 
 	BUG_ON(!IS_ROOT(dentry));
 
 	/* detach this root from the system */
 	spin_lock(&dcache_lock);
+	//delete dentry in lru list
 	dentry_lru_del_init(dentry);
+	//remove dentry from hash list
 	__d_drop(dentry);
 	spin_unlock(&dcache_lock);
 
@@ -639,7 +645,9 @@ static void shrink_dcache_for_umount_subtree(struct dentry *dentry)
 			spin_lock(&dcache_lock);
 			list_for_each_entry(loop, &dentry->d_subdirs,
 					    d_u.d_child) {
+                //delete dentry in lru list
 				dentry_lru_del_init(loop);
+                //remove dentry from hash list
 				__d_drop(loop);
 				cond_resched_lock(&dcache_lock);
 			}
@@ -655,6 +663,7 @@ static void shrink_dcache_for_umount_subtree(struct dentry *dentry)
 		do {
 			struct inode *inode;
 
+            //we want to free dentry in this loop, if dentry->d_count != 0, there must be something wrong
 			if (atomic_read(&dentry->d_count) != 0) {
 				printk(KERN_ERR
 				       "BUG: Dentry %p{i=%lx,n=%s}"
@@ -674,6 +683,7 @@ static void shrink_dcache_for_umount_subtree(struct dentry *dentry)
 				parent = NULL;
 			else {
 				parent = dentry->d_parent;
+                //if child dentry freed, it's parent's d_count should be decreased
 				atomic_dec(&parent->d_count);
 			}
 
@@ -683,13 +693,14 @@ static void shrink_dcache_for_umount_subtree(struct dentry *dentry)
 			inode = dentry->d_inode;
 			if (inode) {
 				dentry->d_inode = NULL;
+                //detach dentry from inode's i_dentry list
 				list_del_init(&dentry->d_alias);
 				if (dentry->d_op && dentry->d_op->d_iput)
 					dentry->d_op->d_iput(dentry, inode);
 				else
 					iput(inode);
 			}
-
+            //free dentry's pointer
 			d_free(dentry);
 
 			/* finished when we fall off the top of the tree,
@@ -700,8 +711,10 @@ static void shrink_dcache_for_umount_subtree(struct dentry *dentry)
 
 			dentry = parent;
 
+        //if dentry has no child, continue
 		} while (list_empty(&dentry->d_subdirs));
 
+        //if dentry has childs
 		dentry = list_entry(dentry->d_subdirs.next,
 				    struct dentry, d_u.d_child);
 	}
@@ -735,6 +748,7 @@ void shrink_dcache_for_umount(struct super_block *sb)
 	atomic_dec(&dentry->d_count);
 	shrink_dcache_for_umount_subtree(dentry);
 
+    //free anonymous dentry
 	while (!hlist_empty(&sb->s_anon)) {
 		dentry = hlist_entry(sb->s_anon.first, struct dentry, d_hash);
 		shrink_dcache_for_umount_subtree(dentry);
@@ -1734,6 +1748,7 @@ struct dentry *d_ancestor(struct dentry *p1, struct dentry *p2)
 	struct dentry *p;
 
 	for (p = p2; !IS_ROOT(p); p = p->d_parent) {
+        //从child也就是p2向其parent遍历,如果p2的ancestor的parent是p1,就说明p1也是p2的ancestor
 		if (p->d_parent == p1)
 			return p;
 	}
@@ -2167,6 +2182,7 @@ int is_subdir(struct dentry *new_dentry, struct dentry *old_dentry)
 
 	/* FIXME: This is old behavior, needed? Please check callers. */
 	if (new_dentry == old_dentry)
+        //new_dentry和old_dentry相同,也表示new_dentry是old_dentry的子目录
 		return 1;
 
 	/*
@@ -2178,6 +2194,7 @@ int is_subdir(struct dentry *new_dentry, struct dentry *old_dentry)
 		/* for restarting inner loop in case of seq retry */
 		seq = read_seqbegin(&rename_lock);
 		if (d_ancestor(old_dentry, new_dentry))
+            //old_dentry是new_dentry的ancestor
 			result = 1;
 		else
 			result = 0;
@@ -2187,6 +2204,7 @@ int is_subdir(struct dentry *new_dentry, struct dentry *old_dentry)
 	return result;
 }
 
+//atomic_dec all the dentries
 void d_genocide(struct dentry *root)
 {
 	struct dentry *this_parent = root;
@@ -2194,6 +2212,7 @@ void d_genocide(struct dentry *root)
 
 	spin_lock(&dcache_lock);
 repeat:
+	//get child
 	next = this_parent->d_subdirs.next;
 resume:
 	while (next != &this_parent->d_subdirs) {

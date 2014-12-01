@@ -177,6 +177,7 @@ static void put_super(struct super_block *sb)
 void deactivate_super(struct super_block *s)
 {
 	struct file_system_type *fs = s->s_type;
+	//if there is no active sb, s_count must be -= S_BIAS-1
 	if (atomic_dec_and_lock(&s->s_active, &sb_lock)) {
 		s->s_count -= S_BIAS-1;
 		spin_unlock(&sb_lock);
@@ -290,11 +291,13 @@ void generic_shutdown_super(struct super_block *sb)
 	const struct super_operations *sop = sb->s_op;
 
 	if (sb->s_root) {
+        //delete all the dentry attached to this sb
 		shrink_dcache_for_umount(sb);
 		fsync_super(sb);
 		lock_super(sb);
 		sb->s_flags &= ~MS_ACTIVE;
 		/* bad name - it should be evict_inodes() */
+        //free the inode with 0 refcnt attached to the sb
 		invalidate_inodes(sb);
 		lock_kernel();
 
@@ -827,6 +830,11 @@ void kill_block_super(struct super_block *sb)
 EXPORT_SYMBOL(kill_block_super);
 #endif
 
+/**
+ * get_sb_nodev - get the fs_type's sb, if the fs of this fs_type
+ * has been moounted in deferent place, there is one sb for each 
+ * mount.
+ */
 int get_sb_nodev(struct file_system_type *fs_type,
 	int flags, void *data,
 	int (*fill_super)(struct super_block *, void *, int),
@@ -857,6 +865,16 @@ static int compare_single(struct super_block *s, void *p)
 	return 1;
 }
 
+/**
+ * get_sb_single - get the fs_type's sb, even if the fs of this 
+ * fs_type has been mounted in deferent place, there is only one sb 
+ * for fs_type. 
+ *  
+ * If there is no sb for fs_type, use sget to get one, this is the 
+ * same with get_sb_nodev, but if there is a sb for fs_type 
+ * get_sb_single will not alloc any sb anymore. It will use the 
+ * exited sb. 
+ */
 int get_sb_single(struct file_system_type *fs_type,
 	int flags, void *data,
 	int (*fill_super)(struct super_block *, void *, int),
@@ -869,6 +887,8 @@ int get_sb_single(struct file_system_type *fs_type,
 	if (IS_ERR(s))
 		return PTR_ERR(s);
 	if (!s->s_root) {
+        //use s->s_root to identify this sb is new allocated one or exited one
+        //if sb is new allocated, it is necessary to fill it, the oppisite is not
 		s->s_flags = flags;
 		error = fill_super(s, data, flags & MS_SILENT ? 1 : 0);
 		if (error) {
@@ -878,6 +898,7 @@ int get_sb_single(struct file_system_type *fs_type,
 		}
 		s->s_flags |= MS_ACTIVE;
 	}
+    //change mount flag
 	do_remount_sb(s, flags, data, 0);
 	return simple_set_mnt(mnt, s);
 }

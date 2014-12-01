@@ -742,6 +742,7 @@ int follow_down(struct vfsmount **mnt, struct dentry **dentry)
 		dput(*dentry);
 		mntput(*mnt);
 		*mnt = mounted;
+		//如果dentry上已经有了别的挂载,dentry切换到这个挂载的根目录上
 		*dentry = dget(mounted->mnt_root);
 		return 1;
 	}

@@ -265,6 +265,13 @@ enum zone_type {
 
 struct zone {
 	/* Fields commonly accessed by the page allocator */
+    /*
+     * If more than pages_high pages are free, the state of zone is ideal.
+     * If the number of free pages falls below pages_low, the kernel begins to
+     * swap pages out onto the hard disk.
+     * If the number of free pages falls below pages_min, the pressure of relaim
+     * pages is increased
+     */
 	unsigned long		pages_min, pages_low, pages_high;
 	/*
 	 * We don't know if the memory that we're going to allocate will be freeable
@@ -285,6 +292,7 @@ struct zone {
 	unsigned long		min_slab_pages;
 	struct per_cpu_pageset	*pageset[NR_CPUS];
 #else
+    //used to implement per-CPU hot/cold page lists
 	struct per_cpu_pageset	pageset[NR_CPUS];
 #endif
 	/*
@@ -295,6 +303,7 @@ struct zone {
 	/* see spanned/present_pages for more description */
 	seqlock_t		span_seqlock;
 #endif
+    //used to implement buddy system
 	struct free_area	free_area[MAX_ORDER];
 
 #ifndef CONFIG_SPARSEMEM
@@ -326,6 +335,10 @@ struct zone {
 	unsigned long		recent_rotated[2];
 	unsigned long		recent_scanned[2];
 
+    /*
+     * specify how many pages were unsuccessflly scanned since the last time 
+     * a page was swapped out 
+    */
 	unsigned long		pages_scanned;	   /* since last reclaim */
 	unsigned long		flags;		   /* zone flags, see below */
 
@@ -345,6 +358,10 @@ struct zone {
 	 * Access to both this field is quite racy even on uniprocessor.  But
 	 * it is expected to average out OK.
 	 */
+    /*
+     * It stores the priority with which zhe zone was scaned in the last scan
+     * operation until sufficient page frames were freed in try_to_free_pages
+    */
 	int prev_priority;
 
 	/*
@@ -409,6 +426,7 @@ struct zone {
 	 * rarely used fields:
 	 */
 	const char		*name;
+    //compiler key word is used to achieve optimal cache alignment
 } ____cacheline_internodealigned_in_smp;
 
 typedef enum {
@@ -598,15 +616,31 @@ extern struct page *mem_map;
  */
 struct bootmem_data;
 typedef struct pglist_data {
+    //zones in node
 	struct zone node_zones[MAX_NR_ZONES];
+    /*
+     * For performance reasons,the kernel always attempts to perform memery
+     * allocations of a process on the NUMA node associated with the CPU on
+     * which it is currently running.However,it is not always possible - for
+     * exampble, the node may already be full.For such situations,each node
+     * provides fallback list(with the help of struct zonelist).The list
+     * contains other nodes(and associated zones) that can be used as
+     * alternatives for memery allocation.The further back an entry on the list,
+     * the less suitable it is.
+    */
 	struct zonelist node_zonelists[MAX_ZONELISTS];
 	int nr_zones;
 #ifdef CONFIG_FLAT_NODE_MEM_MAP	/* means !SPARSEMEM */
+    /*
+    * point to the page array, this page array includes all the pages in this 
+    * node. 
+    */
 	struct page *node_mem_map;
 #ifdef CONFIG_CGROUP_MEM_RES_CTLR
 	struct page_cgroup *node_page_cgroup;
 #endif
 #endif
+    //point to boot memory allocator
 	struct bootmem_data *bdata;
 #ifdef CONFIG_MEMORY_HOTPLUG
 	/*
@@ -618,13 +652,20 @@ typedef struct pglist_data {
 	 */
 	spinlock_t node_size_lock;
 #endif
+    /*
+    * The first page number of this node.Page number is unique in system not 
+    * only in this node. In UMA, this member is always 0. 
+    */
 	unsigned long node_start_pfn;
 	unsigned long node_present_pages; /* total number of physical pages */
 	unsigned long node_spanned_pages; /* total size of physical page
 					     range, including holes */
 	int node_id;
+    //Wait queue for swap daemon
 	wait_queue_head_t kswapd_wait;
+    //Point to the task_struct of swap daemon of this node
 	struct task_struct *kswapd;
+    //The length for release
 	int kswapd_max_order;
 } pg_data_t;
 
