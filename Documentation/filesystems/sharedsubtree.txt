@@ -737,6 +737,14 @@ replicas continue to be exactly same.
 		Should they all be identical? or should /mnt and /mnt/1 be
 		identical only?
 
+        Anwser:
+        They should all be identical.There is no doubt the contains in
+        /mnt and /mnt/1 should be the same.But why they all the same?
+        because even if after move operation, the mount 'B' which is at /tmp
+        at the first time is still a peer of the mount 'A' at /mnt.A new mount
+        'C' which is a clone of 'B', is created and attached to the peer of 
+        mount 'A', AKA mount 'B', at /mnt/1/1.
+
 
 	B. What is the result of the following command sequence?
 
@@ -745,6 +753,9 @@ replicas continue to be exactly same.
 		mount --rbind / /v/1
 
 		what should be the content of /v/1/v/1 be?
+
+        Anwser:
+        The content of /v/1/v/1 should be NULL.
 
 
 	C. What is the result of the following command sequence?

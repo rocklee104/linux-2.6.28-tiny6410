@@ -20,6 +20,7 @@ struct vfsmount;
 struct dentry;
 struct mnt_namespace;
 
+//mnt->mnt_flags中写入的标志
 #define MNT_NOSUID	0x01
 #define MNT_NODEV	0x02
 #define MNT_NOEXEC	0x04
@@ -31,18 +32,23 @@ struct mnt_namespace;
 #define MNT_SHRINKABLE	0x100
 #define MNT_IMBALANCED_WRITE_COUNT	0x200 /* just for debugging */
 
+//共享子树中使用下面的标志
 #define MNT_SHARED	0x1000	/* if the vfsmount is a shared mount */
 #define MNT_UNBINDABLE	0x2000	/* if the vfsmount is a unbindable mount */
 #define MNT_PNODE_MASK	0x3000	/* propagation flag mask */
 
 struct vfsmount {
+	//用于将相同hash值的vfsmount组成链表,hash头是mount_hashtable
 	struct list_head mnt_hash;
 	struct vfsmount *mnt_parent;	/* fs we are mounted on */
 	struct dentry *mnt_mountpoint;	/* dentry of mountpoint */
 	struct dentry *mnt_root;	/* root of the mounted tree */
 	struct super_block *mnt_sb;	/* pointer to superblock */
+	//用于连接子mount的链表头, 成员是子mount的mnt_child
 	struct list_head mnt_mounts;	/* list of children, anchored here */
+	//链表头是父vfsmount的mnt_mounts的成员
 	struct list_head mnt_child;	/* and going through their mnt_child */
+	//如MNT_NOSUID
 	int mnt_flags;
 	/* 4 bytes hole on 64bits arches */
 	const char *mnt_devname;	/* Name of device e.g. /dev/dsk/hda1 */

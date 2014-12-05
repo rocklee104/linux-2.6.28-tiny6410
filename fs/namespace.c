@@ -473,6 +473,7 @@ static void __touch_mnt_namespace(struct mnt_namespace *ns)
 	}
 }
 
+//old_path用来记录mnt的parent
 static void detach_mnt(struct vfsmount *mnt, struct path *old_path)
 {
 	old_path->dentry = mnt->mnt_mountpoint;
@@ -481,6 +482,7 @@ static void detach_mnt(struct vfsmount *mnt, struct path *old_path)
 	mnt->mnt_mountpoint = mnt->mnt_root;
 	list_del_init(&mnt->mnt_child);
 	list_del_init(&mnt->mnt_hash);
+    //将mnt从其原来的挂载点上移除,所以挂载点的d_mounted要--
 	old_path->dentry->d_mounted--;
 }
 
@@ -597,6 +599,7 @@ static struct vfsmount *clone_mnt(struct vfsmount *old, struct dentry *root,
             //clone时要求mnt是old的slave
 			list_add(&mnt->mnt_slave, &old->mnt_slave_list);
 			mnt->mnt_master = old;
+            //slave默认没有共享属性
 			CLEAR_MNT_SHARED(mnt);
 		} else if (!(flag & CL_PRIVATE)) {
             //clone时要求不是private,也不是slave
@@ -1013,6 +1016,7 @@ void release_mounts(struct list_head *head)
 		mnt = list_first_entry(head, struct vfsmount, mnt_hash);
 		list_del_init(&mnt->mnt_hash);
 		if (mnt->mnt_parent != mnt) {
+            //如果不mnt不是系统根mnt,才能释放
 			struct dentry *dentry;
 			struct vfsmount *m;
 			spin_lock(&vfsmount_lock);
@@ -1034,7 +1038,8 @@ void umount_tree(struct vfsmount *mnt, int propagate, struct list_head *kill)
 	struct vfsmount *p;
 
 	for (p = mnt; p; p = next_mnt(p, mnt))
-		list_move(&p->mnt_hash, kill);
+		//将mnt整个挂载树从原来的hash表中删除,然后加入kill链表
+        list_move(&p->mnt_hash, kill);
 
 	if (propagate)
 		propagate_umount(kill);
@@ -1044,11 +1049,14 @@ void umount_tree(struct vfsmount *mnt, int propagate, struct list_head *kill)
 		list_del_init(&p->mnt_list);
 		__touch_mnt_namespace(p->mnt_ns);
 		p->mnt_ns = NULL;
+        //从挂载树的链表中取下来
 		list_del_init(&p->mnt_child);
 		if (p->mnt_parent != p) {
 			p->mnt_parent->mnt_ghosts++;
+            //递减其挂载点的d_mounted
 			p->mnt_mountpoint->d_mounted--;
 		}
+        //修改mnt属性为private
 		change_mnt_propagation(p, MS_PRIVATE);
 	}
 }
@@ -1228,7 +1236,7 @@ struct vfsmount *copy_tree(struct vfsmount *mnt, struct dentry *dentry,
          * 或者,如果mnt可绑定,这样也不需要关心clone标志了.
          */
         //在do_loopback直接调用中,flag == 0,故只要mnt不可绑定就返回NULL.
-		return NULL;
+        return NULL;
 
     //首先clone mnt挂载树的根节点
 	res = q = clone_mnt(mnt, dentry, flag);
@@ -1399,6 +1407,7 @@ static int invent_group_ids(struct vfsmount *mnt, bool recurse)
  * Must be called without spinlocks held, since this function can sleep
  * in allocations.
  */
+//将source_mnt整个挂载树(如果有子mnt,否则就只挂source_mnt)挂到path
 static int attach_recursive_mnt(struct vfsmount *source_mnt,
 			struct path *path, struct path *parent_path)
 {
@@ -1432,10 +1441,13 @@ static int attach_recursive_mnt(struct vfsmount *source_mnt,
 	spin_lock(&vfsmount_lock);
     //单独处理source_mnt
 	if (parent_path) {
+        //如果移动一个旧的mnt到新的路径,需要将其从旧的挂载树上取下
 		detach_mnt(source_mnt, parent_path);
+        //path记录新的挂载点的路径信息,将source_mnt挂载到path
 		attach_mnt(source_mnt, path);
 		touch_mnt_namespace(current->nsproxy->mnt_ns);
 	} else {
+        //将新创建的mnt和挂载点关联起来
 		mnt_set_mountpoint(dest_mnt, dest_dentry, source_mnt);
 		commit_tree(source_mnt);
 	}
@@ -1455,7 +1467,7 @@ static int attach_recursive_mnt(struct vfsmount *source_mnt,
 	return err;
 }
 
-//mnt是新创建的mnt,path中保存挂载点的路径信息
+//mnt是新创建的mnt,path中保存挂载点的路径信息,将mnt的整个挂载树嫁接到path上
 static int graft_tree(struct vfsmount *mnt, struct path *path)
 {
 	int err;
@@ -1502,14 +1514,21 @@ out_unlock:
 static int do_change_type(struct path *path, int flag)
 {
 	struct vfsmount *m, *mnt = path->mnt;
+    //recursive标志单独处理
 	int recurse = flag & MS_REC;
+    //清除recursive标志
 	int type = flag & ~MS_REC;
 	int err = 0;
 
 	if (!capable(CAP_SYS_ADMIN))
+        //只有root才能执行
 		return -EPERM;
 
 	if (path->dentry != path->mnt->mnt_root)
+        /* 
+         * Path must be a mount point,if whithout this snippet,any directory or file can
+         * be operated by mount --make-shared or other similar opertions
+         */
 		return -EINVAL;
 
 	down_write(&namespace_sem);
@@ -1650,20 +1669,25 @@ static inline int tree_contains_unbindable(struct vfsmount *mnt)
 	return 0;
 }
 
+//path中记录挂载点的路径信息,old_name是设备名
 static int do_move_mount(struct path *path, char *old_name)
 {
 	struct path old_path, parent_path;
 	struct vfsmount *p;
 	int err = 0;
 	if (!capable(CAP_SYS_ADMIN))
+        //只有root能够操作
 		return -EPERM;
 	if (!old_name || !*old_name)
+        //如果设备名称为NULL及其解引用后为NULL
 		return -EINVAL;
+    //old_path中记录设备的原路径信息
 	err = kern_path(old_name, LOOKUP_FOLLOW, &old_path);
 	if (err)
 		return err;
 
 	down_write(&namespace_sem);
+    //找到最后一个挂载点
 	while (d_mountpoint(path->dentry) &&
 	       follow_down(&path->mnt, &path->dentry))
 		;
@@ -1677,35 +1701,56 @@ static int do_move_mount(struct path *path, char *old_name)
 		goto out1;
 
 	if (!IS_ROOT(path->dentry) && d_unhashed(path->dentry))
+        //如果path->dentry是整个系统的根目录或者这个dentry已经在hash表中了,这时候才不会跳转到out1
 		goto out1;
 
 	err = -EINVAL;
 	if (old_path.dentry != old_path.mnt->mnt_root)
+        //确保设备的dentry是其mnt的根目录
 		goto out1;
 
 	if (old_path.mnt == old_path.mnt->mnt_parent)
+        //设备的mnt不是根文件系统,也就是说不能移动系统的根目录
 		goto out1;
 
 	if (S_ISDIR(path->dentry->d_inode->i_mode) !=
 	      S_ISDIR(old_path.dentry->d_inode->i_mode))
+        //设备和挂载点的文件类型必须相同
 		goto out1;
 	/*
 	 * Don't move a mount residing in a shared parent.
 	 */
 	if (old_path.mnt->mnt_parent &&
 	    IS_MNT_SHARED(old_path.mnt->mnt_parent))
-		goto out1;
+        /*
+         * 如果一个mnt的parent具有共享属性,这个mnt不允许move,因为这种情况下,mnt的clone也是
+         * 其parent的peer的子mnt.如果移动这样一个mnt可能需要两种处理方式:
+         * 
+         * 1.仅仅将mnt移动.但这种情况下造成了mnt的parent和parent的peer挂载不同步.违背了共享挂载的特性.
+         * 2.移动mnt,并且销毁其clone(也就是其parent的peer下和mnt对应的子mnt).这又影响其parent
+         *   peer的挂载树
+         * 
+         * 综上两种方式都不可取,故应该避免这种情况
+        */
+            goto out1;
 	/*
 	 * Don't move a mount tree containing unbindable mounts to a destination
 	 * mount which is shared.
 	 */
 	if (IS_MNT_SHARED(path->mnt) &&
 	    tree_contains_unbindable(old_path.mnt))
-		goto out1;
+        /* 
+         * 如果挂载点是共享的,但是设备的挂载树中有些挂载有不可挂载属性,这种情况是不允许
+         * mount --move的.
+         */
+        goto out1;
 	err = -ELOOP;
+    /* 
+     * 挂载点的mnt不能是设备mnt的子mnt, 这是因为将一个父mnt移动到子mnt会造成整个挂载树紊乱
+     */
 	for (p = path->mnt; p->mnt_parent != p; p = p->mnt_parent)
 		if (p == old_path.mnt)
-			goto out1;
+            goto out1;
 
 	err = attach_recursive_mnt(old_path.mnt, path, &parent_path);
 	if (err)
@@ -1719,6 +1764,7 @@ out1:
 out:
 	up_write(&namespace_sem);
 	if (!err)
+        //原挂载的父mnt的mnt及dentry计数要--
 		path_put(&parent_path);
 	path_put(&old_path);
 	return err;

@@ -25,9 +25,12 @@
 #define CL_PROPAGATION 		0x10
 #define CL_PRIVATE 		0x20
 
+//即使一个mnt是unbindable的,也会被给予共享属性
 static inline void set_mnt_shared(struct vfsmount *mnt)
 {
+	//清空共享子树的所有属性 
 	mnt->mnt_flags &= ~MNT_PNODE_MASK;
+	//添加共享属性
 	mnt->mnt_flags |= MNT_SHARED;
 }
 

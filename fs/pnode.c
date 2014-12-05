@@ -89,43 +89,66 @@ static int do_make_slave(struct vfsmount *mnt)
 	 * same root dentry. If none is available than
 	 * slave it to anything that is available.
 	 */
+	//找到第一个peer,并且peer->mnt_root和mnt的相同
 	while ((peer_mnt = next_peer(peer_mnt)) != mnt &&
 	       peer_mnt->mnt_root != mnt->mnt_root) ;
 
+	//如果mnt没有peer,或者其peer和mnt的mnt->mnt_root不相同
 	if (peer_mnt == mnt) {
 		peer_mnt = next_peer(mnt);
 		if (peer_mnt == mnt)
+			//确定没有peer
 			peer_mnt = NULL;
 	}
 	if (IS_MNT_SHARED(mnt) && list_empty(&mnt->mnt_share))
+		//虽然mnt有共享属性,但是mnt没有peer
 		mnt_release_group_id(mnt);
 
 	list_del_init(&mnt->mnt_share);
 	mnt->mnt_group_id = 0;
 
 	if (peer_mnt)
+		//mnt如果设置成slave属性,它的peer就会变成其master
 		master = peer_mnt;
 
 	if (master) {
 		list_for_each_entry(slave_mnt, &mnt->mnt_slave_list, mnt_slave)
+			//mnt的slave的master指向mnt的peer
 			slave_mnt->mnt_master = master;
+		//将mnt加入其peer的管理slave的链表
 		list_move(&mnt->mnt_slave, &master->mnt_slave_list);
+		//将mnt的slave也加入其peer的管理slave的链表
 		list_splice(&mnt->mnt_slave_list, master->mnt_slave_list.prev);
+		//mnt不再拥有任何slave
 		INIT_LIST_HEAD(&mnt->mnt_slave_list);
 	} else {
+		//如果mnt没有任何peer
 		struct list_head *p = &mnt->mnt_slave_list;
 		while (!list_empty(p)) {
+			//释放mnt所有的slave,清空这些slave的mnt_slave
                         slave_mnt = list_first_entry(p,
 					struct vfsmount, mnt_slave);
 			list_del_init(&slave_mnt->mnt_slave);
 			slave_mnt->mnt_master = NULL;
 		}
 	}
+	//mnt的peer最终变成mnt的master
 	mnt->mnt_master = master;
+	//mnt不再拥有shared属性
 	CLEAR_MNT_SHARED(mnt);
 	return 0;
 }
 
+/*
+ * type有下面4种可能：
+ * 1.MS_SHARED:这种情况直接设置共享属性即可,mnt_flag置位MNT_SHARED.
+ * 2.MS_SLAVE:如果A存在peer及slave,A及A的slave变成其第一个peer的slave;
+ *  		  如果A没有peer,就将其slave的master置空;最后清除A的共享属性.
+ * 3.MS_PRIVATE:如果A存在peer及slave,A的属性变为private,A的slave变成其第一个peer的slave;
+ *  	      如果A没有peer,就将其slave的master置空;最后清除A的共享属性.
+ * 4.MS_UNBINDABLE:如果A存在peer及slave,A的属性变为unbindable,A的slave变成其第一个peer的slave;
+ * 		      如果A没有peer,就将其slave的master置空;最后清除A的共享属性,mnt_flag置位MNT_UNBINDABLE.
+*/
 void change_mnt_propagation(struct vfsmount *mnt, int type)
 {
 	if (type == MS_SHARED) {
@@ -238,7 +261,9 @@ static struct vfsmount *get_source(struct vfsmount *dest,
 	if (dest != p_last_dest) {
         /* 
          * 如果dest和p_last_dest不相等,说明dest和p_last_dest只是单纯的slave,不具有share属性.
-         * type设置CL_SLAVE标志,在后续clone_mnt调用时,新创建的mnt就是last_src的slave了.
+		 * type设置CL_SLAVE标志,在后续clone_mnt调用时,新创建的mnt就是last_src的slave了  					  .
+		 *  																								  .
+		 * master下的子mnt也是这个master的slave对应子mnt的master											  .
          */
 		*type |= CL_SLAVE;
 		return last_src;
@@ -259,6 +284,7 @@ static struct vfsmount *get_source(struct vfsmount *dest,
  * @source_mnt: source mount.
  * @tree_list : list of heads of trees to be attached.
  */
+//tree_list用于记录那些新生成并且用于propagate的mnt
 int propagate_mnt(struct vfsmount *dest_mnt, struct dentry *dest_dentry,
 		    struct vfsmount *source_mnt, struct list_head *tree_list)
 {
@@ -266,7 +292,16 @@ int propagate_mnt(struct vfsmount *dest_mnt, struct dentry *dest_dentry,
 	int ret = 0;
 	struct vfsmount *prev_dest_mnt = dest_mnt;
 	struct vfsmount *prev_src_mnt  = source_mnt;
+    /* 
+     * tmp_list的作用: 记录需要释放的mnt,主要在一下两种情况下使用
+     * 1.在copy tree时发生错误时,记录之前分配成功的mnt.
+     * 2.在为propagate tree中一个节点分配mnt后,但是检测到这个节点不存在mnt需要挂载上的目录时,
+     *   这时,这个新创建的mnt就需要释放,先把mnt暂存在tmp_list中
+    */ 
 	LIST_HEAD(tmp_list);
+    /*
+     * umount_list记录tmp_list中的成员及这个成员所有的子mnt,后续操作中,需要将这个链表中的成员全部释放 
+    */
 	LIST_HEAD(umount_list);
 
 	for (m = propagation_next(dest_mnt, dest_mnt); m;
@@ -298,7 +333,7 @@ int propagate_mnt(struct vfsmount *dest_mnt, struct dentry *dest_dentry,
              * 同一个dentry,dest_dentry是dest_mnt->mnt_root的子目录,故dest_dentry也应该是m->mnt_root
              * 的子目录
              */
-             
+
 			mnt_set_mountpoint(m, dest_dentry, child);
             //添加到处理propagation的链表中
 			list_add_tail(&child->mnt_hash, tree_list);
@@ -307,7 +342,11 @@ int propagate_mnt(struct vfsmount *dest_mnt, struct dentry *dest_dentry,
 			 * This can happen if the parent mount was bind mounted
 			 * on some subdirectory of a shared/slave mount.
 			 */
-			//I cannot get the possibility
+             /*
+             * 当child的父mnt是由另一个共享/从属mnt通过绑定其子目录生成的,当父目录的传播树中出现一个新的子mnt,
+             * 而这个子mnt的挂载点是在child的父mnt所在挂载点的统计目录或者上级目录,这时候child在其父mnt中就找不到
+             * 对应的挂载点,这时候这个child就应该废弃
+             */
 			list_add_tail(&child->mnt_hash, &tmp_list);
 		}
         //向下一个peer/slave移动

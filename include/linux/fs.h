@@ -112,6 +112,7 @@ extern int dir_notify_enable;
 /*
  * These are the fs-independent mount-flags: up to 32 flags are supported
  */
+//下面这些标志是用户空间传递下来的标志,不会写入mnt->mnt_flags
 //指定文件系统为只读
 #define MS_RDONLY	 1	/* Mount read-only */
 //执行程序时，不遵照set-user-ID和set-group-ID位
