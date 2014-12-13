@@ -67,9 +67,16 @@ struct vfsmount {
 	 * to let these frequently modified fields in a separate cache line
 	 * (so that reads of mnt_flags wont ping-pong on SMP machines)
 	 */
+	//有多少子vfsmount
 	atomic_t mnt_count;
 	int mnt_expiry_mark;		/* true if marked for expiry */
 	int mnt_pinned;
+	/*
+	 * 在卸载的时候首先会调用umount_tree将需要处理的mnt加入一个kill链表,
+	 * 然后调用release_mounts真正处理mnt->mnt_parent及mnt->mnt_mountpoint,
+	 * 使用mnt_ghosts记录这些要处理的mnt的父mnt下有多少子mnt处于以上两个
+	 * 函数的中间状态.
+	 */
 	int mnt_ghosts;
 	/*
 	 * This value is not stable unless all of the mnt_writers[] spinlocks

@@ -317,7 +317,7 @@ int propagate_mnt(struct vfsmount *dest_mnt, struct dentry *dest_dentry,
         * 如果prev_dest_mnt是m的master,source就是prev_src_mnt.
         * 如果prev_dest_mnt和m仅仅是slave,那么需要找到其master的“prev_src_mnt”
         */
-        source =  get_source(m, prev_dest_mnt, prev_src_mnt, &type); 
+        source =  get_source(m, prev_dest_mnt, prev_src_mnt, &type);
 
         //clone source的整个mnt tree
 		if (!(child = copy_tree(source, source->mnt_root, type))) {
@@ -388,6 +388,7 @@ int propagate_mount_busy(struct vfsmount *mnt, int refcnt)
 	int ret = 0;
 
 	if (mnt == parent)
+        //如果mnt是系统的根mnt
 		return do_refcount_check(mnt, refcnt);
 
 	/*
@@ -396,10 +397,13 @@ int propagate_mount_busy(struct vfsmount *mnt, int refcnt)
 	 * mounts
 	 */
 	if (!list_empty(&mnt->mnt_mounts) || do_refcount_check(mnt, refcnt))
+        //如果一个mnt具有子mnt,或者the refcount is greater than count
 		return 1;
 
+    //遍历父mnt所在的propagate tree
 	for (m = propagation_next(parent, parent); m;
 	     		m = propagation_next(m, parent)) {
+        //找到子mnt
 		child = __lookup_mnt(m, mnt->mnt_mountpoint, 0);
 		if (child && list_empty(&child->mnt_mounts) &&
 		    (ret = do_refcount_check(child, 1)))
@@ -422,12 +426,17 @@ static void __propagate_umount(struct vfsmount *mnt)
 	for (m = propagation_next(parent, parent); m;
 			m = propagation_next(m, parent)) {
 
+		//遍历需要释放的mnt的parent的propagate tree,找到这些节点与mnt对应的子mnt 
 		struct vfsmount *child = __lookup_mnt(m,
 					mnt->mnt_mountpoint, 0);
 		/*
 		 * umount the child only if the child has no
 		 * other children
 		 */
+		 /*
+		  * 如果这些子mnt没有子mnt了,就将他们加入mnt->mnt_hash为首的链表中,
+		  * 其实也就是propagate_umount的参数 -- list
+		  */
 		if (child && list_empty(&child->mnt_mounts))
 			list_move_tail(&child->mnt_hash, &mnt->mnt_hash);
 	}
@@ -442,7 +451,9 @@ int propagate_umount(struct list_head *list)
 {
 	struct vfsmount *mnt;
 
+	//list中搜集了需要释放的mnt
 	list_for_each_entry(mnt, list, mnt_hash)
+		//遍历这些需要释放的mnt, 处理这些mnt父目录的propagate tree
 		__propagate_umount(mnt);
 	return 0;
 }

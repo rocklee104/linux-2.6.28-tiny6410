@@ -1398,6 +1398,10 @@ struct dentry * __d_lookup(struct dentry * parent, struct qstr * name)
 
 	rcu_read_lock();
 	
+	/* 
+	 * dentry是需要使用的结构体指针,node是hash链表中的节点,head是链表头,
+	 * d_hash是结构体中用于连入hash表的成员
+	*/
 	hlist_for_each_entry_rcu(dentry, node, head, d_hash) {
 		struct qstr *qstr;
 

@@ -1042,6 +1042,10 @@ void umount_tree(struct vfsmount *mnt, int propagate, struct list_head *kill)
         list_move(&p->mnt_hash, kill);
 
 	if (propagate)
+		/*
+		 * 下面这个函数完成后,kill中就有了mnt的挂载树,及mnt父mnt propagate tree中对应于mnt
+		 * 的子mnt
+		 */
 		propagate_umount(kill);
 
 	list_for_each_entry(p, kill, mnt_hash) {
@@ -1052,6 +1056,10 @@ void umount_tree(struct vfsmount *mnt, int propagate, struct list_head *kill)
         //从挂载树的链表中取下来
 		list_del_init(&p->mnt_child);
 		if (p->mnt_parent != p) {
+			/*
+			* 如果不是系统根mnt,其父mnt的mnt_ghosts++, 表示其父mnt又有一个子mnt
+			* 将要调用release_mounts去处理mnt->mnt_parent及mnt->mnt_mountpoint
+			*/
 			p->mnt_parent->mnt_ghosts++;
             //递减其挂载点的d_mounted
 			p->mnt_mountpoint->d_mounted--;
@@ -1136,9 +1144,14 @@ static int do_umount(struct vfsmount *mnt, int flags)
 	event++;
 
 	if (!(flags & MNT_DETACH))
-		shrink_submounts(mnt, &umount_list);
+        shrink_submounts(mnt, &umount_list);
 
 	retval = -EBUSY;
+    /* 
+     * 一个没有其他进程使用的mnt在这里mnt_count应该为2,因为在创建的时候mnt_count已经为1,
+     * SYSCALL_DEFINE2中通过user_path -> lookup_mnt -> mntget 增加了mnt_count,
+     * mnt_count为2
+     */
 	if (flags & MNT_DETACH || !propagate_mount_busy(mnt, 2)) {
 		if (!list_empty(&mnt->mnt_list))
 			umount_tree(mnt, 1, &umount_list);
@@ -1896,6 +1909,7 @@ static int select_submounts(struct vfsmount *parent, struct list_head *graveyard
 	int found = 0;
 
 repeat:
+    //找到第一个子mount
 	next = this_parent->mnt_mounts.next;
 resume:
 	while (next != &this_parent->mnt_mounts) {
@@ -1908,11 +1922,13 @@ resume:
 		/*
 		 * Descend a level if the d_mounts list is non-empty.
 		 */
+        //向下一级子mount遍历
 		if (!list_empty(&mnt->mnt_mounts)) {
 			this_parent = mnt;
 			goto repeat;
 		}
 
+        //如果已经到了挂载树最左边的leave
 		if (!propagate_mount_busy(mnt, 1)) {
 			list_move_tail(&mnt->mnt_expire, graveyard);
 			found++;

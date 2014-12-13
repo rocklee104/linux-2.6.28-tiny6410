@@ -797,6 +797,7 @@ static int do_lookup(struct nameidata *nd, struct qstr *name,
 		     struct path *path)
 {
 	struct vfsmount *mnt = nd->path.mnt;
+    //在nd->path.dentry这个目录下找到以name为名的子dentry
 	struct dentry *dentry = __d_lookup(nd->path.dentry, name);
 
 	if (!dentry)
@@ -837,6 +838,7 @@ fail:
  */
 static int __link_path_walk(const char *name, struct nameidata *nd)
 {
+    //next记录当前正在解析的文件路径信息
 	struct path next;
 	struct inode *inode;
 	int err;
@@ -854,6 +856,7 @@ static int __link_path_walk(const char *name, struct nameidata *nd)
 	/* At this point we know we have a real path component. */
 	for(;;) {
 		unsigned long hash;
+        //this记录当前正在解析的文件名
 		struct qstr this;
 		unsigned int c;
 
@@ -1297,7 +1300,7 @@ int user_path_at(int dfd, const char __user *name, unsigned flags,
 		 struct path *path)
 {
 	struct nameidata nd;
-	char *tmp = getname(name);
+    char *tmp = getname(name);
 	int err = PTR_ERR(tmp);
 	if (!IS_ERR(tmp)) {
 

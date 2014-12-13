@@ -101,6 +101,7 @@ struct dentry {
 		struct list_head d_child;	/* child of parent list */
 	 	struct rcu_head d_rcu;
 	} d_u;
+	//链表头, 子目录的目录项链表的d_child都是此链表的成员
 	struct list_head d_subdirs;	/* our children */
 	struct list_head d_alias;	/* inode alias list */
 	unsigned long d_time;		/* used by d_revalidate */

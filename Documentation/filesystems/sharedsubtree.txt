@@ -790,6 +790,14 @@ replicas continue to be exactly same.
 		what would be the contents of
 		/mnt/1/test be?
 
+        Anwser:The mount will propagate to 'C', but not propagate to 'B'.
+               Because 'B' has no test directory.The new mount, Lets call it
+               'D',yes, will propagate to 'B', a clone of 'D' will created and 
+               attached to 'B', but then the kernel will realiaze that there is no 
+               directory in 'B' to let the clone mount mount on. This clone
+               mount will be released at last.The contents of /mnt/1/test will
+               be identical to /bin
+
 7) FAQ
 
 	Q1. Why is bind mount needed? How is it different from symbolic links?
@@ -855,18 +863,18 @@ replicas continue to be exactly same.
 				   tmp     usr
 				  /    \
 				m1       m2
-			       / \       /  \
-			     tmp  usr   tmp  usr
-			     / \          /
-			    m1  m2      m1
-				/ \     /  \
-			      tmp usr  tmp   usr
-			      /        / \
-			     m1       m1  m2
-			    /  \
-			  tmp   usr
-			  /  \
-			 m1   m2
+               / \       /  \
+             tmp  usr   tmp  usr
+             / \        /
+            m1  m2     m1
+            / \      /   \
+              tmp   usr  tmp   usr
+              /          / \
+             m1         m1  m2
+            /  \
+          tmp   usr
+          /  \
+         m1   m2
 
 		       it has 6 vfsmounts
 
@@ -990,11 +998,11 @@ replicas continue to be exactly same.
 
 
 		        A <--> B <--> C <---> D
-		       /|\	      /|      |\
-		      / F G	     J K      H I
+		       /|\	          /|      |\
+		      / F G	         J K      H I
 		     /
 		    E<-->K
-			/|\
+			    /|\
 		       M L N
 
 	In the above figure  A,B,C and D all are shared and propagate to each
