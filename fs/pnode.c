@@ -397,16 +397,25 @@ int propagate_mount_busy(struct vfsmount *mnt, int refcnt)
 	 * mounts
 	 */
 	if (!list_empty(&mnt->mnt_mounts) || do_refcount_check(mnt, refcnt))
-        //如果一个mnt具有子mnt,或者the refcount is greater than count
-		return 1;
+        //如果一个mnt具有子mnt,或者the refcount is greater than count,就返回busy
+        return 1;
 
     //遍历父mnt所在的propagate tree
 	for (m = propagation_next(parent, parent); m;
 	     		m = propagation_next(m, parent)) {
-        //找到子mnt
+        //找到mnt的父mnt的propagate tree中对应mnt的子mnt
 		child = __lookup_mnt(m, mnt->mnt_mountpoint, 0);
-		if (child && list_empty(&child->mnt_mounts) &&
+        if (child && list_empty(&child->mnt_mounts) &&
 		    (ret = do_refcount_check(child, 1)))
+            /*
+             * 当child(也就是参数mnt的父mnt的propagate tree中对应mnt的子mnt)下没有子mnt,
+             * 但是计数大于1,返回busy.
+             * 
+             * 但如果child存在子mnt,就去寻找下一个propagate tree中的节点.在系统中的表现就是:
+             * A, B, C同为peer.D是A的slave.Z,Z1,Z2,Z3分别是A,B,C,D的子mnt.E是Z3的子mnt.
+             * 如果umount Z的时候,Z,Z1,Z2会被卸载掉,但是Z3会继续保留在系统中.最后这些mnt只留
+             * 下了A,B,C,D,Z3,E
+            */
 			break;
 	}
 	return ret;
@@ -453,7 +462,10 @@ int propagate_umount(struct list_head *list)
 
 	//list中搜集了需要释放的mnt
 	list_for_each_entry(mnt, list, mnt_hash)
-		//遍历这些需要释放的mnt, 处理这些mnt父目录的propagate tree
+        /* 
+         * 遍历这些需要释放的mnt, 将这些mnt父目录的propagate tree中
+         * 对应这些mnt的子mnt加入mnt_hash中,实际上也就是参数list中
+         */
 		__propagate_umount(mnt);
 	return 0;
 }

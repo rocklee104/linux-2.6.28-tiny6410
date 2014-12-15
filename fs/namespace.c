@@ -1024,6 +1024,7 @@ void release_mounts(struct list_head *head)
 			m = mnt->mnt_parent;
 			mnt->mnt_mountpoint = mnt->mnt_root;
 			mnt->mnt_parent = mnt;
+            //mnt马上要释放,其parent下记录处理处于umount_tree及release_mounts之间的子mnt的计数需要减少
 			m->mnt_ghosts--;
 			spin_unlock(&vfsmount_lock);
 			dput(dentry);
@@ -1144,6 +1145,7 @@ static int do_umount(struct vfsmount *mnt, int flags)
 	event++;
 
 	if (!(flags & MNT_DETACH))
+        //将mnt中所有可以shrink的子mnt加入umount_list链表
         shrink_submounts(mnt, &umount_list);
 
 	retval = -EBUSY;
@@ -1161,6 +1163,7 @@ static int do_umount(struct vfsmount *mnt, int flags)
 	if (retval)
 		security_sb_umount_busy(mnt);
 	up_write(&namespace_sem);
+    //将umount_list上所有的mnt释放
 	release_mounts(&umount_list);
 	return retval;
 }
@@ -1918,6 +1921,7 @@ resume:
 
 		next = tmp->next;
 		if (!(mnt->mnt_flags & MNT_SHRINKABLE))
+            //只有拥有MNT_SHRINKABLE标志的mnt才能shrink
 			continue;
 		/*
 		 * Descend a level if the d_mounts list is non-empty.
@@ -1928,7 +1932,7 @@ resume:
 			goto repeat;
 		}
 
-        //如果已经到了挂载树最左边的leave
+        //如果已经到了挂载树的leave
 		if (!propagate_mount_busy(mnt, 1)) {
 			list_move_tail(&mnt->mnt_expire, graveyard);
 			found++;
@@ -1951,11 +1955,16 @@ resume:
  */
 static void shrink_submounts(struct vfsmount *mnt, struct list_head *umounts)
 {
+    /* 
+     * graveyard只是临时用于记录mnt中可以shrink的子mnt,最终还需要将这些mnt加入umounts中,
+     * umount中还记录了共享子树中需要释放的部分
+     */
 	LIST_HEAD(graveyard);
 	struct vfsmount *m;
 
 	/* extract submounts of 'mountpoint' from the expiration list */
 	while (select_submounts(mnt, &graveyard)) {
+        //当mnt有子mnt的时候才会进入这个循环
 		while (!list_empty(&graveyard)) {
 			m = list_first_entry(&graveyard, struct vfsmount,
 						mnt_expire);

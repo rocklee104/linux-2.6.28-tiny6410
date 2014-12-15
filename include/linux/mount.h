@@ -54,6 +54,7 @@ struct vfsmount {
 	const char *mnt_devname;	/* Name of device e.g. /dev/dsk/hda1 */
     //链表元素, 链表头是namespace->list
 	struct list_head mnt_list;
+	//shrink_submounts这个函数使用这个成员收集可以shrink的子mnt
 	struct list_head mnt_expire;	/* link in fs-specific expiry list */
 	struct list_head mnt_share;	/* circular list of shared mounts */
 	struct list_head mnt_slave_list;/* list of slave mounts */
@@ -67,7 +68,7 @@ struct vfsmount {
 	 * to let these frequently modified fields in a separate cache line
 	 * (so that reads of mnt_flags wont ping-pong on SMP machines)
 	 */
-	//有多少子vfsmount
+	//mnt被引用的次数,当mnt下新创建一个子mnt或者调用lookup_mnt都会造成计数增加 
 	atomic_t mnt_count;
 	int mnt_expiry_mark;		/* true if marked for expiry */
 	int mnt_pinned;
