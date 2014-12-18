@@ -703,6 +703,7 @@ int follow_up(struct vfsmount **mnt, struct dentry **dentry)
 static int __follow_mount(struct path *path)
 {
 	int res = 0;
+    //¹ÒÔØµãµÄ²ã²ã±éÀú
 	while (d_mountpoint(path->dentry)) {
 		struct vfsmount *mounted = lookup_mnt(path->mnt, path->dentry);
 		if (!mounted)
