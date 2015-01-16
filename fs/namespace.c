@@ -1427,7 +1427,7 @@ static int invent_group_ids(struct vfsmount *mnt, bool recurse)
 static int attach_recursive_mnt(struct vfsmount *source_mnt,
 			struct path *path, struct path *parent_path)
 {
-    //tree_list中记录propagation的mnt
+    //tree_list中记录propagation的mnt,这个这个链表头是局部变量,操作链表时就不需要加锁
 	LIST_HEAD(tree_list);
 	struct vfsmount *dest_mnt = path->mnt;
 	struct dentry *dest_dentry = path->dentry;
@@ -1746,7 +1746,7 @@ static int do_move_mount(struct path *path, char *old_name)
          * 2.移动mnt,并且销毁其clone(也就是其parent的peer下和mnt对应的子mnt).这又影响其parent
          *   peer的挂载树
          * 
-         * 综上两种方式都不可取,故应该避免这种情况
+         * 根据共享子树设计者Ram Pai的回复,这种情况太复杂,就没有实现
         */
             goto out1;
 	/*
