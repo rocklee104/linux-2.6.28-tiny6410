@@ -2485,12 +2485,15 @@ void build_all_zonelists(void)
 #define PAGES_PER_WAITQUEUE	256
 
 #ifndef CONFIG_MEMORY_HOTPLUG
+//一般不会有设备支持memory hotplug
 static inline unsigned long wait_table_hash_nr_entries(unsigned long pages)
 {
 	unsigned long size = 1;
 
+    //每256个pages分配一个等待队列头
 	pages /= PAGES_PER_WAITQUEUE;
 
+    //等待队列头的个数必须是2的n次方
 	while (size < pages)
 		size <<= 1;
 
@@ -2499,8 +2502,10 @@ static inline unsigned long wait_table_hash_nr_entries(unsigned long pages)
 	 * on IO we've got bigger problems than wait queue collision.
 	 * Limit the size of the wait table to a reasonable size.
 	 */
+    //等待队列头的个数不能超过4096
 	size = min(size, 4096UL);
 
+    //等待队列头的个数不能小于4
 	return max(size, 4UL);
 }
 #else
@@ -2868,10 +2873,12 @@ int zone_wait_table_init(struct zone *zone, unsigned long zone_size_pages)
 		 wait_table_hash_nr_entries(zone_size_pages);
 	zone->wait_table_bits =
 		wait_table_bits(zone->wait_table_hash_nr_entries);
+    //等待队列头总共占用的空间
 	alloc_size = zone->wait_table_hash_nr_entries
 					* sizeof(wait_queue_head_t);
 
 	if (!slab_is_available()) {
+        //slab还用不了的时候就用alloc_bootmem_node分配空间
 		zone->wait_table = (wait_queue_head_t *)
 			alloc_bootmem_node(pgdat, alloc_size);
 	} else {
@@ -2891,6 +2898,7 @@ int zone_wait_table_init(struct zone *zone, unsigned long zone_size_pages)
 		return -ENOMEM;
 
 	for(i = 0; i < zone->wait_table_hash_nr_entries; ++i)
+        //初始化所有的等待队列头
 		init_waitqueue_head(zone->wait_table + i);
 
 	return 0;

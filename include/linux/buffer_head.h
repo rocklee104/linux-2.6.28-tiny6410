@@ -328,7 +328,9 @@ static inline int trylock_buffer(struct buffer_head *bh)
 static inline void lock_buffer(struct buffer_head *bh)
 {
 	might_sleep();
+    //尝试lock bh
 	if (!trylock_buffer(bh))
+        //如果lock bh失败,就等待bh unlock,再给去lock bh
 		__lock_buffer(bh);
 }
 

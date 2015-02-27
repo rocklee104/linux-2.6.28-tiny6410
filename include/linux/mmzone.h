@@ -398,8 +398,18 @@ struct zone {
 	 * primary users of these fields, and in mm/page_alloc.c
 	 * free_area_init_core() performs the initialization of them.
 	 */
+	/*
+	 * 当对一个page做I/O操作的时候,page需要被锁住,以防止不正确的数据被访问.
+	 * 1. 进程在访问page前，调用wait_on_page*函数,使进程加入一个等待队列
+	 *    (如果没有其它进程正在访问该页，就直接获得访问权限，否则加入等待队列).
+	 * 
+	 * 2. 当前访问page的进程完成自己的访问动作后,会调用unlock_page唤醒在该页
+	 *    上wait的进程， 因而进程即可获得对页的访问权.
+	*/
 	wait_queue_head_t	* wait_table;
+	//等待队列头的个数
 	unsigned long		wait_table_hash_nr_entries;
+	//等待队列头个数是2的多少次幂
 	unsigned long		wait_table_bits;
 
 	/*

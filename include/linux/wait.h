@@ -38,11 +38,13 @@ struct __wait_queue {
 };
 
 struct wait_bit_key {
+    //flags表示位图的地址,而这个地址中存的一般是状态
 	void *flags;
 	int bit_nr;
 };
 
 struct wait_bit_queue {
+    //用于判断状态位图的关键字,如位图地址,及状态标志的位置
 	struct wait_bit_key key;
 	wait_queue_t wait;
 };
@@ -484,7 +486,9 @@ static inline int wait_on_bit(void *word, int bit,
 				int (*action)(void *), unsigned mode)
 {
 	if (!test_bit(bit, word))
+        //如果word的bit位已经被cleared
 		return 0;
+    //如果word的bit位被set
 	return out_of_line_wait_on_bit(word, bit, action, mode);
 }
 

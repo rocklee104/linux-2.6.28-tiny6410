@@ -57,6 +57,7 @@ static int sync_buffer(void *word)
 {
 	struct block_device *bd;
 	struct buffer_head *bh
+        //通过b_state获取bh
 		= container_of(word, struct buffer_head, b_state);
 
 	smp_mb();
