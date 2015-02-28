@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  linux/fs/file_table.c
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
@@ -120,6 +120,7 @@ struct file *get_empty_filp(void)
 
 	tsk = current;
 	INIT_LIST_HEAD(&f->f_u.fu_list);
+	//初始化为1
 	atomic_long_set(&f->f_count, 1);
 	rwlock_init(&f->f_owner.lock);
 	f->f_uid = tsk->fsuid;
@@ -220,6 +221,7 @@ EXPORT_SYMBOL(init_file);
 void fput(struct file *file)
 {
 	if (atomic_long_dec_and_test(&file->f_count))
+		//如果引用计数为0,就释放file对象
 		__fput(file);
 }
 
@@ -259,6 +261,7 @@ void __fput(struct file *file)
 	struct vfsmount *mnt = file->f_path.mnt;
 	struct inode *inode = dentry->d_inode;
 
+	//用于调试,如果sleep就打印回溯信息
 	might_sleep();
 
 	fsnotify_close(file);
@@ -318,18 +321,23 @@ EXPORT_SYMBOL(fget);
  * and a flag is returned to be passed to the corresponding fput_light().
  * There must not be a cloning between an fget_light/fput_light pair.
  */
+ //如果没有其他进程访问fd table,file对象的refcnt就不需要增加
 struct file *fget_light(unsigned int fd, int *fput_needed)
 {
 	struct file *file;
 	struct files_struct *files = current->files;
 
 	*fput_needed = 0;
+	//如果file_struct只有一个进程在使用, 不需要RCU.
+	//同一个进程多次读取,这里不会自加1
 	if (likely((atomic_read(&files->count) == 1))) {
 		file = fcheck_files(files, fd);
+		//如果有多个进程在使用,就加锁访问
 	} else {
 		rcu_read_lock();
 		file = fcheck_files(files, fd);
 		if (file) {
+			//计数器不为0的时候自加,open过程中f_count初始化为1
 			if (atomic_long_inc_not_zero(&file->f_count))
 				*fput_needed = 1;
 			else
@@ -352,6 +360,7 @@ void put_filp(struct file *file)
 	}
 }
 
+//把file加入list的链表中
 void file_move(struct file *file, struct list_head *list)
 {
 	if (!list)
@@ -370,16 +379,19 @@ void file_kill(struct file *file)
 	}
 }
 
+//将fs从新挂载成read only的,需要检查是否有文件被打开或者正在被写入
 int fs_may_remount_ro(struct super_block *sb)
 {
 	struct file *file;
 
 	/* Check that no files are currently opened for writing. */
 	file_list_lock();
+	//遍历file链表
 	list_for_each_entry(file, &sb->s_files, f_u.fu_list) {
 		struct inode *inode = file->f_path.dentry->d_inode;
 
 		/* File with pending delete? */
+		//硬链接数为0,表示inode已经被删除了
 		if (inode->i_nlink == 0)
 			goto too_bad;
 
@@ -404,6 +416,7 @@ void __init files_init(unsigned long mempages)
 	n = (mempages * (PAGE_SIZE / 1024)) / 10;
 	files_stat.max_files = n; 
 	if (files_stat.max_files < NR_FILE)
+		//系统能同时打开的最大文件个数的下限是NR_FILE
 		files_stat.max_files = NR_FILE;
 	files_defer_init();
 	percpu_counter_init(&nr_files, 0);

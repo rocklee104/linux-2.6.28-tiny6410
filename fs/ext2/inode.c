@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  linux/fs/ext2/inode.c
  *
  * Copyright (C) 1992, 1993, 1994, 1995
@@ -129,9 +129,12 @@ static inline int verify_chain(Indirect *from, Indirect *to)
 static int ext2_block_to_path(struct inode *inode,
 			long i_block, int offsets[4], int *boundary)
 {
+    //在ext2中一个block占用多少个整形，及可以存储多少个block的记录
 	int ptrs = EXT2_ADDR_PER_BLOCK(inode->i_sb);
 	int ptrs_bits = EXT2_ADDR_PER_BLOCK_BITS(inode->i_sb);
+    //直接寻址的block个数
 	const long direct_blocks = EXT2_NDIR_BLOCKS,
+        //一级间接寻址的个数
 		indirect_blocks = ptrs,
 		double_blocks = (1 << (ptrs_bits * 2));
 	int n = 0;
@@ -140,18 +143,22 @@ static int ext2_block_to_path(struct inode *inode,
 	if (i_block < 0) {
 		ext2_warning (inode->i_sb, "ext2_block_to_path", "block < 0");
 	} else if (i_block < direct_blocks) {
+        //只有直接索引
 		offsets[n++] = i_block;
 		final = direct_blocks;
 	} else if ( (i_block -= direct_blocks) < indirect_blocks) {
+        //有直接索引，一级间接索引
 		offsets[n++] = EXT2_IND_BLOCK;
 		offsets[n++] = i_block;
 		final = ptrs;
 	} else if ((i_block -= indirect_blocks) < double_blocks) {
+        //有直接索引，一级间接索引，二级间接索引
 		offsets[n++] = EXT2_DIND_BLOCK;
 		offsets[n++] = i_block >> ptrs_bits;
 		offsets[n++] = i_block & (ptrs - 1);
 		final = ptrs;
 	} else if (((i_block -= double_blocks) >> (ptrs_bits * 2)) < ptrs) {
+        //有直接索引，一级间接索引，二级间接索引，三级间接索引
 		offsets[n++] = EXT2_TIND_BLOCK;
 		offsets[n++] = i_block >> (ptrs_bits * 2);
 		offsets[n++] = (i_block >> ptrs_bits) & (ptrs - 1);

@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  linux/fs/stat.c
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
@@ -80,6 +80,7 @@ int vfs_lstat_fd(int dfd, char __user *name, struct kstat *stat)
 	struct path path;
 	int error;
 
+	//nd中保存了文件信息
 	error = user_path_at(dfd, name, 0, &path);
 	if (!error) {
 		error = vfs_getattr(path.mnt, path.dentry, stat);

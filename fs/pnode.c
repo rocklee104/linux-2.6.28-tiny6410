@@ -1,4 +1,4 @@
-/*
+ï»¿/*
  *  linux/fs/pnode.c
  *
  * (C) Copyright IBM Corporation 2005.
@@ -82,6 +82,7 @@ int get_dominating_id(struct vfsmount *mnt, const struct path *root)
 static int do_make_slave(struct vfsmount *mnt)
 {
 	struct vfsmount *peer_mnt = mnt, *master = mnt->mnt_master;
+	//slave_mountç”¨äºæ§åˆ¶å¾ªç¯
 	struct vfsmount *slave_mnt;
 
 	/*
@@ -89,65 +90,65 @@ static int do_make_slave(struct vfsmount *mnt)
 	 * same root dentry. If none is available than
 	 * slave it to anything that is available.
 	 */
-	//ÕÒµ½µÚÒ»¸öpeer,²¢ÇÒpeer->mnt_rootºÍmntµÄÏàÍ¬
+	//æ‰¾åˆ°ç¬¬ä¸€ä¸ªpeer,å¹¶ä¸”peer->mnt_rootå’Œmntçš„ç›¸åŒ
 	while ((peer_mnt = next_peer(peer_mnt)) != mnt &&
 	       peer_mnt->mnt_root != mnt->mnt_root) ;
 
-	//Èç¹ûmntÃ»ÓĞpeer,»òÕßÆäpeerºÍmntµÄmnt->mnt_root²»ÏàÍ¬
+	//å¦‚æœmntæ²¡æœ‰peer,æˆ–è€…å…¶peerå’Œmntçš„mnt->mnt_rootä¸ç›¸åŒ
 	if (peer_mnt == mnt) {
 		peer_mnt = next_peer(mnt);
 		if (peer_mnt == mnt)
-			//È·¶¨Ã»ÓĞpeer
+			//ç¡®å®šæ²¡æœ‰peer
 			peer_mnt = NULL;
 	}
 	if (IS_MNT_SHARED(mnt) && list_empty(&mnt->mnt_share))
-		//ËäÈ»mntÓĞ¹²ÏíÊôĞÔ,µ«ÊÇmntÃ»ÓĞpeer
+		//è™½ç„¶mntæœ‰å…±äº«å±æ€§,ä½†æ˜¯mntæ²¡æœ‰peer
 		mnt_release_group_id(mnt);
 
 	list_del_init(&mnt->mnt_share);
 	mnt->mnt_group_id = 0;
 
 	if (peer_mnt)
-		//mntÈç¹ûÉèÖÃ³ÉslaveÊôĞÔ,ËüµÄpeer¾Í»á±ä³ÉÆämaster
+		//mntå¦‚æœè®¾ç½®æˆslaveå±æ€§,å®ƒçš„peerå°±ä¼šå˜æˆå…¶master
 		master = peer_mnt;
 
 	if (master) {
 		list_for_each_entry(slave_mnt, &mnt->mnt_slave_list, mnt_slave)
-			//mntµÄslaveµÄmasterÖ¸ÏòmntµÄpeer
+			//mntçš„slaveçš„masteræŒ‡å‘mntçš„peer
 			slave_mnt->mnt_master = master;
-		//½«mnt¼ÓÈëÆäpeerµÄ¹ÜÀíslaveµÄÁ´±í
+		//å°†mntåŠ å…¥å…¶peerçš„ç®¡ç†slaveçš„é“¾è¡¨
 		list_move(&mnt->mnt_slave, &master->mnt_slave_list);
-		//½«mntµÄslaveÒ²¼ÓÈëÆäpeerµÄ¹ÜÀíslaveµÄÁ´±í
+		//å°†mntçš„slaveä¹ŸåŠ å…¥å…¶peerçš„ç®¡ç†slaveçš„é“¾è¡¨
 		list_splice(&mnt->mnt_slave_list, master->mnt_slave_list.prev);
-		//mnt²»ÔÙÓµÓĞÈÎºÎslave
+		//mntä¸å†æ‹¥æœ‰ä»»ä½•slave
 		INIT_LIST_HEAD(&mnt->mnt_slave_list);
 	} else {
-		//Èç¹ûmntÃ»ÓĞÈÎºÎpeer
+		//å¦‚æœmntæ²¡æœ‰ä»»ä½•peer
 		struct list_head *p = &mnt->mnt_slave_list;
 		while (!list_empty(p)) {
-			//ÊÍ·ÅmntËùÓĞµÄslave,Çå¿ÕÕâĞ©slaveµÄmnt_slave
+			//é‡Šæ”¾mntæ‰€æœ‰çš„slave,æ¸…ç©ºè¿™äº›slaveçš„mnt_slave
                         slave_mnt = list_first_entry(p,
 					struct vfsmount, mnt_slave);
 			list_del_init(&slave_mnt->mnt_slave);
 			slave_mnt->mnt_master = NULL;
 		}
 	}
-	//mntµÄpeer×îÖÕ±ä³ÉmntµÄmaster
+	//mntçš„peeræœ€ç»ˆå˜æˆmntçš„master
 	mnt->mnt_master = master;
-	//mnt²»ÔÙÓµÓĞsharedÊôĞÔ
+	//mntä¸å†æ‹¥æœ‰sharedå±æ€§
 	CLEAR_MNT_SHARED(mnt);
 	return 0;
 }
 
 /*
- * typeÓĞÏÂÃæ4ÖÖ¿ÉÄÜ£º
- * 1.MS_SHARED:ÕâÖÖÇé¿öÖ±½ÓÉèÖÃ¹²ÏíÊôĞÔ¼´¿É,mnt_flagÖÃÎ»MNT_SHARED.
- * 2.MS_SLAVE:Èç¹ûA´æÔÚpeer¼°slave,A¼°AµÄslave±ä³ÉÆäµÚÒ»¸öpeerµÄslave;
- *  		  Èç¹ûAÃ»ÓĞpeer,¾Í½«ÆäslaveµÄmasterÖÃ¿Õ;×îºóÇå³ıAµÄ¹²ÏíÊôĞÔ.
- * 3.MS_PRIVATE:Èç¹ûA´æÔÚpeer¼°slave,AµÄÊôĞÔ±äÎªprivate,AµÄslave±ä³ÉÆäµÚÒ»¸öpeerµÄslave;
- *  	      Èç¹ûAÃ»ÓĞpeer,¾Í½«ÆäslaveµÄmasterÖÃ¿Õ;×îºóÇå³ıAµÄ¹²ÏíÊôĞÔ.
- * 4.MS_UNBINDABLE:Èç¹ûA´æÔÚpeer¼°slave,AµÄÊôĞÔ±äÎªunbindable,AµÄslave±ä³ÉÆäµÚÒ»¸öpeerµÄslave;
- * 		      Èç¹ûAÃ»ÓĞpeer,¾Í½«ÆäslaveµÄmasterÖÃ¿Õ;×îºóÇå³ıAµÄ¹²ÏíÊôĞÔ,mnt_flagÖÃÎ»MNT_UNBINDABLE.
+ * typeæœ‰ä¸‹é¢4ç§å¯èƒ½ï¼š
+ * 1.MS_SHARED:è¿™ç§æƒ…å†µç›´æ¥è®¾ç½®å…±äº«å±æ€§å³å¯,mnt_flagç½®ä½MNT_SHARED.
+ * 2.MS_SLAVE:å¦‚æœAå­˜åœ¨peeråŠslave,AåŠAçš„slaveå˜æˆå…¶ç¬¬ä¸€ä¸ªpeerçš„slave;
+ *  		  å¦‚æœAæ²¡æœ‰peer,å°±å°†å…¶slaveçš„masterç½®ç©º;æœ€åæ¸…é™¤Açš„å…±äº«å±æ€§.
+ * 3.MS_PRIVATE:å¦‚æœAå­˜åœ¨peeråŠslave,Açš„å±æ€§å˜ä¸ºprivate,Açš„slaveå˜æˆå…¶ç¬¬ä¸€ä¸ªpeerçš„slave;
+ *  	      å¦‚æœAæ²¡æœ‰peer,å°±å°†å…¶slaveçš„masterç½®ç©º;æœ€åæ¸…é™¤Açš„å…±äº«å±æ€§.
+ * 4.MS_UNBINDABLE:å¦‚æœAå­˜åœ¨peeråŠslave,Açš„å±æ€§å˜ä¸ºunbindable,Açš„slaveå˜æˆå…¶ç¬¬ä¸€ä¸ªpeerçš„slave;
+ * 		      å¦‚æœAæ²¡æœ‰peer,å°±å°†å…¶slaveçš„masterç½®ç©º;æœ€åæ¸…é™¤Açš„å…±äº«å±æ€§,mnt_flagç½®ä½MNT_UNBINDABLE.
 */
 void change_mnt_propagation(struct vfsmount *mnt, int type)
 {
@@ -156,7 +157,9 @@ void change_mnt_propagation(struct vfsmount *mnt, int type)
 		return;
 	}
 	do_make_slave(mnt);
+	//ä¸å¯ç»‘å®šæŒ‚è½½å’Œç§æœ‰æŒ‚è½½
 	if (type != MS_SLAVE) {
+		//å°†mntä»ä»å±æŒ‚è½½ä¸­åˆ é™¤
 		list_del_init(&mnt->mnt_slave);
 		mnt->mnt_master = NULL;
 		if (type == MS_UNBINDABLE)
@@ -172,17 +175,19 @@ void change_mnt_propagation(struct vfsmount *mnt, int type)
  * @origin: the original mount from where the tree walk initiated
  */
 /* 
- * originÖĞµÄ¹ÒÔØÄÜ¹»´«²¥µÄÊÇoriginµÄpeer,originµÄslave¼°slaveµÄn¼¶slave.
- * peerµÄslave¼°peerµÄn¼¶slave.
+ * originä¸­çš„æŒ‚è½½èƒ½å¤Ÿä¼ æ’­çš„æ˜¯originçš„peer,originçš„slaveåŠslaveçš„nçº§slave.
+ * peerçš„slaveåŠpeerçš„nçº§slave.
  * 
- * NOTE:originµÄslaveµÄpeerÒ»¶¨Ò²ÊÇoriginµÄslave.
- * 		Èç¹ûm²»ÔÚoriginµÄpropagation treeÖĞ,Íâ²¿Ê¹ÓÃpropagation_nextÑ­»·¾Í¿ÉÄÜ³öÏÖËÀÑ­»·
+ * NOTE:originçš„slaveçš„peerä¸€å®šä¹Ÿæ˜¯originçš„slave.
+ * 		å¦‚æœmä¸åœ¨originçš„propagation treeä¸­,å¤–éƒ¨ä½¿ç”¨propagation_nextå¾ªç¯å°±å¯èƒ½å‡ºç°æ­»å¾ªç¯
  */
 static struct vfsmount *propagation_next(struct vfsmount *m,
 					 struct vfsmount *origin)
 {
 	/* are there any slaves of this mount? */
+	//å…ˆæ‰¾æœ€åº•å±‚çš„first slave
 	if (!IS_MNT_NEW(m) && !list_empty(&m->mnt_slave_list))
+		//å¦‚æœè¿™ä¸ªæŒ‚è½½ä¸æ˜¯newå¹¶ä¸”æœ‰slave,å°±è¿”å›ç¬¬ä¸€ä¸ªslaveçš„mount
 		return first_slave(m);
 
 	while (1) {
@@ -191,20 +196,20 @@ static struct vfsmount *propagation_next(struct vfsmount *m,
 
 		if (master == origin->mnt_master) {
             /* 
-             * Note:ÒÔÏÂm±íÊ¾×î¿ªÊ¼µ÷ÓÃpropagation_nextÊ±´«ÈëµÄm,m'±íÊ¾×îºó½øÈëÕâ¸öifÓï¾äÖĞµÄm.
+             * Note:ä»¥ä¸‹mè¡¨ç¤ºæœ€å¼€å§‹è°ƒç”¨propagation_nextæ—¶ä¼ å…¥çš„m,m'è¡¨ç¤ºæœ€åè¿›å…¥è¿™ä¸ªifè¯­å¥ä¸­çš„m.
              * 
-             * Èç¹ûmÔÚslave treeÖĞÒ»Ö±Ïòmaster×·Ëİ,×îÖÕÕÒµ½Ò»¸ö½Úµãm'µÄmasterºÍoriginµÄmaster
-             * Ö¸ÕëÖ¸ÏòÍ¬Ò»¸ömaster,ÕâÊ±ºòm'ºÍorigin¿ÉÄÜ´æÔÚÈıÖÖ¹ØÏµ:
-             *   1.m'->masterºÍoriginµÄmaster¶¼ÎªNULL,m'ºÍoriginÊÇpeerµÄ¹ØÏµ
-             *   2.m'->masterºÍoriginµÄmaster²»ÎªNULL,m'ºÍorigin¶¼ÊÇÆämasterµÄslave
-             *   3.m'ºÍorigin¶¼ÊÇmasterµÄslave²¢m'ºÍoriginÍ¬Îªpeer
+             * å¦‚æœmåœ¨slave treeä¸­ä¸€ç›´å‘masterè¿½æº¯,æœ€ç»ˆæ‰¾åˆ°ä¸€ä¸ªèŠ‚ç‚¹m'çš„masterå’Œoriginçš„master
+             * æŒ‡é’ˆæŒ‡å‘åŒä¸€ä¸ªmaster,è¿™æ—¶å€™m'å’Œoriginå¯èƒ½å­˜åœ¨ä¸‰ç§å…³ç³»:
+             *   1.m'->masterå’Œoriginçš„masteréƒ½ä¸ºNULL,m'å’Œoriginæ˜¯peerçš„å…³ç³»
+             *   2.m'->masterå’Œoriginçš„masterä¸ä¸ºNULL,m'å’Œoriginéƒ½æ˜¯å…¶masterçš„slave
+             *   3.m'å’Œoriginéƒ½æ˜¯masterçš„slaveå¹¶m'å’ŒoriginåŒä¸ºpeer
             */
-            //Èç¹ûÊÇÉÏÊöµÄµÚ1,3ÖÖ¹ØÏµmµÄpeerÖ¸ÏòÆäpeer, Èç¹ûÊÇµÚ2ÖÖ,peerÖ¸Ïò×Ô¼º
+            //å¦‚æœæ˜¯ä¸Šè¿°çš„ç¬¬1,3ç§å…³ç³»mçš„peeræŒ‡å‘å…¶peer, å¦‚æœæ˜¯ç¬¬2ç§,peeræŒ‡å‘è‡ªå·±
 			next = next_peer(m);
-            //Èç¹ûnext == origin±íÊ¾peer±éÀúÍê³É
+            //å¦‚æœnext == originè¡¨ç¤ºpeeréå†å®Œæˆ
 			return ((next == origin) ? NULL : next);
 		} else if (m->mnt_slave.next != &master->mnt_slave_list)
-            //Èç¹ûm²»ÊÇÆämasterµÄmnt_slave_listÁ´±íÖĞ×îºóÒ»¸öslave,¾Í·µ»ØÆämasterµÄÏÂ¸öslave
+            //å¦‚æœmä¸æ˜¯å…¶masterçš„mnt_slave_listé“¾è¡¨ä¸­æœ€åä¸€ä¸ªslave,å°±è¿”å›å…¶masterçš„ä¸‹ä¸ªslave
 			return next_slave(m);
 
 		/* back at master */
@@ -222,10 +227,10 @@ static struct vfsmount *propagation_next(struct vfsmount *m,
  * 		cloned as a slave.
  */
 /* 
- * ·µ»ØÒ»¸övfsmnt,¹©destµÄpeer clone, ±»clone¶ÔÏóµÄÒªÇó:
- * 1.Èç¹ûdestºÍlast_destÊÇpeer¹ØÏµ(slave & sharedÒ²ÊôÓÚÕâÖÖÇé¿ö),ÄÇÃ´±»cloneµÄ¶ÔÏó¾ÍÊÇlast_src.
- * 2.Èç¹ûlast_destÊÇdestµÄmaster,ÄÇÃ´±»cloneµÄ¶ÔÏó¾ÍÊÇlast_src.
- * 3.Èç¹ûdestºÍlast_dest½ö½öÖ»ÊÇslave,ÄÇÃ´±»cloneµÄ¶ÔÏóÊÇmasterµÄÄÇ¸ölast_src
+ * è¿”å›ä¸€ä¸ªvfsmnt,ä¾›destçš„peer clone, è¢«cloneå¯¹è±¡çš„è¦æ±‚:
+ * 1.å¦‚æœdestå’Œlast_destæ˜¯peerå…³ç³»(slave & sharedä¹Ÿå±äºè¿™ç§æƒ…å†µ),é‚£ä¹ˆè¢«cloneçš„å¯¹è±¡å°±æ˜¯last_src.
+ * 2.å¦‚æœlast_destæ˜¯destçš„master,é‚£ä¹ˆè¢«cloneçš„å¯¹è±¡å°±æ˜¯last_src.
+ * 3.å¦‚æœdestå’Œlast_destä»…ä»…åªæ˜¯slave,é‚£ä¹ˆè¢«cloneçš„å¯¹è±¡æ˜¯masterçš„é‚£ä¸ªlast_src
 */
 static struct vfsmount *get_source(struct vfsmount *dest,
 					struct vfsmount *last_dest,
@@ -238,13 +243,13 @@ static struct vfsmount *get_source(struct vfsmount *dest,
 
 	if (IS_MNT_SHARED(dest))
         /* 
-         * Èç¹ûdestÓĞ¹²Ïí±êÖ¾,·µ»ØµÄtypeÖĞÒ²ĞèÒªÌí¼Ó¹²Ïí±êÖ¾,½ÓÏÂÊ¹ÓÃcopy_treeÊ±,
-         * ¼´Ê¹sourceÖĞÃ»ÓĞ¹²Ïí±êÖ¾,ÔÚcopy_tree·µ»ØµÄmntÒ²»áÓĞ±»ÉèÖÃ´Ë±êÖ¾
+         * å¦‚æœdestæœ‰å…±äº«æ ‡å¿—,è¿”å›çš„typeä¸­ä¹Ÿéœ€è¦æ·»åŠ å…±äº«æ ‡å¿—,æ¥ä¸‹ä½¿ç”¨copy_treeæ—¶,
+         * å³ä½¿sourceä¸­æ²¡æœ‰å…±äº«æ ‡å¿—,åœ¨copy_treeè¿”å›çš„mntä¹Ÿä¼šæœ‰è¢«è®¾ç½®æ­¤æ ‡å¿—
          */
 		*type |= CL_MAKE_SHARED;
 
 	while (last_dest != dest->mnt_master) {
-        //last_destºÍdestÊÇpeer,»òÕßlast_destºÍdestÖ»ÊÇslave
+        //last_destå’Œdestæ˜¯peer,æˆ–è€…last_destå’Œdeståªæ˜¯slave
 		p_last_dest = last_dest;
 		p_last_src = last_src;
 		last_dest = last_dest->mnt_master;
@@ -253,17 +258,17 @@ static struct vfsmount *get_source(struct vfsmount *dest,
 
 	if (p_last_dest) {
 		do {
-            //ÕÒµ½ÏÂÒ»¸ö²»ÎªnewµÄpeer
+            //æ‰¾åˆ°ä¸‹ä¸€ä¸ªä¸ä¸ºnewçš„peer
 			p_last_dest = next_peer(p_last_dest);
 		} while (IS_MNT_NEW(p_last_dest));
 	}
 
 	if (dest != p_last_dest) {
         /* 
-         * Èç¹ûdestºÍp_last_dest²»ÏàµÈ,ËµÃ÷destºÍp_last_destÖ»ÊÇµ¥´¿µÄslave,²»¾ßÓĞshareÊôĞÔ.
-		 * typeÉèÖÃCL_SLAVE±êÖ¾,ÔÚºóĞøclone_mntµ÷ÓÃÊ±,ĞÂ´´½¨µÄmnt¾ÍÊÇlast_srcµÄslaveÁË  					  .
+         * å¦‚æœdestå’Œp_last_destä¸ç›¸ç­‰,è¯´æ˜destå’Œp_last_deståªæ˜¯å•çº¯çš„slave,ä¸å…·æœ‰shareå±æ€§.
+		 * typeè®¾ç½®CL_SLAVEæ ‡å¿—,åœ¨åç»­clone_mntè°ƒç”¨æ—¶,æ–°åˆ›å»ºçš„mntå°±æ˜¯last_srcçš„slaveäº†  					  .
 		 *  																								  .
-		 * masterÏÂµÄ×ÓmntÒ²ÊÇÕâ¸ömasterµÄslave¶ÔÓ¦×ÓmntµÄmaster											  .
+		 * masterä¸‹çš„å­mntä¹Ÿæ˜¯è¿™ä¸ªmasterçš„slaveå¯¹åº”å­mntçš„master											  .
          */
 		*type |= CL_SLAVE;
 		return last_src;
@@ -284,7 +289,7 @@ static struct vfsmount *get_source(struct vfsmount *dest,
  * @source_mnt: source mount.
  * @tree_list : list of heads of trees to be attached.
  */
-//tree_listÓÃÓÚ¼ÇÂ¼ÄÇĞ©ĞÂÉú³É²¢ÇÒÓÃÓÚpropagateµÄmnt
+//tree_listç”¨äºè®°å½•é‚£äº›æ–°ç”Ÿæˆå¹¶ä¸”ç”¨äºpropagateçš„mnt
 int propagate_mnt(struct vfsmount *dest_mnt, struct dentry *dest_dentry,
 		    struct vfsmount *source_mnt, struct list_head *tree_list)
 {
@@ -293,14 +298,14 @@ int propagate_mnt(struct vfsmount *dest_mnt, struct dentry *dest_dentry,
 	struct vfsmount *prev_dest_mnt = dest_mnt;
 	struct vfsmount *prev_src_mnt  = source_mnt;
     /* 
-     * tmp_listµÄ×÷ÓÃ: ¼ÇÂ¼ĞèÒªÊÍ·ÅµÄmnt,Ö÷ÒªÔÚÒ»ÏÂÁ½ÖÖÇé¿öÏÂÊ¹ÓÃ
-     * 1.ÔÚcopy treeÊ±·¢Éú´íÎóÊ±,¼ÇÂ¼Ö®Ç°·ÖÅä³É¹¦µÄmnt.
-     * 2.ÔÚÎªpropagate treeÖĞÒ»¸ö½Úµã·ÖÅämntºó,µ«ÊÇ¼ì²âµ½Õâ¸ö½Úµã²»´æÔÚmntĞèÒª¹ÒÔØÉÏµÄÄ¿Â¼Ê±,
-     *   ÕâÊ±,Õâ¸öĞÂ´´½¨µÄmnt¾ÍĞèÒªÊÍ·Å,ÏÈ°ÑmntÔİ´æÔÚtmp_listÖĞ
+     * tmp_listçš„ä½œç”¨: è®°å½•éœ€è¦é‡Šæ”¾çš„mnt,ä¸»è¦åœ¨ä¸€ä¸‹ä¸¤ç§æƒ…å†µä¸‹ä½¿ç”¨
+     * 1.åœ¨copy treeæ—¶å‘ç”Ÿé”™è¯¯æ—¶,è®°å½•ä¹‹å‰åˆ†é…æˆåŠŸçš„mnt.
+     * 2.åœ¨ä¸ºpropagate treeä¸­ä¸€ä¸ªèŠ‚ç‚¹åˆ†é…mntå,ä½†æ˜¯æ£€æµ‹åˆ°è¿™ä¸ªèŠ‚ç‚¹ä¸å­˜åœ¨mntéœ€è¦æŒ‚è½½ä¸Šçš„ç›®å½•æ—¶,
+     *   è¿™æ—¶,è¿™ä¸ªæ–°åˆ›å»ºçš„mntå°±éœ€è¦é‡Šæ”¾,å…ˆæŠŠmntæš‚å­˜åœ¨tmp_listä¸­
     */ 
 	LIST_HEAD(tmp_list);
     /*
-     * umount_list¼ÇÂ¼tmp_listÖĞµÄ³ÉÔ±¼°Õâ¸ö³ÉÔ±ËùÓĞµÄ×Ómnt,ºóĞø²Ù×÷ÖĞ,ĞèÒª½«Õâ¸öÁ´±íÖĞµÄ³ÉÔ±È«²¿ÊÍ·Å 
+     * umount_listè®°å½•tmp_listä¸­çš„æˆå‘˜åŠè¿™ä¸ªæˆå‘˜æ‰€æœ‰çš„å­mnt,åç»­æ“ä½œä¸­,éœ€è¦å°†è¿™ä¸ªé“¾è¡¨ä¸­çš„æˆå‘˜å…¨éƒ¨é‡Šæ”¾ 
     */
 	LIST_HEAD(umount_list);
 
@@ -313,29 +318,29 @@ int propagate_mnt(struct vfsmount *dest_mnt, struct dentry *dest_dentry,
 			continue;
 
        /* 
-        * »ñÈ¡ĞèÒªcloneµÄmnt,Èç¹ûprev_dest_mntÊÇmµÄpeer,source¾ÍÊÇprev_src_mnt.
-        * Èç¹ûprev_dest_mntÊÇmµÄmaster,source¾ÍÊÇprev_src_mnt.
-        * Èç¹ûprev_dest_mntºÍm½ö½öÊÇslave,ÄÇÃ´ĞèÒªÕÒµ½ÆämasterµÄ¡°prev_src_mnt¡±
+        * è·å–éœ€è¦cloneçš„mnt,å¦‚æœprev_dest_mntæ˜¯mçš„peer,sourceå°±æ˜¯prev_src_mnt.
+        * å¦‚æœprev_dest_mntæ˜¯mçš„master,sourceå°±æ˜¯prev_src_mnt.
+        * å¦‚æœprev_dest_mntå’Œmä»…ä»…æ˜¯slave,é‚£ä¹ˆéœ€è¦æ‰¾åˆ°å…¶masterçš„â€œprev_src_mntâ€
         */
         source =  get_source(m, prev_dest_mnt, prev_src_mnt, &type);
 
-        //clone sourceµÄÕû¸ömnt tree
+        //clone sourceçš„æ•´ä¸ªmnt tree
 		if (!(child = copy_tree(source, source->mnt_root, type))) {
 			ret = -ENOMEM;
-            //Ö»Òªcopy_treeÊ§°ÜÒ»´Î,¾ÍĞèÒª½«ÒÔÇ°copy³É¹¦µÄmnt treeÈ«²¿ÊÍ·Åµô
+            //åªè¦copy_treeå¤±è´¥ä¸€æ¬¡,å°±éœ€è¦å°†ä»¥å‰copyæˆåŠŸçš„mnt treeå…¨éƒ¨é‡Šæ”¾æ‰
 			list_splice(tree_list, tmp_list.prev);
 			goto out;
 		}
 
 		if (is_subdir(dest_dentry, m->mnt_root)) {
             /* 
-             * Ò»°ãÇé¿öÏÂmÊÇdest_mntµÄpeer»òÕßslave,ÕâÑùµÄ»°m->mnt_rootºÍdest_mnt->mnt_rootÖ¸Ïò
-             * Í¬Ò»¸ödentry,dest_dentryÊÇdest_mnt->mnt_rootµÄ×ÓÄ¿Â¼,¹Êdest_dentryÒ²Ó¦¸ÃÊÇm->mnt_root
-             * µÄ×ÓÄ¿Â¼
+             * ä¸€èˆ¬æƒ…å†µä¸‹mæ˜¯dest_mntçš„peeræˆ–è€…slave,è¿™æ ·çš„è¯m->mnt_rootå’Œdest_mnt->mnt_rootæŒ‡å‘
+             * åŒä¸€ä¸ªdentry,dest_dentryæ˜¯dest_mnt->mnt_rootçš„å­ç›®å½•,æ•…dest_dentryä¹Ÿåº”è¯¥æ˜¯m->mnt_root
+             * çš„å­ç›®å½•
              */
 
 			mnt_set_mountpoint(m, dest_dentry, child);
-            //Ìí¼Óµ½´¦ÀípropagationµÄÁ´±íÖĞ
+            //æ·»åŠ åˆ°å¤„ç†propagationçš„é“¾è¡¨ä¸­
 			list_add_tail(&child->mnt_hash, tree_list);
 		} else {
 			/*
@@ -343,13 +348,13 @@ int propagate_mnt(struct vfsmount *dest_mnt, struct dentry *dest_dentry,
 			 * on some subdirectory of a shared/slave mount.
 			 */
              /*
-             * µ±childµÄ¸¸mntÊÇÓÉÁíÒ»¸ö¹²Ïí/´ÓÊômntÍ¨¹ı°ó¶¨Æä×ÓÄ¿Â¼Éú³ÉµÄ,µ±¸¸Ä¿Â¼µÄ´«²¥Ê÷ÖĞ³öÏÖÒ»¸öĞÂµÄ×Ómnt,
-             * ¶øÕâ¸ö×ÓmntµÄ¹ÒÔØµãÊÇÔÚchildµÄ¸¸mntËùÔÚ¹ÒÔØµãµÄÍ³¼ÆÄ¿Â¼»òÕßÉÏ¼¶Ä¿Â¼,ÕâÊ±ºòchildÔÚÆä¸¸mntÖĞ¾ÍÕÒ²»µ½
-             * ¶ÔÓ¦µÄ¹ÒÔØµã,ÕâÊ±ºòÕâ¸öchild¾ÍÓ¦¸Ã·ÏÆú
+             * å½“childçš„çˆ¶mntæ˜¯ç”±å¦ä¸€ä¸ªå…±äº«/ä»å±mnté€šè¿‡ç»‘å®šå…¶å­ç›®å½•ç”Ÿæˆçš„,å½“çˆ¶ç›®å½•çš„ä¼ æ’­æ ‘ä¸­å‡ºç°ä¸€ä¸ªæ–°çš„å­mnt,
+             * è€Œè¿™ä¸ªå­mntçš„æŒ‚è½½ç‚¹æ˜¯åœ¨childçš„çˆ¶mntæ‰€åœ¨æŒ‚è½½ç‚¹çš„ç»Ÿè®¡ç›®å½•æˆ–è€…ä¸Šçº§ç›®å½•,è¿™æ—¶å€™childåœ¨å…¶çˆ¶mntä¸­å°±æ‰¾ä¸åˆ°
+             * å¯¹åº”çš„æŒ‚è½½ç‚¹,è¿™æ—¶å€™è¿™ä¸ªchildå°±åº”è¯¥åºŸå¼ƒ
              */
 			list_add_tail(&child->mnt_hash, &tmp_list);
 		}
-        //ÏòÏÂÒ»¸öpeer/slaveÒÆ¶¯
+        //å‘ä¸‹ä¸€ä¸ªpeer/slaveç§»åŠ¨
 		prev_dest_mnt = m;
 		prev_src_mnt  = child;
 	}
@@ -388,7 +393,7 @@ int propagate_mount_busy(struct vfsmount *mnt, int refcnt)
 	int ret = 0;
 
 	if (mnt == parent)
-        //Èç¹ûmntÊÇÏµÍ³µÄ¸ùmnt
+        //å¦‚æœmntæ˜¯ç³»ç»Ÿçš„æ ¹mnt
 		return do_refcount_check(mnt, refcnt);
 
 	/*
@@ -397,24 +402,24 @@ int propagate_mount_busy(struct vfsmount *mnt, int refcnt)
 	 * mounts
 	 */
 	if (!list_empty(&mnt->mnt_mounts) || do_refcount_check(mnt, refcnt))
-        //Èç¹ûÒ»¸ömnt¾ßÓĞ×Ómnt,»òÕßthe refcount is greater than count,¾Í·µ»Øbusy
+        //å¦‚æœä¸€ä¸ªmntå…·æœ‰å­mnt,æˆ–è€…the refcount is greater than count,å°±è¿”å›busy
         return 1;
 
-    //±éÀú¸¸mntËùÔÚµÄpropagate tree
+    //éå†çˆ¶mntæ‰€åœ¨çš„propagate tree
 	for (m = propagation_next(parent, parent); m;
 	     		m = propagation_next(m, parent)) {
-        //ÕÒµ½mntµÄ¸¸mntµÄpropagate treeÖĞ¶ÔÓ¦mntµÄ×Ómnt
+        //æ‰¾åˆ°mntçš„çˆ¶mntçš„propagate treeä¸­å¯¹åº”mntçš„å­mnt
 		child = __lookup_mnt(m, mnt->mnt_mountpoint, 0);
         if (child && list_empty(&child->mnt_mounts) &&
 		    (ret = do_refcount_check(child, 1)))
             /*
-             * µ±child(Ò²¾ÍÊÇ²ÎÊımntµÄ¸¸mntµÄpropagate treeÖĞ¶ÔÓ¦mntµÄ×Ómnt)ÏÂÃ»ÓĞ×Ómnt,
-             * µ«ÊÇ¼ÆÊı´óÓÚ1,·µ»Øbusy.
+             * å½“child(ä¹Ÿå°±æ˜¯å‚æ•°mntçš„çˆ¶mntçš„propagate treeä¸­å¯¹åº”mntçš„å­mnt)ä¸‹æ²¡æœ‰å­mnt,
+             * ä½†æ˜¯è®¡æ•°å¤§äº1,è¿”å›busy.
              * 
-             * µ«Èç¹ûchild´æÔÚ×Ómnt,¾ÍÈ¥Ñ°ÕÒÏÂÒ»¸öpropagate treeÖĞµÄ½Úµã.ÔÚÏµÍ³ÖĞµÄ±íÏÖ¾ÍÊÇ:
-             * A, B, CÍ¬Îªpeer.DÊÇAµÄslave.Z,Z1,Z2,Z3·Ö±ğÊÇA,B,C,DµÄ×Ómnt.EÊÇZ3µÄ×Ómnt.
-             * Èç¹ûumount ZµÄÊ±ºò,Z,Z1,Z2»á±»Ğ¶ÔØµô,µ«ÊÇZ3»á¼ÌĞø±£ÁôÔÚÏµÍ³ÖĞ.×îºóÕâĞ©mntÖ»Áô
-             * ÏÂÁËA,B,C,D,Z3,E
+             * ä½†å¦‚æœchildå­˜åœ¨å­mnt,å°±å»å¯»æ‰¾ä¸‹ä¸€ä¸ªpropagate treeä¸­çš„èŠ‚ç‚¹.åœ¨ç³»ç»Ÿä¸­çš„è¡¨ç°å°±æ˜¯:
+             * A, B, CåŒä¸ºpeer.Dæ˜¯Açš„slave.Z,Z1,Z2,Z3åˆ†åˆ«æ˜¯A,B,C,Dçš„å­mnt.Eæ˜¯Z3çš„å­mnt.
+             * å¦‚æœumount Zçš„æ—¶å€™,Z,Z1,Z2ä¼šè¢«å¸è½½æ‰,ä½†æ˜¯Z3ä¼šç»§ç»­ä¿ç•™åœ¨ç³»ç»Ÿä¸­.æœ€åè¿™äº›mntåªç•™
+             * ä¸‹äº†A,B,C,D,Z3,E
             */
 			break;
 	}
@@ -435,7 +440,7 @@ static void __propagate_umount(struct vfsmount *mnt)
 	for (m = propagation_next(parent, parent); m;
 			m = propagation_next(m, parent)) {
 
-		//±éÀúĞèÒªÊÍ·ÅµÄmntµÄparentµÄpropagate tree,ÕÒµ½ÕâĞ©½ÚµãÓëmnt¶ÔÓ¦µÄ×Ómnt 
+		//éå†éœ€è¦é‡Šæ”¾çš„mntçš„parentçš„propagate tree,æ‰¾åˆ°è¿™äº›èŠ‚ç‚¹ä¸mntå¯¹åº”çš„å­mnt 
 		struct vfsmount *child = __lookup_mnt(m,
 					mnt->mnt_mountpoint, 0);
 		/*
@@ -443,8 +448,8 @@ static void __propagate_umount(struct vfsmount *mnt)
 		 * other children
 		 */
 		 /*
-		  * Èç¹ûÕâĞ©×ÓmntÃ»ÓĞ×ÓmntÁË,¾Í½«ËûÃÇ¼ÓÈëmnt->mnt_hashÎªÊ×µÄÁ´±íÖĞ,
-		  * ÆäÊµÒ²¾ÍÊÇpropagate_umountµÄ²ÎÊı -- list
+		  * å¦‚æœè¿™äº›å­mntæ²¡æœ‰å­mntäº†,å°±å°†ä»–ä»¬åŠ å…¥mnt->mnt_hashä¸ºé¦–çš„é“¾è¡¨ä¸­,
+		  * å…¶å®ä¹Ÿå°±æ˜¯propagate_umountçš„å‚æ•° -- list
 		  */
 		if (child && list_empty(&child->mnt_mounts))
 			list_move_tail(&child->mnt_hash, &mnt->mnt_hash);
@@ -460,11 +465,11 @@ int propagate_umount(struct list_head *list)
 {
 	struct vfsmount *mnt;
 
-	//listÖĞËÑ¼¯ÁËĞèÒªÊÍ·ÅµÄmnt
+	//listä¸­æœé›†äº†éœ€è¦é‡Šæ”¾çš„mnt
 	list_for_each_entry(mnt, list, mnt_hash)
         /* 
-         * ±éÀúÕâĞ©ĞèÒªÊÍ·ÅµÄmnt, ½«ÕâĞ©mnt¸¸Ä¿Â¼µÄpropagate treeÖĞ
-         * ¶ÔÓ¦ÕâĞ©mntµÄ×Ómnt¼ÓÈëmnt_hashÖĞ,Êµ¼ÊÉÏÒ²¾ÍÊÇ²ÎÊılistÖĞ
+         * éå†è¿™äº›éœ€è¦é‡Šæ”¾çš„mnt, å°†è¿™äº›mntçˆ¶ç›®å½•çš„propagate treeä¸­
+         * å¯¹åº”è¿™äº›mntçš„å­mntåŠ å…¥mnt_hashä¸­,å®é™…ä¸Šä¹Ÿå°±æ˜¯å‚æ•°listä¸­
          */
 		__propagate_umount(mnt);
 	return 0;

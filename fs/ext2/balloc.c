@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  linux/fs/ext2/balloc.c
  *
  * Copyright (C) 1992, 1993, 1994, 1995
@@ -35,6 +35,7 @@
 
 #define in_range(b, first, len)	((b) >= (first) && (b) <= (first) + (len) - 1)
 
+//获取group desc内容
 struct ext2_group_desc * ext2_get_group_desc(struct super_block * sb,
 					     unsigned int block_group,
 					     struct buffer_head ** bh)
@@ -53,7 +54,9 @@ struct ext2_group_desc * ext2_get_group_desc(struct super_block * sb,
 		return NULL;
 	}
 
+	//group descriptor所在的block
 	group_desc = block_group >> EXT2_DESC_PER_BLOCK_BITS(sb);
+	//group descriptor所在的block内的偏移
 	offset = block_group & (EXT2_DESC_PER_BLOCK(sb) - 1);
 	if (!sbi->s_group_desc[group_desc]) {
 		ext2_error (sb, "ext2_get_group_desc",
@@ -1486,6 +1489,7 @@ unsigned long ext2_count_free_blocks (struct super_block * sb)
 	return bitmap_count;
 #else
         for (i = 0; i < EXT2_SB(sb)->s_groups_count; i++) {
+			//将每个group内的free blocks进行累加，得到系统的free blocks
                 desc = ext2_get_group_desc (sb, i, NULL);
                 if (!desc)
                         continue;
@@ -1495,6 +1499,7 @@ unsigned long ext2_count_free_blocks (struct super_block * sb)
 #endif
 }
 
+//测试a是否是b的n次方
 static inline int test_root(int a, int b)
 {
 	int num = b;
@@ -1507,7 +1512,9 @@ static inline int test_root(int a, int b)
 static int ext2_group_sparse(int group)
 {
 	if (group <= 1)
+		//group 0中肯定有sb
 		return 1;
+	//测试group是否是3^n,5^n,7^n
 	return (test_root(group, 3) || test_root(group, 5) ||
 		test_root(group, 7));
 }
@@ -1520,10 +1527,15 @@ static int ext2_group_sparse(int group)
  *	Return the number of blocks used by the superblock (primary or backup)
  *	in this group.  Currently this will be only 0 or 1.
  */
+//测试一个group中是否记录了super block
 int ext2_bg_has_super(struct super_block *sb, int group)
 {
 	if (EXT2_HAS_RO_COMPAT_FEATURE(sb,EXT2_FEATURE_RO_COMPAT_SPARSE_SUPER)&&
 	    !ext2_group_sparse(group))
+		/*
+		 *默认情况下，每个group都会有sb。开启了sparse模式后，只有3^n,5^n,7^n有sb备份。 
+		 *如果开启了sparse,并且组号不是3^n,5^n,7^n, 组内肯定没有sb
+		*/
 		return 0;
 	return 1;
 }

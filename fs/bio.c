@@ -137,6 +137,7 @@ static void bio_kmalloc_destructor(struct bio *bio)
 void bio_init(struct bio *bio)
 {
 	memset(bio, 0, sizeof(*bio));
+	//bi_flags³õÊ¼»¯Îª1
 	bio->bi_flags = 1 << BIO_UPTODATE;
 	bio->bi_comp_cpu = -1;
 	atomic_set(&bio->bi_cnt, 1);

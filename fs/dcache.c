@@ -1,4 +1,4 @@
-/*
+﻿/*
  * fs/dcache.c
  *
  * Complete reimplementation
@@ -45,6 +45,7 @@ EXPORT_SYMBOL(dcache_lock);
 
 static struct kmem_cache *dentry_cache __read_mostly;
 
+//由于struct dentry可能没有字节对齐,DNAME_INLINE_LEN 会大于等于DNAME_INLINE_LEN_MIN
 #define DNAME_INLINE_LEN (sizeof(struct dentry)-offsetof(struct dentry,d_iname))
 
 /*
@@ -60,9 +61,11 @@ static struct kmem_cache *dentry_cache __read_mostly;
 
 static unsigned int d_hash_mask __read_mostly;
 static unsigned int d_hash_shift __read_mostly;
+//记录内存中活动的dentry
 static struct hlist_head *dentry_hashtable __read_mostly;
 
 /* Statistics gathering. */
+//dentry_stat.nr_unused用于记录dentry_unused中元素的个数
 struct dentry_stat_t dentry_stat = {
 	.age_limit = 45,
 };
@@ -85,6 +88,7 @@ static void d_callback(struct rcu_head *head)
  * no dcache_lock, please.  The caller must decrement dentry_stat.nr_dentry
  * inside dcache_lock.
  */
+//释放dentry在kmem_cache中的空间 
 static void d_free(struct dentry *dentry)
 {
 	if (dentry->d_op && dentry->d_op->d_release)
@@ -107,6 +111,7 @@ static void dentry_iput(struct dentry * dentry)
 	struct inode *inode = dentry->d_inode;
 	if (inode) {
 		dentry->d_inode = NULL;
+		//解除对inode的指向 
 		list_del_init(&dentry->d_alias);
 		spin_unlock(&dentry->d_lock);
 		spin_unlock(&dcache_lock);
@@ -200,6 +205,7 @@ static struct dentry *d_kill(struct dentry *dentry)
  * on the compiler to always get this right (gcc generally doesn't).
  * Real recursion would eat up our stack space.
  */
+ //尾递归是极其重要的，不用尾递归，函数的堆栈耗用难以估量，需要保存很多中间函数的堆栈
 
 /*
  * dput - release a dentry
@@ -221,11 +227,14 @@ void dput(struct dentry *dentry)
 repeat:
 	if (atomic_read(&dentry->d_count) == 1)
 		might_sleep();
+	/* 这里只对dentry->d_count做减1操作，如果减1后dentry->d_count不为0，那立刻返回。*/
+    // atomic_dec_and_lock (x, &lock), 如果x - 1 == 0, 返回1， 否则，返回0
 	if (!atomic_dec_and_lock(&dentry->d_count, &dcache_lock))
 		return;
 
 	spin_lock(&dentry->d_lock);
 	if (atomic_read(&dentry->d_count)) {
+		//因为在atomic_dec_and_lock中减一等于0了,这里不应该进来
 		spin_unlock(&dentry->d_lock);
 		spin_unlock(&dcache_lock);
 		return;
@@ -234,15 +243,20 @@ repeat:
 	/*
 	 * AV: ->d_delete() is _NOT_ allowed to block now.
 	 */
+	/* 如果该dentry有自己的d_delete()函数，那直接调用它，指向完之后，调到unhash_it。*/
 	if (dentry->d_op && dentry->d_op->d_delete) {
 		if (dentry->d_op->d_delete(dentry))
+			//d_delete操作成功返回1
 			goto unhash_it;
 	}
 	/* Unreachable? Get rid of it */
  	if (d_unhashed(dentry))
+		//已经有了DCACHE_UNHASHED标志,这时候就需要彻底删除
 		goto kill_it;
   	if (list_empty(&dentry->d_lru)) {
+		//如果此dentry没在lru list中,并且没有DCACHE_UNHASHED标志,表示这个dentry最近被使用过
   		dentry->d_flags |= DCACHE_REFERENCED;
+		//将其加入dentry_unused
 		dentry_lru_add(dentry);
   	}
  	spin_unlock(&dentry->d_lock);
@@ -253,7 +267,9 @@ unhash_it:
 	__d_drop(dentry);
 kill_it:
 	/* if dentry was on the d_lru list delete it from there */
+			//如果dentry已经在lru list上了, 就将其从lru list上删除
 	dentry_lru_del(dentry);
+        //从目录树中删除
 	dentry = d_kill(dentry);
 	if (dentry)
 		goto repeat;
@@ -423,7 +439,9 @@ static void prune_one_dentry(struct dentry * dentry)
 	__releases(dcache_lock)
 	__acquires(dcache_lock)
 {
+	//从hash表中删除
 	__d_drop(dentry);
+	//从子目录链表中删除
 	dentry = d_kill(dentry);
 
 	/*
@@ -435,9 +453,11 @@ static void prune_one_dentry(struct dentry * dentry)
 		if (!atomic_dec_and_lock(&dentry->d_count, &dentry->d_lock))
 			return;
 
+	//释放inode
 		if (dentry->d_op && dentry->d_op->d_delete)
 			dentry->d_op->d_delete(dentry);
 		dentry_lru_del_init(dentry);
+	//释放dentry空间
 		__d_drop(dentry);
 		dentry = d_kill(dentry);
 		spin_lock(&dcache_lock);
@@ -821,6 +841,7 @@ positive:
  * drop the lock and return early due to latency
  * constraints.
  */
+ //只查找没有子目录的dentry,因为如果一个dentry有子目录,其dentry->d_count肯定不为0
 static int select_parent(struct dentry * parent)
 {
 	struct dentry *this_parent = parent;
@@ -841,6 +862,7 @@ resume:
 		 * move only zero ref count dentries to the end 
 		 * of the unused list for prune_dcache
 		 */
+		 //如果dentry->d_count为0, 则将dentry插入dentry_unused尾部
 		if (!atomic_read(&dentry->d_count)) {
 			dentry_lru_add_tail(dentry);
 			found++;
@@ -851,6 +873,7 @@ resume:
 		 * ensures forward progress). We'll be coming back to find
 		 * the rest.
 		 */
+		 //如果找到目标dentry, 并且need_resched为真,就退出,下次进来的时候继续
 		if (found && need_resched())
 			goto out;
 
@@ -887,7 +910,9 @@ void shrink_dcache_parent(struct dentry * parent)
 	struct super_block *sb = parent->d_sb;
 	int found;
 
+	//将dentry_unused中的d_count为0的dentry放到list tail, 统计d_count为0的dentry的个数
 	while ((found = select_parent(parent)) != 0)
+		//将d_count为0的dentry,并且d_sb是parent->d_sb的dentry删除
 		__shrink_dcache_sb(sb, &found, 0);
 }
 
@@ -953,7 +978,9 @@ struct dentry *d_alloc(struct dentry * parent, const struct qstr *name)
 	memcpy(dname, name->name, name->len);
 	dname[name->len] = 0;
 
+	//把 dentry 的使用计数初始化为1
 	atomic_set(&dentry->d_count, 1);
+	//这时候还没加入hash表
 	dentry->d_flags = DCACHE_UNHASHED;
 	spin_lock_init(&dentry->d_lock);
 	dentry->d_inode = NULL;
@@ -971,6 +998,7 @@ struct dentry *d_alloc(struct dentry * parent, const struct qstr *name)
 	INIT_LIST_HEAD(&dentry->d_alias);
 
 	if (parent) {
+		//dget是为了防止父目录在该 dentry 删除前被删除
 		dentry->d_parent = dget(parent);
 		dentry->d_sb = parent->d_sb;
 	} else {
@@ -979,6 +1007,7 @@ struct dentry *d_alloc(struct dentry * parent, const struct qstr *name)
 
 	spin_lock(&dcache_lock);
 	if (parent)
+	//如果存在父目录,就把自己加入父目录的子目录链表中
 		list_add(&dentry->d_u.d_child, &parent->d_subdirs);
 	dentry_stat.nr_dentry++;
 	spin_unlock(&dcache_lock);
@@ -1115,9 +1144,12 @@ struct dentry * d_alloc_root(struct inode * root_inode)
 	if (root_inode) {
 		static const struct qstr name = { .name = "/", .len = 1 };
 
+		//根目录的父目录为NULL
 		res = d_alloc(NULL, &name);
 		if (res) {
+			//根目录dentry的sb和根目录的inode指向的sb一致
 			res->d_sb = root_inode->i_sb;
+			//根目录的父目录是自己
 			res->d_parent = res;
 			d_instantiate(res, root_inode);
 		}
@@ -1125,11 +1157,14 @@ struct dentry * d_alloc_root(struct inode * root_inode)
 	return res;
 }
 
+//d_hash(dentry,hash) 为散列函数 , 它将 dentry 地址和 hash 值相组合 , 
+//映射到 dentry_hashtable 表中 , 返回相应的散列链 
 static inline struct hlist_head *d_hash(struct dentry *parent,
 					unsigned long hash)
 {
 	hash += ((unsigned long) parent ^ GOLDEN_RATIO_PRIME) / L1_CACHE_BYTES;
 	hash = hash ^ ((hash ^ GOLDEN_RATIO_PRIME) >> D_HASHBITS);
+	//保证hash值在hashtable中
 	return dentry_hashtable + (hash & D_HASHMASK);
 }
 
@@ -1372,6 +1407,7 @@ err_out:
  * directory using the seqlockt_t rename_lock.
  */
 
+//d_lookup(dentry,qstr) 在散列中找出以 dentry 作为父目录项 , 名称为 qstr 的目录项 
 struct dentry * d_lookup(struct dentry * parent, struct qstr * name)
 {
 	struct dentry * dentry = NULL;
@@ -1391,20 +1427,23 @@ struct dentry * __d_lookup(struct dentry * parent, struct qstr * name)
 	unsigned int len = name->len;
 	unsigned int hash = name->hash;
 	const unsigned char *str = name->name;
+	//找到hash值所在的链表头
 	struct hlist_head *head = d_hash(parent,hash);
 	struct dentry *found = NULL;
 	struct hlist_node *node;
 	struct dentry *dentry;
 
+	//进行rcu之前, 必须rcu_read_lock
 	rcu_read_lock();
 	
 	/* 
-	 * dentry����Ҫʹ�õĽṹ��ָ��,node��hash�����еĽڵ�,head������ͷ,
-	 * d_hash�ǽṹ������������hash���ĳ�Ա
+	 * dentry是需要使用的结构体指针,node是hash链表中的节点,head是链表头,
+	 * d_hash是结构体中用于连入hash表的成员
 	*/
 	hlist_for_each_entry_rcu(dentry, node, head, d_hash) {
 		struct qstr *qstr;
 
+		//寻找hash值和name传进来的hash值一样的子目录
 		if (dentry->d_name.hash != hash)
 			continue;
 		if (dentry->d_parent != parent)
@@ -1429,8 +1468,10 @@ struct dentry * __d_lookup(struct dentry * parent, struct qstr * name)
 		 * change the qstr (protected by d_lock).
 		 */
 		qstr = &dentry->d_name;
+		//如果父目录有比较函数
 		if (parent->d_op && parent->d_op->d_compare) {
 			if (parent->d_op->d_compare(parent, qstr, name))
+				//一致返回0, 不一致返回非0
 				goto next;
 		} else {
 			if (qstr->len != len)
@@ -1446,6 +1487,7 @@ struct dentry * __d_lookup(struct dentry * parent, struct qstr * name)
 next:
 		spin_unlock(&dentry->d_lock);
  	}
+	//结束rcu保护
  	rcu_read_unlock();
 
  	return found;
@@ -1529,6 +1571,15 @@ out:
  * it to be deleted later when it has no users
  */
  
+ /*当一个文件被删除时,我们有2种选择:*/
+  /*- 将这个dentry变成negtive状态(没有具体inode)*/
+  /*- 将这个dentry变成unhash状态(在dentry_hash中删除)并且释放.*/
+
+  /*通常情况下,我们只是想要将dentry变成negtive状态,但是如果有其他*/
+  /*地方真正使用这个dentry或者我们需要操作的inode不能被释放.我们只能*/
+  /*退一步,暂时不删除这个dentry, 仅仅将其从hash队列中删除,当没有任何*/
+  /*地方使用这个dentry时,再将其删除*/
+ 
 /**
  * d_delete - delete a dentry
  * @dentry: The dentry to delete
@@ -1547,11 +1598,13 @@ void d_delete(struct dentry * dentry)
 	spin_lock(&dentry->d_lock);
 	isdir = S_ISDIR(dentry->d_inode->i_mode);
 	if (atomic_read(&dentry->d_count) == 1) {
+		//解除对inode的关联,并调用iput对inode的引用计数减一
 		dentry_iput(dentry);
 		fsnotify_nameremove(dentry, isdir);
 		return;
 	}
 
+	//unhash this dentry,由于本函数调用了spin_lock(&dcache_lock),故此处不用d_drop
 	if (!d_unhashed(dentry))
 		__d_drop(dentry);
 
@@ -1579,7 +1632,8 @@ static void _d_rehash(struct dentry * entry)
  *
  * Adds a dentry to the hash according to its name.
  */
- 
+
+//将 dentry 加入散列表
 void d_rehash(struct dentry * entry)
 {
 	spin_lock(&dcache_lock);
@@ -1752,7 +1806,7 @@ struct dentry *d_ancestor(struct dentry *p1, struct dentry *p2)
 	struct dentry *p;
 
 	for (p = p2; !IS_ROOT(p); p = p->d_parent) {
-        //��childҲ����p2����parent����,���p2��ancestor��parent��p1,��˵��p1Ҳ��p2��ancestor
+        //从child也就是p2向其parent遍历,如果p2的ancestor的parent是p1,就说明p1也是p2的ancestor
 		if (p->d_parent == p1)
 			return p;
 	}
@@ -2186,7 +2240,7 @@ int is_subdir(struct dentry *new_dentry, struct dentry *old_dentry)
 
 	/* FIXME: This is old behavior, needed? Please check callers. */
 	if (new_dentry == old_dentry)
-        //new_dentry��old_dentry��ͬ,Ҳ��ʾnew_dentry��old_dentry����Ŀ¼
+        //new_dentry和old_dentry相同,也表示new_dentry是old_dentry的子目录
 		return 1;
 
 	/*
@@ -2198,7 +2252,8 @@ int is_subdir(struct dentry *new_dentry, struct dentry *old_dentry)
 		/* for restarting inner loop in case of seq retry */
 		seq = read_seqbegin(&rename_lock);
 		if (d_ancestor(old_dentry, new_dentry))
-            //old_dentry��new_dentry��ancestor
+            //old_dentry是new_dentry的ancestor
+		    //如果new_dentry向上追溯使new_dentry == old_dentry,说明new_dentry是old_dentry的子目录
 			result = 1;
 		else
 			result = 0;
@@ -2208,6 +2263,7 @@ int is_subdir(struct dentry *new_dentry, struct dentry *old_dentry)
 	return result;
 }
 
+//将文件系统中的所有dentry的引用计数减1,这是因为初始化dentry的时候d_count=1
 //atomic_dec all the dentries
 void d_genocide(struct dentry *root)
 {
@@ -2226,13 +2282,17 @@ resume:
 		if (d_unhashed(dentry)||!dentry->d_inode)
 			continue;
 		if (!list_empty(&dentry->d_subdirs)) {
+			//向目录树的子节点移动
 			this_parent = dentry;
 			goto repeat;
 		}
+		//对无子节点的dentry引用计数减一
 		atomic_dec(&dentry->d_count);
 	}
+	//子节点处理完成,父节点移向同级节点
 	if (this_parent != root) {
 		next = this_parent->d_u.d_child.next;
+		//对有子节点的dentry引用计数减一
 		atomic_dec(&this_parent->d_count);
 		this_parent = this_parent->d_parent;
 		goto resume;
@@ -2298,6 +2358,7 @@ static void __init dcache_init_early(void)
 					&d_hash_mask,
 					0);
 
+	//把dentry_hashtable中所有的backet都初始化
 	for (loop = 0; loop < (1 << d_hash_shift); loop++)
 		INIT_HLIST_HEAD(&dentry_hashtable[loop]);
 }

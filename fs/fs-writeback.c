@@ -1,4 +1,4 @@
-/*
+﻿/*
  * fs/fs-writeback.c
  *
  * Copyright (C) 2002, Linus Torvalds.
@@ -91,6 +91,7 @@ static void writeback_release(struct backing_dev_info *bdi)
  * page->mapping->host, so the page-dirtying time is recorded in the internal
  * blockdev inode.
  */
+//在把inode标记为dirty之前，需要将inode放入hash表中
 void __mark_inode_dirty(struct inode *inode, int flags)
 {
 	struct super_block *sb = inode->i_sb;
@@ -100,6 +101,7 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 	 * dirty the inode itself
 	 */
 	if (flags & (I_DIRTY_SYNC | I_DIRTY_DATASYNC)) {
+		//更新日志
 		if (sb->s_op->dirty_inode)
 			sb->s_op->dirty_inode(inode);
 	}
@@ -112,6 +114,7 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 
 	/* avoid the locking if we can */
 	if ((inode->i_state & flags) == flags)
+		//inode的状态已经包含flag
 		return;
 
 	if (unlikely(block_dump)) {
@@ -151,10 +154,13 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 		 * dirty list.  Add blockdev inodes as well.
 		 */
 		if (!S_ISBLK(inode->i_mode)) {
+			//没有在hash表中
 			if (hlist_unhashed(&inode->i_hash))
 				goto out;
 		}
+		//inode在hash表中
 		if (inode->i_state & (I_FREEING|I_CLEAR))
+			//inode要被销毁
 			goto out;
 
 		/*
@@ -436,6 +442,7 @@ __writeback_single_inode(struct inode *inode, struct writeback_control *wbc)
  * on the writer throttling path, and we get decent balancing between many
  * throttled threads: we don't want them all piling up on inode_sync_wait.
  */
+//inode从sb->io移动到sb->dirty上
 void generic_sync_sb_inodes(struct super_block *sb,
 				struct writeback_control *wbc)
 {
@@ -444,18 +451,28 @@ void generic_sync_sb_inodes(struct super_block *sb,
 
 	spin_lock(&inode_lock);
 	if (!wbc->for_kupdate || list_empty(&sb->s_io))
+        //不是周期性的回写或者s_io是空,就将s_dirty中的元素移动到s_io中,重新初始化s_dirty
 		queue_io(sb, wbc->older_than_this);
 
 	while (!list_empty(&sb->s_io)) {
 		struct inode *inode = list_entry(sb->s_io.prev,
 						struct inode, i_list);
+        //从最早dirty的inode开始遍历
 		struct address_space *mapping = inode->i_mapping;
 		struct backing_dev_info *bdi = mapping->backing_dev_info;
 		long pages_skipped;
 
 		if (!bdi_cap_writeback_dirty(bdi)) {
+            //如果设备不能writeback
+            /*
+             *纯粹基于内存的文件系统如ramdisk,或者伪文件系统(bdev除外)或者纯粹的虚拟文件系统 
+             *都不需要与底层块设备同步,这些文件系统会在backing_dev_info中设置 
+             *BDI_CAP_NO_WRITEBACK 
+            */
+            //将inode从原先的链表中取出来,加入s_dirty
 			redirty_tail(inode);
 			if (sb_is_blkdev_sb(sb)) {
+                //bdev文件系统,跳过
 				/*
 				 * Dirty memory-backed blockdev: the ramdisk
 				 * driver does this.  Skip just this inode
@@ -467,10 +484,12 @@ void generic_sync_sb_inodes(struct super_block *sb,
 			 * than the kernel-internal bdev filesystem.  Skip the
 			 * entire superblock.
 			 */
+            //对于文件系统而不是内核内部的bdev伪文件系统的dirty inode,跳过全部的superblock
 			break;
 		}
 
 		if (wbc->nonblocking && bdi_write_congested(bdi)) {
+            //wbc中设置了回写队列在遇到拥塞时是不阻塞,并且bdi在回写过程中遇到了拥塞
 			wbc->encountered_congestion = 1;
 			if (!sb_is_blkdev_sb(sb))
 				break;		/* Skip a congested fs */
@@ -478,6 +497,7 @@ void generic_sync_sb_inodes(struct super_block *sb,
 			continue;		/* Skip a congested blockdev */
 		}
 
+        //要操作的块设备不是这个设备
 		if (wbc->bdi && bdi != wbc->bdi) {
 			if (!sb_is_blkdev_sb(sb))
 				break;		/* fs has the wrong queue */
@@ -486,10 +506,12 @@ void generic_sync_sb_inodes(struct super_block *sb,
 		}
 
 		/* Was this inode dirtied after sync_sb_inodes was called? */
+        //如果是sync_sb_inode执行后,结点变为了脏结点,就略过个结点
 		if (time_after(inode->dirtied_when, start))
 			break;
 
 		/* Is another pdflush already flushing this queue? */
+        //已经有另外的pdflush在处理这个super_block中的结点了
 		if (current_is_pdflush() && !writeback_acquire(bdi))
 			break;
 
@@ -497,6 +519,7 @@ void generic_sync_sb_inodes(struct super_block *sb,
 		__iget(inode);
 		pages_skipped = wbc->pages_skipped;
 		__writeback_single_inode(inode, wbc);
+        //处理完了,清除设备的BDI_pdflush 标志
 		if (current_is_pdflush())
 			writeback_release(bdi);
 		if (wbc->pages_skipped != pages_skipped) {
@@ -508,6 +531,7 @@ void generic_sync_sb_inodes(struct super_block *sb,
 		}
 		spin_unlock(&inode_lock);
 		iput(inode);
+        //如果有抢占的情况,就将当前进程让出来
 		cond_resched();
 		spin_lock(&inode_lock);
 		if (wbc->nr_to_write <= 0) {

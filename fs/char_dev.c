@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  linux/fs/char_dev.c
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
@@ -42,6 +42,7 @@ struct backing_dev_info directly_mappable_cdev_bdi = {
 		BDI_CAP_READ_MAP | BDI_CAP_WRITE_MAP | BDI_CAP_EXEC_MAP),
 };
 
+//全局数组实现散列表, 使主设备号作为散列键, 键值通过major % 255获取
 static struct kobj_map *cdev_map;
 
 static DEFINE_MUTEX(chrdevs_lock);
@@ -326,6 +327,7 @@ void unregister_chrdev(unsigned int major, const char *name)
 	kfree(cd);
 }
 
+//操作cdev时需要加的锁
 static DEFINE_SPINLOCK(cdev_lock);
 
 static struct kobject *cdev_get(struct cdev *p)
@@ -361,6 +363,7 @@ static int chrdev_open(struct inode *inode, struct file *filp)
 
 	spin_lock(&cdev_lock);
 	p = inode->i_cdev;
+	//如果此inode从未打开过
 	if (!p) {
 		struct kobject *kobj;
 		int idx;
@@ -368,6 +371,7 @@ static int chrdev_open(struct inode *inode, struct file *filp)
 		kobj = kobj_lookup(cdev_map, inode->i_rdev, &idx);
 		if (!kobj)
 			return -ENXIO;
+		//通过一个kobj获取cdev对象
 		new = container_of(kobj, struct cdev, kobj);
 		spin_lock(&cdev_lock);
 		/* Check i_cdev again in case somebody beat us to it while
@@ -376,11 +380,13 @@ static int chrdev_open(struct inode *inode, struct file *filp)
 		if (!p) {
 			inode->i_cdev = p = new;
 			inode->i_cindex = idx;
+			//将inode加入cdev的链表中
 			list_add(&inode->i_devices, &p->list);
 			new = NULL;
 		} else if (!cdev_get(p))
 			ret = -ENXIO;
 	} else if (!cdev_get(p))
+		//如果inode被打开过
 		ret = -ENXIO;
 	spin_unlock(&cdev_lock);
 	cdev_put(new);

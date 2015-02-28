@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  linux/fs/file.c
  *
  *  Copyright (C) 1998-1999, Stephen Tweedie and Bill Hawes
@@ -130,7 +130,9 @@ static void copy_fdtable(struct fdtable *nfdt, struct fdtable *ofdt)
 
 	cpy = ofdt->max_fds / BITS_PER_BYTE;
 	set = (nfdt->max_fds - ofdt->max_fds) / BITS_PER_BYTE;
+		//copy位图
 	memcpy(nfdt->open_fds, ofdt->open_fds, cpy);
+		//将超出的部分全部置0
 	memset((char *)(nfdt->open_fds) + cpy, 0, set);
 	memcpy(nfdt->close_on_exec, ofdt->close_on_exec, cpy);
 	memset((char *)(nfdt->close_on_exec) + cpy, 0, set);
@@ -250,6 +252,7 @@ int expand_files(struct files_struct *files, int nr)
 {
 	struct fdtable *fdt;
 
+	//通过进程的打开文件列表获得文件描述符位图结构
 	fdt = files_fdtable(files);
 
 	/*

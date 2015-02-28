@@ -34,6 +34,7 @@ struct bdev_inode {
 
 static const struct address_space_operations def_blk_aops;
 
+//通过inode找到bdev_inode
 static inline struct bdev_inode *BDEV_I(struct inode *inode)
 {
 	return container_of(inode, struct bdev_inode, vfs_inode);
@@ -93,9 +94,11 @@ EXPORT_SYMBOL(set_blocksize);
 int sb_set_blocksize(struct super_block *sb, int size)
 {
 	if (set_blocksize(sb->s_bdev, size))
+		//size不符合要求
 		return 0;
 	/* If we get here, we know size is power of two
 	 * and it's value is between 512 and PAGE_SIZE */
+	//size符合要求
 	sb->s_blocksize = size;
 	sb->s_blocksize_bits = blksize_bits(size);
 	return sb->s_blocksize;
@@ -103,6 +106,7 @@ int sb_set_blocksize(struct super_block *sb, int size)
 
 EXPORT_SYMBOL(sb_set_blocksize);
 
+//保证设置的块大小大于等于硬件实际的block size
 int sb_min_blocksize(struct super_block *sb, int size)
 {
 	int minsize = bdev_hardsect_size(sb->s_bdev);
@@ -326,6 +330,7 @@ static struct file_system_type bd_type = {
 	.kill_sb	= kill_anon_super,
 };
 
+//伪文件系统bdev的vfsmount指针
 static struct vfsmount *bd_mnt __read_mostly;
 struct super_block *blockdev_superblock;
 
@@ -355,6 +360,7 @@ static inline unsigned long hash(dev_t dev)
 	return MAJOR(dev)+MINOR(dev);
 }
 
+//bdev伪文件系统中与inode关联的bdev.bd_dev中保存了这个块设备的设备号
 static int bdev_test(struct inode *inode, void *data)
 {
 	return BDEV_I(inode)->bdev.bd_dev == *(dev_t *)data;
@@ -366,13 +372,26 @@ static int bdev_set(struct inode *inode, void *data)
 	return 0;
 }
 
+//全局链表头,用于记录系统中所有的block device
 static LIST_HEAD(all_bdevs);
 
+//根据设备号获取block device
+/** 此函数首先根据dev_t获取inode: 
+ * 1.从hash表中找到hash值匹配的inode 
+ * 2.从inode获取block device 
+ * 3.再从blockdevice中获取dev_t 
+ * 4.如果这个dev_t对象和传入的data相等，这个inode就是我们要找的inode.
+ * 然后就对这个找到的inode的block device对象赋值。
+ * @param dev
+ * @return struct block_device* 
+ */
 struct block_device *bdget(dev_t dev)
 {
 	struct block_device *bdev;
 	struct inode *inode;
 
+	/*这里先在inode的哈希表中进行查找与dev设备号对应的inode，如果没找到的话， 
+    则通过bdev伪文件系统创建bdev_inode(包含inode和block device的结构体)*/  
 	inode = iget5_locked(bd_mnt->mnt_sb, hash(dev),
 			bdev_test, bdev_set, &dev);
 
@@ -422,19 +441,29 @@ void bdput(struct block_device *bdev)
 
 EXPORT_SYMBOL(bdput);
  
+// /dev/中的inode->通过设备号获取bdev fs中的inode->bdev fs中的bdev
 static struct block_device *bd_acquire(struct inode *inode)
 {
 	struct block_device *bdev;
 
 	spin_lock(&bdev_lock);
+	/*
+	 * 之前调用bd_acquire,inode(/dev的tmpfs)中的i_bdev就已经指向了block device,
+	 * 否则只有dev fs中的inode->i_bdev指向了block device
+	*/ 
 	bdev = inode->i_bdev;
 	if (bdev) {
+		//增加引用计数
 		atomic_inc(&bdev->bd_inode->i_count);
 		spin_unlock(&bdev_lock);
 		return bdev;
 	}
 	spin_unlock(&bdev_lock);
 
+	/*
+	 * 通过设备号的信息来获取block device实例,这个设备号的传递过程:
+	 * 设备驱动中注册->add_disk->udev->shmem_mknod->shmem_get_inode->init_special_inode
+	*/
 	bdev = bdget(inode->i_rdev);
 	if (bdev) {
 		spin_lock(&bdev_lock);
@@ -448,6 +477,7 @@ static struct block_device *bd_acquire(struct inode *inode)
 			atomic_inc(&bdev->bd_inode->i_count);
 			inode->i_bdev = bdev;
 			inode->i_mapping = bdev->bd_inode->i_mapping;
+			//多个设备节点指向同一个设备
 			list_add(&inode->i_devices, &bdev->bd_inodes);
 		}
 		spin_unlock(&bdev_lock);
@@ -473,6 +503,7 @@ void bd_forget(struct inode *inode)
 		iput(bdev->bd_inode);
 }
 
+//将bd_holder字段设置为一个特定的地址
 int bd_claim(struct block_device *bdev, void *holder)
 {
 	int res;
@@ -480,15 +511,20 @@ int bd_claim(struct block_device *bdev, void *holder)
 
 	/* first decide result */
 	if (bdev->bd_holder == holder)
+		//bdev已经被holder hold过一次了
 		res = 0;	 /* already a holder */
 	else if (bdev->bd_holder != NULL)
+		//bdev被其他的holder hold住了
 		res = -EBUSY; 	 /* held by someone else */
 	else if (bdev->bd_contains == bdev)
+		//bdev没有被其他的holder hold住,并且是主设备
 		res = 0;  	 /* is a whole device which isn't held */
 
 	else if (bdev->bd_contains->bd_holder == bd_claim)
+		//bdev的holder是NULL,并且是从设备
 		res = 0; 	 /* is a partition of a device that is being partitioned */
 	else if (bdev->bd_contains->bd_holder != NULL)
+		//主设备被其他holder hold住了,次设备也就不能被hold住
 		res = -EBUSY;	 /* is a partition of a held device */
 	else
 		res = 0;	 /* is a partition of an un-held device */
@@ -499,6 +535,10 @@ int bd_claim(struct block_device *bdev, void *holder)
 		 * will be incremented twice, and bd_holder will
 		 * be set to bd_claim before being set to holder
 		 */
+        /*
+         * 对于主设备来说,bd_holders会自加2次,bd_holder也会被设置两次.
+         * 第一次设置为bd_claim,第二次设置为holder(一般是struct file*)
+        */
 		bdev->bd_contains->bd_holders ++;
 		bdev->bd_contains->bd_holder = bd_claim;
 		bdev->bd_holders++;
@@ -514,8 +554,10 @@ void bd_release(struct block_device *bdev)
 {
 	spin_lock(&bdev_lock);
 	if (!--bdev->bd_contains->bd_holders)
+		//首先release主设备
 		bdev->bd_contains->bd_holder = NULL;
 	if (!--bdev->bd_holders)
+		//再release从设备
 		bdev->bd_holder = NULL;
 	spin_unlock(&bdev_lock);
 }
@@ -958,13 +1000,18 @@ int check_disk_change(struct block_device *bdev)
 }
 
 EXPORT_SYMBOL(check_disk_change);
-
+/**
+* bd_set_size - 设置block device的block size
+* @param bdev : block device 对象
+* @param size : 磁盘的容量
+*/
 void bd_set_size(struct block_device *bdev, loff_t size)
 {
 	unsigned bsize = bdev_hardsect_size(bdev);
 
 	bdev->bd_inode->i_size = size;
 	while (bsize < PAGE_CACHE_SIZE) {
+		//如果扇区大小小于页面大小 
 		if (size & bsize)
 			break;
 		bsize <<= 1;
@@ -1010,11 +1057,14 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 	if (!disk)
 		goto out_unlock_kernel;
 
+	//此block device没有被打开过
 	mutex_lock_nested(&bdev->bd_mutex, for_part);
 	if (!bdev->bd_openers) {
 		bdev->bd_disk = disk;
 		bdev->bd_contains = bdev;
+        //没有使用fdisk之前，是不会有分区信息的，即没有sda1,sda2等设备
 		if (!partno) {
+			//block device是一个磁盘
 			struct backing_dev_info *bdi;
 
 			ret = -ENXIO;
@@ -1023,21 +1073,32 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 				goto out_clear;
 
 			if (disk->fops->open) {
+				//调用磁盘的open
 				ret = disk->fops->open(bdev, mode);
 				if (ret)
+					//如果open失败
 					goto out_clear;
 			}
+			//disk->fops->open有可能会修改bd_openers
 			if (!bdev->bd_openers) {
+				//给bdev的block size 赋值。一个扇区512字节,左移9位
 				bd_set_size(bdev,(loff_t)get_capacity(disk)<<9);
+				//获取请求队列的backing_dev_info
 				bdi = blk_get_backing_dev_info(bdev);
 				if (bdi == NULL)
 					bdi = &default_backing_dev_info;
+				//inode地址空间中的backing_dev_info需要和请求队列中的一致 
 				bdev->bd_inode->i_data.backing_dev_info = bdi;
 			}
+			//在register_disk中设置了这个标志
 			if (bdev->bd_invalidated)
+                //重新扫描分区 
 				rescan_partitions(disk, bdev);
 		} else {
+			//是分区
+            //主block device的对象 
 			struct block_device *whole;
+			//通过设备号找到主设备
 			whole = bdget_disk(disk, 0);
 			ret = -ENOMEM;
 			if (!whole)
@@ -1046,6 +1107,7 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 			ret = __blkdev_get(whole, mode, 1);
 			if (ret)
 				goto out_clear;
+            //bdev的主设备指向whole
 			bdev->bd_contains = whole;
 			bdev->bd_inode->i_data.backing_dev_info =
 			   whole->bd_inode->i_data.backing_dev_info;
@@ -1058,11 +1120,14 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 			bd_set_size(bdev, (loff_t)bdev->bd_part->nr_sects << 9);
 		}
 	} else {
+	//block device被打开过
 		put_disk(disk);
 		module_put(disk->fops->owner);
 		disk = NULL;
+		//如果此block device是一个主设备
 		if (bdev->bd_contains == bdev) {
 			if (bdev->bd_disk->fops->open) {
+				//调用具体设备的open
 				ret = bdev->bd_disk->fops->open(bdev, mode);
 				if (ret)
 					goto out_unlock_bdev;
@@ -1125,6 +1190,10 @@ static int blkdev_open(struct inode * inode, struct file * filp)
 	if ((filp->f_flags & O_ACCMODE) == 3)
 		filp->f_mode |= FMODE_WRITE_IOCTL;
 
+	/*
+	 * 这里为什么不用I_BDEV的原因是调用这个函数的时候,
+	 * 可能在bdev fs中还没有生成过相应的节点,使用bd_acquire更加安全
+	*/ 
 	bdev = bd_acquire(inode);
 	if (bdev == NULL)
 		return -ENOMEM;
@@ -1316,6 +1385,7 @@ struct block_device *open_bdev_exclusive(const char *path, fmode_t mode, void *h
 	struct block_device *bdev;
 	int error = 0;
 
+	//根据路径名获取block_device
 	bdev = lookup_bdev(path);
 	if (IS_ERR(bdev))
 		return bdev;

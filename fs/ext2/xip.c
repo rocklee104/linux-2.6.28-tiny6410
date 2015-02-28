@@ -68,6 +68,7 @@ void ext2_xip_verify_sb(struct super_block *sb)
 
 	if ((sbi->s_mount_opt & EXT2_MOUNT_XIP) &&
 	    !sb->s_bdev->bd_disk->fops->direct_access) {
+        //如果挂载选项中要求xip, 但是block device不支持，挂载时忽略xip
 		sbi->s_mount_opt &= (~EXT2_MOUNT_XIP);
 		ext2_warning(sb, __func__,
 			     "ignoring xip option - not supported by bdev");

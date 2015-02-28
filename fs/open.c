@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  linux/fs/open.c
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
@@ -450,9 +450,11 @@ SYSCALL_DEFINE3(faccessat, int, dfd, const char __user *, filename, int, mode)
 	kernel_cap_t uninitialized_var(old_cap);  /* !SECURE_NO_SETUID_FIXUP */
 	int res;
 
+	//mode只能在 F_OK, X_OK, W_OK, R_OK中取值
 	if (mode & ~S_IRWXO)	/* where's F_OK, X_OK, W_OK, R_OK? */
 		return -EINVAL;
 
+	//清除fsuid,fsgid,cap
 	old_fsuid = current->fsuid;
 	old_fsgid = current->fsgid;
 
@@ -477,6 +479,7 @@ SYSCALL_DEFINE3(faccessat, int, dfd, const char __user *, filename, int, mode)
 			old_cap = cap_set_effective(current->cap_permitted);
 	}
 
+	//获取文件的nd,res为0时,表示__user_walk_fd成功
 	res = user_path_at(dfd, filename, LOOKUP_FOLLOW, &path);
 	if (res)
 		goto out;
@@ -513,6 +516,7 @@ SYSCALL_DEFINE3(faccessat, int, dfd, const char __user *, filename, int, mode)
 out_path_release:
 	path_put(&path);
 out:
+	//恢复fsuid,fsgid,cap
 	current->fsuid = old_fsuid;
 	current->fsgid = old_fsgid;
 
@@ -814,11 +818,14 @@ static struct file *__dentry_open(struct dentry *dentry, struct vfsmount *mnt,
 	struct inode *inode;
 	int error;
 
+	//系统调用时传入的标志
 	f->f_flags = flags;
 	f->f_mode = (__force fmode_t)((flags+1) & O_ACCMODE) | FMODE_LSEEK |
 				FMODE_PREAD | FMODE_PWRITE;
 	inode = dentry->d_inode;
+	//如果用户要求写
 	if (f->f_mode & FMODE_WRITE) {
+		//写文件之前要加锁
 		error = __get_file_write_access(inode, mnt);
 		if (error)
 			goto cleanup_file;
@@ -826,29 +833,39 @@ static struct file *__dentry_open(struct dentry *dentry, struct vfsmount *mnt,
 			file_take_write(f);
 	}
 
+	//地址空间对象
 	f->f_mapping = inode->i_mapping;
 	f->f_path.dentry = dentry;
 	f->f_path.mnt = mnt;
+	//文件指针位置
 	f->f_pos = 0;
 	f->f_op = fops_get(inode->i_fop);
+	//把file加入sb维护的file链表中去
 	file_move(f, &inode->i_sb->s_files);
 
 	error = security_dentry_open(f);
 	if (error)
 		goto cleanup_all;
 
+	//普通文件open为空
 	if (!open && f->f_op)
+		//使用inode中的i_fop
 		open = f->f_op->open;
+	/*如果是设备文件，需要打开*/  
 	if (open) {
 		error = open(inode, f);
 		if (error)
 			goto cleanup_all;
 	}
 
+	//man中指出creation  flags  are  O_CREAT, O_EXCL, O_NOCTTY, O_TRUNC
+	//这里将所有创建标志全部清空
 	f->f_flags &= ~(O_CREAT | O_EXCL | O_NOCTTY | O_TRUNC);
 
+	 /*预读初始化*/
 	file_ra_state_init(&f->f_ra, f->f_mapping->host->i_mapping);
 
+	//NB是注意的意思
 	/* NB: we're sure to have correct a_ops only after f_op->open */
 	if (f->f_flags & O_DIRECT) {
 		if (!f->f_mapping->a_ops ||
@@ -937,8 +954,10 @@ struct file *nameidata_to_filp(struct nameidata *nd, int flags)
 	struct file *filp;
 
 	/* Pick up the filp from the open intent */
+	//获得文件指针
 	filp = nd->intent.open.file;
 	/* Has the filesystem initialised the file for us? */
+	//文件系统是否已经初始化dentry?
 	if (filp->f_path.dentry == NULL)
 		filp = __dentry_open(nd->path.dentry, nd->path.mnt, flags, filp,
 				     NULL);
@@ -1018,6 +1037,7 @@ void fd_install(unsigned int fd, struct file *file)
 	spin_lock(&files->file_lock);
 	fdt = files_fdtable(files);
 	BUG_ON(fdt->fd[fd] != NULL);
+	//fd和file关联起来
 	rcu_assign_pointer(fdt->fd[fd], file);
 	spin_unlock(&files->file_lock);
 }
@@ -1030,6 +1050,7 @@ long do_sys_open(int dfd, const char __user *filename, int flags, int mode)
 	int fd = PTR_ERR(tmp);
 
 	if (!IS_ERR(tmp)) {
+		//找到一个未使用的fd
 		fd = get_unused_fd_flags(flags);
 		if (fd >= 0) {
 			struct file *f = do_filp_open(dfd, tmp, flags, mode);
@@ -1051,6 +1072,7 @@ SYSCALL_DEFINE3(open, const char __user *, filename, int, flags, int, mode)
 	long ret;
 
 	if (force_o_largefile())
+		//64位默认打开此选项
 		flags |= O_LARGEFILE;
 
 	ret = do_sys_open(AT_FDCWD, filename, flags, mode);

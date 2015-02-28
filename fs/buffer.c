@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  linux/fs/buffer.c
  *
  *  Copyright (C) 1991, 1992, 2002  Linus Torvalds
@@ -57,7 +57,6 @@ static int sync_buffer(void *word)
 {
 	struct block_device *bd;
 	struct buffer_head *bh
-        //ͨ��b_state��ȡbh
 		= container_of(word, struct buffer_head, b_state);
 
 	smp_mb();
@@ -77,6 +76,7 @@ EXPORT_SYMBOL(__lock_buffer);
 
 void unlock_buffer(struct buffer_head *bh)
 {
+    //清除BH_locked标志
 	clear_bit_unlock(BH_Lock, &bh->b_state);
 	smp_mb__after_clear_bit();
 	wake_up_bit(&bh->b_state, BH_Lock);
@@ -258,6 +258,7 @@ EXPORT_SYMBOL(thaw_bdev);
  * succeeds, there is no need to take private_lock. (But if
  * private_lock is contended then so is mapping->tree_lock).
  */
+//这个函数在页缓存中搜索符合条件的块缓存
 static struct buffer_head *
 __find_get_block_slow(struct block_device *bdev, sector_t block)
 {
@@ -270,23 +271,29 @@ __find_get_block_slow(struct block_device *bdev, sector_t block)
 	struct page *page;
 	int all_mapped = 1;
 
+    //在页缓存中搜索包含块缓存的页
 	index = block >> (PAGE_CACHE_SHIFT - bd_inode->i_blkbits);
 	page = find_get_page(bd_mapping, index);
 	if (!page)
 		goto out;
 
+    //与try_to_free_buffers互斥访问block device的mapping
 	spin_lock(&bd_mapping->private_lock);
 	if (!page_has_buffers(page))
+        //页中没有与之关联的缓冲区
 		goto out_unlock;
+    //找到缓冲区链表的头
 	head = page_buffers(page);
 	bh = head;
 	do {
 		if (bh->b_blocknr == block) {
+            //如果块缓冲区的逻辑块号是请求的逻辑块号，返回这个缓冲区
 			ret = bh;
 			get_bh(bh);
 			goto out_unlock;
 		}
 		if (!buffer_mapped(bh))
+            //如果bh没有映射， all_mapped=0；
 			all_mapped = 0;
 		bh = bh->b_this_page;
 	} while (bh != head);
@@ -380,6 +387,7 @@ static void free_more_memory(void)
  * I/O completion handler for block_read_full_page() - pages
  * which come unlocked at the end of I/O.
  */
+//uptodate表示本次读是否正确
 static void end_buffer_async_read(struct buffer_head *bh, int uptodate)
 {
 	unsigned long flags;
@@ -392,6 +400,7 @@ static void end_buffer_async_read(struct buffer_head *bh, int uptodate)
 
 	page = bh->b_page;
 	if (uptodate) {
+        //如果读正确，那么设置该buffer_head状态为BH_Uptodate
 		set_buffer_uptodate(bh);
 	} else {
 		clear_buffer_uptodate(bh);
@@ -406,15 +415,22 @@ static void end_buffer_async_read(struct buffer_head *bh, int uptodate)
 	 * decide that the page is now completely done.
 	 */
 	first = page_buffers(page);
+    /*
+     *里禁止中断并且加自旋锁是为了防止多个buffer 
+     *head完成io后调用end_buffer_async_read对此page操作 
+    */
 	local_irq_save(flags);
 	bit_spin_lock(BH_Uptodate_Lock, &first->b_state);
+    //清除BH_Async_Read标志
 	clear_buffer_async_read(bh);
+    //对buffer_head解锁
 	unlock_buffer(bh);
 	tmp = bh;
 	do {
 		if (!buffer_uptodate(tmp))
 			page_uptodate = 0;
 		if (buffer_async_read(tmp)) {
+            //如果BH_Async_Read标志没有被清除，就马上退出
 			BUG_ON(!buffer_locked(tmp));
 			goto still_busy;
 		}
@@ -514,9 +530,11 @@ still_busy:
  * PageLocked prevents anyone from starting writeback of a page which is
  * under read I/O (PageWriteback is only ever set against a locked page).
  */
+//设置读完成后的回调函数
 static void mark_buffer_async_read(struct buffer_head *bh)
 {
 	bh->b_end_io = end_buffer_async_read;
+    //标记本buffer head需要被异步读取
 	set_buffer_async_read(bh);
 }
 
@@ -898,11 +916,13 @@ int remove_inode_buffers(struct inode *inode)
 
 		spin_lock(&buffer_mapping->private_lock);
 		while (!list_empty(list)) {
+            //获取inode关联的第一个bh
 			struct buffer_head *bh = BH_ENTRY(list->next);
 			if (buffer_dirty(bh)) {
 				ret = 0;
 				break;
 			}
+            //将bh从list中移除
 			__remove_assoc_queue(bh);
 		}
 		spin_unlock(&buffer_mapping->private_lock);
@@ -919,6 +939,13 @@ int remove_inode_buffers(struct inode *inode)
  * The retry flag is used to differentiate async IO (paging, swapping)
  * which may not fail from ordinary buffer allocations.
  */
+/*
+* 当指定一个用作数据区的页以及每个buffer的大小时，创建合适数量的buffer.使用bh->b_this_page
+* 链接这些创建的buffer.如果无法创建更多的buffer, 就返回NULL
+*/
+/*
+* alloc_page_buffers - 分割一个page成size大小的块缓 
+*/ 
 struct buffer_head *alloc_page_buffers(struct page *page, unsigned long size,
 		int retry)
 {
@@ -941,6 +968,7 @@ try_again:
 		bh->b_state = 0;
 		atomic_set(&bh->b_count, 0);
 		bh->b_private = NULL;
+        //从create_empty_buffers调用时，bh->b_size = blocksize
 		bh->b_size = size;
 
 		/* Link the buffer to its page */
@@ -953,6 +981,7 @@ try_again:
  * In case anything failed, we just free everything we got.
  */
 no_grow:
+	//依次释放bh
 	if (head) {
 		do {
 			bh = head;
@@ -967,7 +996,13 @@ no_grow:
 	 * become available.  But we don't want tasks sleeping with 
 	 * partially complete buffers, so all were released above.
 	 */
+	/*
+	 *同步io request不经过调度算法直接操作磁盘，可能会失败。异步io request 不能失败， 
+	 *所以需要等待直到获取可用的bufferhead.我们不希望获取一个获取部分可用bh的task 
+	 *睡眠，因为这样会浪费一部分内存空间。所以只要bh没有获取完全，就要将已经获得的bh释放
+	*/
 	if (!retry)
+		//如果retry为0，bh分配失败就退出
 		return NULL;
 
 	/* We're _really_ low on memory. Now we just
@@ -976,6 +1011,7 @@ no_grow:
 	 * the reserve list is empty, we're sure there are 
 	 * async buffer heads in use.
 	 */
+	//如果retry为1（当async io request时），如果分配失败，需要继续分配bh
 	free_more_memory();
 	goto try_again;
 }
@@ -998,6 +1034,7 @@ link_dev_buffers(struct page *page, struct buffer_head *head)
 /*
  * Initialise the state of a blockdev page's buffers.
  */ 
+//初始化buffers, 一般调用此函数的buffer均没有被map
 static void
 init_page_buffers(struct page *page, struct block_device *bdev,
 			sector_t block, int size)
@@ -1013,8 +1050,10 @@ init_page_buffers(struct page *page, struct block_device *bdev,
 			bh->b_blocknr = block;
 			if (uptodate)
 				set_buffer_uptodate(bh);
+			//b_blocknr和b_bdev指向了块设备的有效数据就表示mapped
 			set_buffer_mapped(bh);
 		}
+        //如果bh被map过了，就什么都不做，跳到下一个buffer
 		block++;
 		bh = bh->b_this_page;
 	} while (bh != head);
@@ -1033,6 +1072,7 @@ grow_dev_page(struct block_device *bdev, sector_t block,
 	struct page *page;
 	struct buffer_head *bh;
 
+    //在页缓存中搜索页面，如果不存在，则创建。返回的page是加了锁的。
 	page = find_or_create_page(inode->i_mapping, index,
 		(mapping_gfp_mask(inode->i_mapping) & ~__GFP_FS)|__GFP_MOVABLE);
 	if (!page)
@@ -1041,15 +1081,24 @@ grow_dev_page(struct block_device *bdev, sector_t block,
 	BUG_ON(!PageLocked(page));
 
 	if (page_has_buffers(page)) {
+        //这里的page含有buffer, 一定是通过搜索找到的page
 		bh = page_buffers(page);
 		if (bh->b_size == size) {
+            //重新初始化page中的buffer
 			init_page_buffers(page, bdev, block, size);
 			return page;
 		}
+        //size不匹配，需要释放页内所有的buffer，重新分配大小为size的buffer
 		if (!try_to_free_buffers(page))
 			goto failed;
 	}
 
+    /*
+     *如果page没有buffer,那就需要： 
+     *1.分配块缓冲 
+     *2.将块缓冲和page关联起来 
+     *3.设置bh的b_bdev和bh->b_blocknr
+    */
 	/*
 	 * Allocate some buffers for this page
 	 */
@@ -1063,6 +1112,7 @@ grow_dev_page(struct block_device *bdev, sector_t block,
 	 * run under the page lock.
 	 */
 	spin_lock(&inode->i_mapping->private_lock);
+    //将bh和page关联起来
 	link_dev_buffers(page, bh);
 	init_page_buffers(page, bdev, block, size);
 	spin_unlock(&inode->i_mapping->private_lock);
@@ -1079,6 +1129,7 @@ failed:
  * Create buffers for the specified block device block's page.  If
  * that page was dirty, the buffers are set dirty also.
  */
+//创建符合条件的bh
 static int
 grow_buffers(struct block_device *bdev, sector_t block, int size)
 {
@@ -1091,6 +1142,10 @@ grow_buffers(struct block_device *bdev, sector_t block, int size)
 		sizebits++;
 	} while ((size << sizebits) < PAGE_SIZE);
 
+    /*
+     *size一般小于等于一个页。通过上面那个循环，可以得出2^sizebits个size等于一个页。 
+     *而size一般是一个block size大小。block >> sizebits就可以得到起始页号index。
+    */
 	index = block >> sizebits;
 
 	/*
@@ -1111,6 +1166,7 @@ grow_buffers(struct block_device *bdev, sector_t block, int size)
 	page = grow_dev_page(bdev, block, index, size);
 	if (!page)
 		return 0;
+    //page操作完成，就应该unlock it
 	unlock_page(page);
 	page_cache_release(page);
 	return 1;
@@ -1135,6 +1191,10 @@ __getblk_slow(struct block_device *bdev, sector_t block, int size)
 		struct buffer_head * bh;
 		int ret;
 
+        /*
+         *1.如果数据不在页缓存中，或虽然在页缓存中，但对应的页没有与之关联的缓冲区，返回NULL。 
+         *2.如果数据在页缓存中，且对应页有相关缓存区，则返回指向所要缓冲头的指针。
+        */
 		bh = __find_get_block(bdev, block, size);
 		if (bh)
 			return bh;
@@ -1198,6 +1258,7 @@ void mark_buffer_dirty(struct buffer_head *bh)
 			return;
 	}
 
+    //buffer本身不dirty, 设置buffer dirty成功
 	if (!test_set_buffer_dirty(bh))
 		__set_page_dirty(bh->b_page, page_mapping(bh->b_page), 0);
 }
@@ -1247,6 +1308,10 @@ static struct buffer_head *__bread_slow(struct buffer_head *bh)
 		bh->b_end_io = end_buffer_read_sync;
 		submit_bh(READ, bh);
 		wait_on_buffer(bh);
+        /*
+         *正常情况下，当数据传输完成，b_end_io被调用，就会unlock_buffer, 
+         *并且buffer uptodate
+        */    
 		if (buffer_uptodate(bh))
 			return bh;
 	}
@@ -1294,6 +1359,7 @@ static inline void check_irqs_on(void)
 /*
  * The LRU management algorithm is dopey-but-simple.  Sorry.
  */
+//将新的缓冲头添加到LRU中
 static void bh_lru_install(struct buffer_head *bh)
 {
 	struct buffer_head *evictee = NULL;
@@ -1308,11 +1374,13 @@ static void bh_lru_install(struct buffer_head *bh)
 		int out = 0;
 
 		get_bh(bh);
+        //将bh加入到lru的头部
 		bhs[out++] = bh;
 		for (in = 0; in < BH_LRU_SIZE; in++) {
 			struct buffer_head *bh2 = lru->bhs[in];
 
 			if (bh2 == bh) {
+                //如果bh已经存在lru中，就将原来已经存在的bh释放,将下一个lru->bhs[in]放入bhs[out]
 				__brelse(bh2);
 			} else {
 				if (out >= BH_LRU_SIZE) {
@@ -1324,12 +1392,15 @@ static void bh_lru_install(struct buffer_head *bh)
 			}
 		}
 		while (out < BH_LRU_SIZE)
+            //在lru->bhs[in]中有多个bh2 == bh
 			bhs[out++] = NULL;
+        //将新的lru数组赋值给bh_lrus
 		memcpy(lru->bhs, bhs, sizeof(bhs));
 	}
 	bh_lru_unlock();
 
 	if (evictee)
+        //lru中最末尾的成员，需要被释放
 		__brelse(evictee);
 }
 
@@ -1351,6 +1422,7 @@ lookup_bh_lru(struct block_device *bdev, sector_t block, unsigned size)
 
 		if (bh && bh->b_bdev == bdev &&
 				bh->b_blocknr == block && bh->b_size == size) {
+            //将符合条件的bh移动到lru的最前端
 			if (i) {
 				while (i) {
 					lru->bhs[i] = lru->bhs[i - 1];
@@ -1372,17 +1444,24 @@ lookup_bh_lru(struct block_device *bdev, sector_t block, unsigned size)
  * it in the LRU and mark it as accessed.  If it is not present then return
  * NULL
  */
+/*
+ * 首先在lru中搜索符合条件的bh,没有找到就在页缓存中搜索bh,
+ * 如果在页缓存中搜索到了,就将这个bh加入lru
+*/
 struct buffer_head *
 __find_get_block(struct block_device *bdev, sector_t block, unsigned size)
 {
 	struct buffer_head *bh = lookup_bh_lru(bdev, block, size);
 
 	if (bh == NULL) {
+        //在lru中没有找到符合条件的bh，就在页缓存中搜索
 		bh = __find_get_block_slow(bdev, block);
 		if (bh)
+            //如果在页缓存中搜索到了符合条件的bh，就将其加入lru
 			bh_lru_install(bh);
 	}
 	if (bh)
+        //设置bh所在page的PG_referenced和PG_active标志
 		touch_buffer(bh);
 	return bh;
 }
@@ -1437,9 +1516,11 @@ EXPORT_SYMBOL(__breadahead);
 struct buffer_head *
 __bread(struct block_device *bdev, sector_t block, unsigned size)
 {
+    //搜索及建立符合条件的buffer
 	struct buffer_head *bh = __getblk(bdev, block, size);
 
 	if (likely(bh) && !buffer_uptodate(bh))
+        //如果buffer中的内容not uptodate, 就需要从通用块层中读取数据更新buffer
 		bh = __bread_slow(bh);
 	return bh;
 }
@@ -1560,22 +1641,28 @@ void create_empty_buffers(struct page *page,
 {
 	struct buffer_head *bh, *head, *tail;
 
+    //head是单向链表最头部成员
 	head = alloc_page_buffers(page, blocksize, 1);
 	bh = head;
 	do {
+        //将链表各成员设置b_state
 		bh->b_state |= b_state;
 		tail = bh;
 		bh = bh->b_this_page;
 	} while (bh);
+    //尾部成员的next指向头部，完成循环链表的连接
 	tail->b_this_page = head;
 
 	spin_lock(&page->mapping->private_lock);
 	if (PageUptodate(page) || PageDirty(page)) {
+        //页中包含有效数据或者page被标记为dirty,需要将buffer_head设置成同样的状态
 		bh = head;
 		do {
 			if (PageDirty(page))
+                //将bh->b_state设置成BH_Dirty
 				set_buffer_dirty(bh);
 			if (PageUptodate(page))
+                //将bh->b_state设置成BH_Uptodate
 				set_buffer_uptodate(bh);
 			bh = bh->b_this_page;
 		} while (bh != head);
@@ -2161,29 +2248,48 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 	BUG_ON(!PageLocked(page));
 	blocksize = 1 << inode->i_blkbits;
 	if (!page_has_buffers(page))
+        //如果块缓存不存在就创建
 		create_empty_buffers(page, blocksize, 0);
+    //获取块缓存链表头
 	head = page_buffers(page);
 
+    //块起始位置
 	iblock = (sector_t)page->index << (PAGE_CACHE_SHIFT - inode->i_blkbits);
+    //文件末尾的块
 	lblock = (i_size_read(inode)+blocksize-1) >> inode->i_blkbits;
 	bh = head;
 	nr = 0;
 	i = 0;
 
+    /*
+     * 需要处理3中情况： 
+     * 1.缓冲区的内容是最新的:直接跳过
+     * 2.缓冲区的内容不是最新的，有映射：加入数组
+     * 3.缓冲区的内容没有映射：映射，加入数组
+     */
 	do {
 		if (buffer_uptodate(bh))
+            //如果记录块内容是一致的，就跳过
 			continue;
 
 		if (!buffer_mapped(bh)) {
+            //如果块缓冲区还没有和物理块建立映射关系且块起始地址未超出文件末尾,建立映射
 			int err = 0;
 
 			fully_mapped = 0;
 			if (iblock < lblock) {
 				WARN_ON(bh->b_size != blocksize);
+                //inode用于获取bdev, iblock指定了block number, bh是一个块缓存
+                //get_block用于定位一个块, 即建立映射
 				err = get_block(inode, iblock, bh, 0);
 				if (err)
 					SetPageError(page);
 			}
+            /*
+             *调用get_block后，bh就会置位BH_Mapped,如果bh没有置位BH_Mapped, 
+             *就说明当前读的位置超过文件尾了，这时需要将内存block填充0，并设置为 
+             *BH_Uptodate状态。
+            */
 			if (!buffer_mapped(bh)) {
 				zero_user(page, i * blocksize, blocksize);
 				if (!err)
@@ -2194,9 +2300,15 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 			 * get_block() might have updated the buffer
 			 * synchronously
 			 */
+            /*
+             *某些fs会在映射期间读出数据块，将buffer设置成uptodate, 
+             *以这里需要再次检查buffer是否uptodate
+            */
+            //据说reiserfs会干这个事情
 			if (buffer_uptodate(bh))
 				continue;
 		}
+        //不是最新的，但是有映射的记录块的buffer_head放到指针数组arr[]中
 		arr[nr++] = bh;
 	} while (i++, iblock++, (bh = bh->b_this_page) != head);
 
@@ -2210,11 +2322,13 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 		 */
 		if (!PageError(page))
 			SetPageUptodate(page);
+        //如果所有的在buffer head都是BH_Uptodate状态，唤醒等待此页的进程
 		unlock_page(page);
 		return 0;
 	}
 
 	/* Stage two: lock the buffers */
+    //如果某些块处于非Uptodate状态，那么需要锁住这些block,置位BH_Async_Read
 	for (i = 0; i < nr; i++) {
 		bh = arr[i];
 		lock_buffer(bh);
@@ -2229,6 +2343,7 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 	for (i = 0; i < nr; i++) {
 		bh = arr[i];
 		if (buffer_uptodate(bh))
+            //如果buffer中的内容和disk中的一致，就从buffer中读取
 			end_buffer_async_read(bh, 1);
 		else
 			submit_bh(READ, bh);
@@ -2914,10 +3029,14 @@ static void end_bio_bh_io_sync(struct bio *bio, int err)
 		set_bit(BH_Eopnotsupp, &bh->b_state);
 	}
 
+	//通过__bread_slow调用时bh->b_end_io为end_buffer_read_sync
+	//如果bi_flags的BIO_UPTODATE置位,test_bit返回1
 	bh->b_end_io(bh, test_bit(BIO_UPTODATE, &bio->bi_flags));
+	//传输完毕,bio就需要释放
 	bio_put(bio);
 }
 
+//回写指定的块
 int submit_bh(int rw, struct buffer_head * bh)
 {
 	struct bio *bio;
@@ -2946,10 +3065,15 @@ int submit_bh(int rw, struct buffer_head * bh)
 	 */
 	bio = bio_alloc(GFP_NOIO, 1);
 
+	/*
+	 * bio一个扇区大小是512byte,而bh->b_size肯定是512的倍数,
+	 * 这里获取了本次传输的起始扇区号
+	 */
 	bio->bi_sector = bh->b_blocknr * (bh->b_size >> 9);
 	bio->bi_bdev = bh->b_bdev;
 	bio->bi_io_vec[0].bv_page = bh->b_page;
 	bio->bi_io_vec[0].bv_len = bh->b_size;
+	//指向bh->b_data
 	bio->bi_io_vec[0].bv_offset = bh_offset(bh);
 
 	bio->bi_vcnt = 1;
@@ -3077,12 +3201,19 @@ int sync_dirty_buffer(struct buffer_head *bh)
  *
  * try_to_free_buffers() is non-blocking.
  */
+/*
+ *如果一个bh引用计数大于0，或者状态是dirty或者lock，说明这个bh busy
+*/
 static inline int buffer_busy(struct buffer_head *bh)
 {
 	return atomic_read(&bh->b_count) |
 		(bh->b_state & ((1 << BH_Dirty) | (1 << BH_Lock)));
 }
 
+/*
+ *移除与page相关的所有bufferhead,返回首个bh的地址， 
+ *后续需要这个地址来释放所有的bh,成功返回1，失败返回0。 
+*/
 static int
 drop_buffers(struct page *page, struct buffer_head **buffers_to_free)
 {
@@ -3090,28 +3221,35 @@ drop_buffers(struct page *page, struct buffer_head **buffers_to_free)
 	struct buffer_head *bh;
 
 	bh = head;
+    //step 1:检查page中的块缓存是否处于busy状态，如果busy, 返回0
 	do {
+        //buffer_write_io_error的定义为BUFFER_FNS(Write_EIO, write_io_error)
 		if (buffer_write_io_error(bh) && page->mapping)
+            //如果bh io 错误，并且page->mapping存在，就设置page->mapping的标志为io error
 			set_bit(AS_EIO, &page->mapping->flags);
 		if (buffer_busy(bh))
 			goto failed;
 		bh = bh->b_this_page;
 	} while (bh != head);
 
+    //step 2:将bh从mapping链表中取出
 	do {
 		struct buffer_head *next = bh->b_this_page;
 
 		if (bh->b_assoc_map)
+            //如果此bh还关联了其他的mapping, 就将此bh从mapping链表中取出来
 			__remove_assoc_queue(bh);
 		bh = next;
 	} while (bh != head);
 	*buffers_to_free = head;
+    //step 3:将page->private清空
 	__clear_page_buffers(page);
 	return 1;
 failed:
 	return 0;
 }
 
+//return 1 succeed, return 0 failed
 int try_to_free_buffers(struct page *page)
 {
 	struct address_space * const mapping = page->mapping;
@@ -3123,10 +3261,12 @@ int try_to_free_buffers(struct page *page)
 		return 0;
 
 	if (mapping == NULL) {		/* can this still happen? */
+        //如果mapping == NULL, 那就不需要清除page在radix tree中的tag
 		ret = drop_buffers(page, &buffers_to_free);
 		goto out;
 	}
 
+    //因为要操作mapping中的radix tree,这里就需要对mapping加锁
 	spin_lock(&mapping->private_lock);
 	ret = drop_buffers(page, &buffers_to_free);
 
@@ -3148,6 +3288,7 @@ int try_to_free_buffers(struct page *page)
 		cancel_dirty_page(page, PAGE_CACHE_SIZE);
 	spin_unlock(&mapping->private_lock);
 out:
+    //释放bh
 	if (buffers_to_free) {
 		struct buffer_head *bh = buffers_to_free;
 
@@ -3212,10 +3353,13 @@ static int max_buffer_heads;
 int buffer_heads_over_limit;
 
 struct bh_accounting {
+	//用于累计每个cpu的bh，判断是否超过限额.
 	int nr;			/* Number of live bh's */
+	//用于判断当前cpu的bh是否超过4096
 	int ratelimit;		/* Limit cacheline bouncing */
 };
 
+//定义一个per-cpu变量
 static DEFINE_PER_CPU(struct bh_accounting, bh_accounting) = {0, 0};
 
 static void recalc_bh_state(void)
@@ -3224,7 +3368,12 @@ static void recalc_bh_state(void)
 	int tot = 0;
 
 	if (__get_cpu_var(bh_accounting).ratelimit++ < 4096)
+		//如果当前cpu的bh_accounting.ratelimit+1小于4096,就直接返回
 		return;
+	/*
+	 *如果当前cpu的bh_accounting.ratelimit+1等于4096,将ratelimit清0，重新累加计算
+	 *每个cpu的bh_accounting.nr，如果累加值超过max_buffer_heads，buffer_heads_over_limit置1
+	*/
 	__get_cpu_var(bh_accounting).ratelimit = 0;
 	for_each_online_cpu(i)
 		tot += per_cpu(bh_accounting, i).nr;
@@ -3236,6 +3385,7 @@ struct buffer_head *alloc_buffer_head(gfp_t gfp_flags)
 	struct buffer_head *ret = kmem_cache_alloc(bh_cachep, gfp_flags);
 	if (ret) {
 		INIT_LIST_HEAD(&ret->b_assoc_buffers);
+		//判断bh是否超过系统限额
 		get_cpu_var(bh_accounting).nr++;
 		recalc_bh_state();
 		put_cpu_var(bh_accounting);

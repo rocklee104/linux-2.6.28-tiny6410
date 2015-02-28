@@ -15,7 +15,7 @@
  *  Added kerneld support: Jacques Gelinas and Bjorn Ekwall
  *  Added change_root: Werner Almesberger & Hans Lermen, Feb '96
  *  Added options to /proc/mounts:
- *    Torbjörn Lindh (torbjorn.lindh@gopta.se), April 14, 1996.
+ *    Torbj?rn Lindh (torbjorn.lindh@gopta.se), April 14, 1996.
  *  Added devfs support: Richard Gooch <rgooch@atnf.csiro.au>, 13-JAN-1998
  *  Heavily rewritten for 'one fs - one tree' dcache architecture. AV, Mar 2000
  */
@@ -42,6 +42,7 @@
 #include "internal.h"
 
 
+//这里定义了一个全局变量--super_blocks, 这是一个链表头,用于管理系统中所有的super_block
 LIST_HEAD(super_blocks);
 DEFINE_SPINLOCK(sb_lock);
 
@@ -73,6 +74,7 @@ static struct super_block *alloc_super(struct file_system_type *type)
 		INIT_LIST_HEAD(&s->s_dentry_lru);
 		init_rwsem(&s->s_umount);
 		mutex_init(&s->s_lock);
+		//由于没有定义CONFIG_LOCKDEP,lockdep_set_class什么都不做
 		lockdep_set_class(&s->s_umount, &type->s_umount_key);
 		/*
 		 * The locking rules for s_lock are up to the
@@ -179,6 +181,7 @@ void deactivate_super(struct super_block *s)
 	struct file_system_type *fs = s->s_type;
 	//if there is no active sb, s_count must be -= S_BIAS-1
 	if (atomic_dec_and_lock(&s->s_active, &sb_lock)) {
+		//没有活动的super block, s_count就减去S_BIAS-1
 		s->s_count -= S_BIAS-1;
 		spin_unlock(&sb_lock);
 		DQUOT_OFF(s, 0);
@@ -286,6 +289,8 @@ int fsync_super(struct super_block *sb)
  *	rearrange the set of dentries belonging to this super_block, nor may it
  *	change the attachments of dentries to inodes.
  */
+ //generic_shutdown_super处理了在shutdown sb时所有的独立于特定文件系统的工作.
+ //而典型的->kill_sb处理特定于文件系统的资源释放工作,不仅仅关于sb.
 void generic_shutdown_super(struct super_block *sb)
 {
 	const struct super_operations *sop = sb->s_op;
@@ -343,7 +348,9 @@ struct super_block *sget(struct file_system_type *type,
 	int err;
 
 retry:
+	//获取一个sb
 	spin_lock(&sb_lock);
+	//遍历type管理的所有sb
 	if (test) {
 		list_for_each_entry(old, &type->fs_supers, s_instances) {
 			if (!test(old, data))
@@ -355,8 +362,10 @@ retry:
 			return old;
 		}
 	}
+	//分配一个sb
 	if (!s) {
 		spin_unlock(&sb_lock);
+		//分配并初始化一个sb
 		s = alloc_super(type);
 		if (!s)
 			return ERR_PTR(-ENOMEM);
@@ -371,7 +380,9 @@ retry:
 	}
 	s->s_type = type;
 	strlcpy(s->s_id, type->name, sizeof(s->s_id));
+	//super_blocks是一个链表头,用于管理系统中所有的super block
 	list_add_tail(&s->s_list, &super_blocks);
+	//把sb头插到file_system_type中的sb链表中
 	list_add(&s->s_instances, &type->fs_supers);
 	spin_unlock(&sb_lock);
 	get_filesystem(type);
@@ -484,6 +495,9 @@ restart:
  *	mounted on the device given. %NULL is returned if no match is found.
  */
 
+/*
+* 扫描super block链表，如果bdev挂载到一个文件系统上，找到这个文件系统的sb 
+*/
 struct super_block * get_super(struct block_device *bdev)
 {
 	struct super_block *sb;
@@ -615,16 +629,19 @@ int do_remount_sb(struct super_block *sb, int flags, void *data, int force)
 	int remount_rw;
 	
 #ifdef CONFIG_BLOCK
+	//mountflag rw, 但是bdev只读
 	if (!(flags & MS_RDONLY) && bdev_read_only(sb->s_bdev))
 		return -EACCES;
 #endif
 	if (flags & MS_RDONLY)
 		acct_auto_close(sb);
+	//对于sysfs,因为在kernel启动过程中没有dentry_unused,这个函数没做什么事
 	shrink_dcache_sb(sb);
 	fsync_super(sb);
 
 	/* If we are remounting RDONLY and current sb is read/write,
 	   make sure there are no rw files opened */
+	//如果mount flag包含read only,但是sb不是read only的,就需要检查文件系统是否有文件被写入 
 	if ((flags & MS_RDONLY) && !(sb->s_flags & MS_RDONLY)) {
 		if (force)
 			mark_files_ro(sb);
@@ -643,6 +660,7 @@ int do_remount_sb(struct super_block *sb, int flags, void *data, int force)
 		if (retval)
 			return retval;
 	}
+	//在remount时候只能改变MS_RDONLY/MS_SYNCHRONOUS/MS_MANDLOCK这3个标志
 	sb->s_flags = (sb->s_flags & ~MS_RMT_MASK) | (flags & MS_RMT_MASK);
 	if (remount_rw)
 		DQUOT_ON_REMOUNT(sb);
@@ -688,6 +706,7 @@ void emergency_remount(void)
 static DEFINE_IDA(unnamed_dev_ida);
 static DEFINE_SPINLOCK(unnamed_dev_lock);/* protects the above */
 
+//主要是为了获得设备标示符
 int set_anon_super(struct super_block *s, void *data)
 {
 	int dev;
@@ -741,7 +760,9 @@ EXPORT_SYMBOL(kill_litter_super);
 #ifdef CONFIG_BLOCK
 static int set_bdev_super(struct super_block *s, void *data)
 {
+    //给block device对象赋值
 	s->s_bdev = data;
+    //给dev_t赋值
 	s->s_dev = s->s_bdev->bd_dev;
 	return 0;
 }
@@ -751,6 +772,7 @@ static int test_bdev_super(struct super_block *s, void *data)
 	return (void *)s->s_bdev == data;
 }
 
+//挂载块设备上的文件系统
 int get_sb_bdev(struct file_system_type *fs_type,
 	int flags, const char *dev_name, void *data,
 	int (*fill_super)(struct super_block *, void *, int),
@@ -764,6 +786,7 @@ int get_sb_bdev(struct file_system_type *fs_type,
 	if (!(flags & MS_RDONLY))
 		mode |= FMODE_WRITE;
 
+	//打开dev_name块设备
 	bdev = open_bdev_exclusive(dev_name, mode, fs_type);
 	if (IS_ERR(bdev))
 		return PTR_ERR(bdev);
@@ -774,13 +797,23 @@ int get_sb_bdev(struct file_system_type *fs_type,
 	 * while we are mounting
 	 */
 	down(&bdev->bd_mount_sem);
+    /*
+     *搜索文件系统的超级块对象链表,如果找到一个块设备相关的超级块,则返回它的地址, 
+     *否则,分配并初始化一个新的超级块对象,把它插入到文件系统链表和超级块全局链表中,并返回其地址。 
+     *这就是为什么例如/dev/sda1能挂载到不同挂载点，挂载后每个挂载点内容相同的原因。 
+    */
 	s = sget(fs_type, test_bdev_super, set_bdev_super, bdev);
 	up(&bdev->bd_mount_sem);
 	if (IS_ERR(s))
 		goto error_s;
 
 	if (s->s_root) {
+        //如果为真,表示这个文件系统被挂载过了，需要调用一次close_bdev_excl，将第二次打开计数关闭。 
 		if ((flags ^ s->s_flags) & MS_RDONLY) {
+            /*
+             *如果一个设备已经被打开过一次，这次打开的标志在MS_RDONLY上和上次的不同， 
+             *即两次打开的标志一次是O_RDWR,一次是O_RDONLY，就返回错误
+            */
 			up_write(&s->s_umount);
 			deactivate_super(s);
 			error = -EBUSY;
@@ -789,12 +822,16 @@ int get_sb_bdev(struct file_system_type *fs_type,
 
 		close_bdev_exclusive(bdev, mode);
 	} else {
+	//否则,把参数flags中的值拷贝到超级块的s_flags字段
 		char b[BDEVNAME_SIZE];
 
 		s->s_flags = flags;
 		s->s_mode = mode;
+		//设置sb的s_id
 		strlcpy(s->s_id, bdevname(bdev, b), sizeof(s->s_id));
+		//设置fs的block size
 		sb_set_blocksize(s, block_size(bdev));
+		//根据文件系统填充sb的其他字段
 		error = fill_super(s, data, flags & MS_SILENT ? 1 : 0);
 		if (error) {
 			up_write(&s->s_umount);
@@ -830,6 +867,7 @@ void kill_block_super(struct super_block *sb)
 EXPORT_SYMBOL(kill_block_super);
 #endif
 
+//挂载无设备文件系统
 /**
  * get_sb_nodev - get the fs_type's sb, if the fs of this fs_type
  * has been moounted in deferent place, there is one sb for each 
@@ -848,13 +886,16 @@ int get_sb_nodev(struct file_system_type *fs_type,
 
 	s->s_flags = flags;
 
+	//不同的fs调用不同的方法填充sb,如op,inode的赋值
 	error = fill_super(s, data, flags & MS_SILENT ? 1 : 0);
 	if (error) {
 		up_write(&s->s_umount);
 		deactivate_super(s);
 		return error;
 	}
+	//激活sb
 	s->s_flags |= MS_ACTIVE;
+	//设置fs的sb和rootdir,关联sb和vfsmount
 	return simple_set_mnt(mnt, s);
 }
 
@@ -875,6 +916,7 @@ static int compare_single(struct super_block *s, void *p)
  * get_sb_single will not alloc any sb anymore. It will use the 
  * exited sb. 
  */
+ //挂载在挂载点之间共享实例的文件系统
 int get_sb_single(struct file_system_type *fs_type,
 	int flags, void *data,
 	int (*fill_super)(struct super_block *, void *, int),
@@ -916,6 +958,7 @@ vfs_kern_mount(struct file_system_type *type, int flags, const char *name, void 
 		return ERR_PTR(-ENODEV);
 
 	error = -ENOMEM;
+	//分配并初始化一个vfsmount
 	mnt = alloc_vfsmnt(name);
 	if (!mnt)
 		goto out;
@@ -930,6 +973,8 @@ vfs_kern_mount(struct file_system_type *type, int flags, const char *name, void 
 			goto out_free_secdata;
 	}
 
+	//读取super block
+	//对于rootfs来说,是rootfs_get_sb(type, flags, name, data, mnt);
 	error = type->get_sb(type, flags, name, data, mnt);
 	if (error < 0)
 		goto out_free_secdata;
@@ -939,7 +984,9 @@ vfs_kern_mount(struct file_system_type *type, int flags, const char *name, void 
  	if (error)
  		goto out_sb;
 
+	//fs挂载前的mountpoint就指向自己的根目录
 	mnt->mnt_mountpoint = mnt->mnt_root;
+	//fs挂载前parent指向自己
 	mnt->mnt_parent = mnt;
 	up_write(&mnt->mnt_sb->s_umount);
 	free_secdata(secdata);
@@ -984,6 +1031,7 @@ static struct vfsmount *fs_set_subtype(struct vfsmount *mnt, const char *fstype)
 struct vfsmount *
 do_kern_mount(const char *fstype, int flags, const char *name, void *data)
 {
+	//查找是否有匹配的文件系统,如果没有就加载相关模块
 	struct file_system_type *type = get_fs_type(fstype);
 	struct vfsmount *mnt;
 	if (!type)

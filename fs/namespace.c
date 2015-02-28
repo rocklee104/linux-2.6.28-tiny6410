@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  linux/fs/namespace.c
  *
  * (C) Copyright Al Viro 2000, 2001
@@ -42,6 +42,7 @@ static int event;
 static DEFINE_IDA(mnt_id_ida);
 static DEFINE_IDA(mnt_group_ida);
 
+//mount_hashtable桶是双向链表,桶的偏移为以父vfsmount及子vfsmount的dentry算出的hash
 static struct list_head *mount_hashtable __read_mostly;
 static struct kmem_cache *mnt_cache __read_mostly;
 static struct rw_semaphore namespace_sem;
@@ -52,6 +53,7 @@ EXPORT_SYMBOL_GPL(fs_kobj);
 
 static inline unsigned long hash(struct vfsmount *mnt, struct dentry *dentry)
 {
+	//L1_CACHE_BYTES是128个字节
 	unsigned long tmp = ((unsigned long)mnt / L1_CACHE_BYTES);
 	tmp += ((unsigned long)dentry / L1_CACHE_BYTES);
 	tmp = tmp + (tmp >> HASH_SHIFT);
@@ -122,11 +124,13 @@ struct vfsmount *alloc_vfsmnt(const char *name)
 		}
 
 		atomic_set(&mnt->mnt_count, 1);
+		//所有链表相关初始化一遍
 		INIT_LIST_HEAD(&mnt->mnt_hash);
 		INIT_LIST_HEAD(&mnt->mnt_child);
 		INIT_LIST_HEAD(&mnt->mnt_mounts);
 		INIT_LIST_HEAD(&mnt->mnt_list);
 		INIT_LIST_HEAD(&mnt->mnt_expire);
+        //初始化时,mnt_share链表中的pre和next都指向自己
 		INIT_LIST_HEAD(&mnt->mnt_share);
 		INIT_LIST_HEAD(&mnt->mnt_slave_list);
 		INIT_LIST_HEAD(&mnt->mnt_slave);
@@ -423,8 +427,10 @@ struct vfsmount *__lookup_mnt(struct vfsmount *mnt, struct dentry *dentry,
 	struct list_head *head = mount_hashtable + hash(mnt, dentry);
 	struct list_head *tmp = head;
 	struct vfsmount *p, *found = NULL;
+	//p是当前vfsmount的子vfsmount
 
 	for (;;) {
+		//从头搜索(最先挂载), 还是从尾搜索(最后挂载)
 		tmp = dir ? tmp->next : tmp->prev;
 		p = NULL;
 		if (tmp == head)
@@ -473,7 +479,7 @@ static void __touch_mnt_namespace(struct mnt_namespace *ns)
 	}
 }
 
-//old_path������¼mnt��parent
+//old_path用来记录mnt的parent
 static void detach_mnt(struct vfsmount *mnt, struct path *old_path)
 {
 	old_path->dentry = mnt->mnt_mountpoint;
@@ -482,13 +488,14 @@ static void detach_mnt(struct vfsmount *mnt, struct path *old_path)
 	mnt->mnt_mountpoint = mnt->mnt_root;
 	list_del_init(&mnt->mnt_child);
 	list_del_init(&mnt->mnt_hash);
-    //��mnt����ԭ���Ĺ��ص����Ƴ�,���Թ��ص��d_mountedҪ--
+    //将mnt从其原来的挂载点上移除,所以挂载点的d_mounted要--
 	old_path->dentry->d_mounted--;
 }
 
 void mnt_set_mountpoint(struct vfsmount *mnt, struct dentry *dentry,
 			struct vfsmount *child_mnt)
 {
+    //在clone_mnt中child_mnt->mnt_parent指向了自己,这里就改变parent为mnt
 	child_mnt->mnt_parent = mntget(mnt);
 	child_mnt->mnt_mountpoint = dget(dentry);
 	dentry->d_mounted++;
@@ -497,10 +504,10 @@ void mnt_set_mountpoint(struct vfsmount *mnt, struct dentry *dentry,
 static void attach_mnt(struct vfsmount *mnt, struct path *path)
 {
 	mnt_set_mountpoint(path->mnt, path->dentry, mnt);
-    //ͨ����mnt��mnt�Ĺ��ص�,�����mnt����mount_hashtable
+    //通过父mnt及mnt的挂载点,将这个mnt加入mount_hashtable
 	list_add_tail(&mnt->mnt_hash, mount_hashtable +
 			hash(path->mnt, path->dentry));
-    //��mnt��Ϊ��mnt�����丸mnt
+    //将mnt作为子mnt加入其父mnt
 	list_add_tail(&mnt->mnt_child, &path->mnt->mnt_mounts);
 }
 
@@ -512,51 +519,57 @@ static void commit_tree(struct vfsmount *mnt)
 	struct vfsmount *parent = mnt->mnt_parent;
 	struct vfsmount *m;
 	LIST_HEAD(head);
+	//父vfsmount的命名空间
 	struct mnt_namespace *n = parent->mnt_ns;
 
 	BUG_ON(parent == mnt);
 
 	list_add_tail(&head, &mnt->mnt_list);
+	//将链表中的所有vfsmount的namespace全都置成和父vfsmount的namespace
 	list_for_each_entry(m, &head, mnt_list)
-    //��mnt->mnt_list���������е�Ԫ�ص�mnt_nsȫ�����óɸ�mnt��namespace
+    //将mnt->mnt_list所在链表中的元素的mnt_ns全部设置成父mnt的namespace
 		m->mnt_ns = n;
-    //��head���������е�Ԫ��ͷ����n(head���Ԫ�ز�����)
+    //将head所在链表中的元素头插入n(head这个元素不插入)
 	list_splice(&head, n->list.prev);
 
-    //��mnt����mount_hashtable
+    //将mnt插入mount_hashtable
 	list_add_tail(&mnt->mnt_hash, mount_hashtable +
 				hash(parent, mnt->mnt_mountpoint));
-    //��mnt������parent�Ĺ�����mnt��������
+    //将mnt插入其parent的管理子mnt的链表中
 	list_add_tail(&mnt->mnt_child, &parent->mnt_mounts);
 	touch_mnt_namespace(n);
 }
 
+//遍历mnt tree
 static struct vfsmount *next_mnt(struct vfsmount *p, struct vfsmount *root)
 {
+	//取p的第一个子mnt
 	struct list_head *next = p->mnt_mounts.next;
 	if (next == &p->mnt_mounts) {
-        //pû����mnt��
+        //没有子vfsmount
 		while (1) {
 			if (p == root)
+				//整个mnt tree遍历完成
 				return NULL;
-            //�����ֵܽڵ��ƶ�
+            //向其兄弟节点移动
 			next = p->mnt_child.next;
 			if (next != &p->mnt_parent->mnt_mounts)
 				break;
-            //�򸸽ڵ��ƶ�
+            //向父节点移动
 			p = p->mnt_parent;
 		}
 	}
+	//返回子mnt
 	return list_entry(next, struct vfsmount, mnt_child);
 }
 
 static struct vfsmount *skip_mnt_tree(struct vfsmount *p)
 {
     /*
-     * ����������ǳ�����,��whileѭ����һֱ��λ��p�Ĺ����������һ������ڵ�.
-     * ���غ�,��copy_tree��ѭ����next_mnt��ȥѰ���������ڵ��next mnt.
-     * �����������ڵ���p���һ��,������next_mnt�л���������ڵ�һֱ����
-     * ���ڵ�׷��,ֱ��p����һ���ֵܽڵ�Ϊֹ.��������������pΪroot�Ĺ�������copy.
+     * 这里的做法非常巧妙,在while循环中一直定位到p的挂载树中最后一个子孙节点.
+     * 返回后,在copy_tree的循环中next_mnt回去寻找这个子孙节点的next mnt.
+     * 由于这个子孙节点是p最后一个,所以在next_mnt中会从这个子孙节点一直向其
+     * 父节点追溯,直到p的下一个兄弟节点为止.这样就跳过了以p为root的挂载树的copy.
     */
 	struct list_head *prev = p->mnt_mounts.prev;
 	while (prev != &p->mnt_mounts) {
@@ -566,9 +579,11 @@ static struct vfsmount *skip_mnt_tree(struct vfsmount *p)
 	return p;
 }
 
+//重新分配一个vfsmount,这个mnt的sb是old的sb,但是root被限制在参数@root
 static struct vfsmount *clone_mnt(struct vfsmount *old, struct dentry *root,
 					int flag)
 {
+	//指向同一个sb, 不需要分配空间
 	struct super_block *sb = old->mnt_sb;
 	struct vfsmount *mnt = alloc_vfsmnt(old->mnt_devname);
 
@@ -584,35 +599,37 @@ static struct vfsmount *clone_mnt(struct vfsmount *old, struct dentry *root,
 				goto out_free;
 		}
 
-        //�·����mnt�̳�old�Ĺ��ر�־
+        //新分配的mnt继承old的挂载标志
 		mnt->mnt_flags = old->mnt_flags;
-        //��Ϊ���mnt��old����sb,������root,��sb->s_active�Լ�
+        //因为这个mnt和old共用sb,并且有root,故sb->s_active自加
 		atomic_inc(&sb->s_active);
-        //mnt��old����sb
+        //mnt和old共用sb
 		mnt->mnt_sb = sb;
+        //如果mnt->mnt_root = dget(old->mnt_root);那么进入b后可以看到old的根目录
 		mnt->mnt_root = dget(root);
-        //Ŀǰֻ��clone,��û�а�mnt�;����Ŀ¼��������,����������mnt_mountpointָ����mnt_root
+        //目前只是clone,并没有把mnt和具体的目录关联起来,故这里设置mnt_mountpoint指向其mnt_root
 		mnt->mnt_mountpoint = mnt->mnt_root;
+		//父vfsmount指向自己
 		mnt->mnt_parent = mnt;
 
 		if (flag & CL_SLAVE) {
-            //cloneʱҪ��mnt��old��slave
+            //clone时要求mnt是old的slave
 			list_add(&mnt->mnt_slave, &old->mnt_slave_list);
 			mnt->mnt_master = old;
-            //slaveĬ��û�й�������
+            //slave默认没有共享属性
 			CLEAR_MNT_SHARED(mnt);
 		} else if (!(flag & CL_PRIVATE)) {
-            //cloneʱҪ����private,Ҳ����slave
+            //clone时要求不是private,也不是slave
 			if ((flag & CL_PROPAGATION) || IS_MNT_SHARED(old))
-                //cloneʱҪ��propagate����old(һ�����豸)�����;���shared����,��mnt����old��peer group
+                //clone时要求propagate或者old(一般是设备)本身就具有shared属性,将mnt加入old的peer group
 				list_add(&mnt->mnt_share, &old->mnt_share);
 			if (IS_MNT_SLAVE(old))
-                //��old��������slave,��ômnt����slave����,���Һ�oldӵ�й�ͬ��master
+                //若old本身就是slave,那么mnt加入slave链表,并且和old拥有共同的master
                 list_add(&mnt->mnt_slave, &old->mnt_slave);
 			mnt->mnt_master = old->mnt_master;
 		}
 		if (flag & CL_MAKE_SHARED)
-            //Ϊmnt���ù�������
+            //为mnt设置共享属性
 			set_mnt_shared(mnt);
 
 		/* stick the duplicate mount on the same expiry list
@@ -1016,7 +1033,7 @@ void release_mounts(struct list_head *head)
 		mnt = list_first_entry(head, struct vfsmount, mnt_hash);
 		list_del_init(&mnt->mnt_hash);
 		if (mnt->mnt_parent != mnt) {
-            //�����mnt����ϵͳ��mnt,�����ͷ�
+            //如果不mnt不是系统根mnt,才能释放
 			struct dentry *dentry;
 			struct vfsmount *m;
 			spin_lock(&vfsmount_lock);
@@ -1024,7 +1041,7 @@ void release_mounts(struct list_head *head)
 			m = mnt->mnt_parent;
 			mnt->mnt_mountpoint = mnt->mnt_root;
 			mnt->mnt_parent = mnt;
-            //mnt����Ҫ�ͷ�,��parent�¼�¼��������umount_tree��release_mounts֮�����mnt�ļ�����Ҫ����
+            //mnt马上要释放,其parent下记录处理处于umount_tree及release_mounts之间的子mnt的计数需要减少
 			m->mnt_ghosts--;
 			spin_unlock(&vfsmount_lock);
 			dput(dentry);
@@ -1039,13 +1056,13 @@ void umount_tree(struct vfsmount *mnt, int propagate, struct list_head *kill)
 	struct vfsmount *p;
 
 	for (p = mnt; p; p = next_mnt(p, mnt))
-		//��mnt������������ԭ����hash����ɾ��,Ȼ�����kill����
+		//将mnt整个挂载树从原来的hash表中删除,然后加入kill链表
         list_move(&p->mnt_hash, kill);
 
 	if (propagate)
 		/*
-		 * �������������ɺ�,kill�о�����mnt�Ĺ�����,��mnt��mnt propagate tree�ж�Ӧ��mnt
-		 * ����mnt
+		 * 下面这个函数完成后,kill中就有了mnt的挂载树,及mnt父mnt propagate tree中对应于mnt
+		 * 的子mnt
 		 */
 		propagate_umount(kill);
 
@@ -1054,18 +1071,18 @@ void umount_tree(struct vfsmount *mnt, int propagate, struct list_head *kill)
 		list_del_init(&p->mnt_list);
 		__touch_mnt_namespace(p->mnt_ns);
 		p->mnt_ns = NULL;
-        //�ӹ�������������ȡ����
+        //从挂载树的链表中取下来
 		list_del_init(&p->mnt_child);
 		if (p->mnt_parent != p) {
 			/*
-			* �������ϵͳ��mnt,�丸mnt��mnt_ghosts++, ��ʾ�丸mnt����һ����mnt
-			* ��Ҫ����release_mountsȥ����mnt->mnt_parent��mnt->mnt_mountpoint
+			* 如果不是系统根mnt,其父mnt的mnt_ghosts++, 表示其父mnt又有一个子mnt
+			* 将要调用release_mounts去处理mnt->mnt_parent及mnt->mnt_mountpoint
 			*/
 			p->mnt_parent->mnt_ghosts++;
-            //�ݼ�����ص��d_mounted
+            //递减其挂载点的d_mounted
 			p->mnt_mountpoint->d_mounted--;
 		}
-        //�޸�mnt����Ϊprivate
+        //修改mnt属性为private
 		change_mnt_propagation(p, MS_PRIVATE);
 	}
 }
@@ -1145,14 +1162,14 @@ static int do_umount(struct vfsmount *mnt, int flags)
 	event++;
 
 	if (!(flags & MNT_DETACH))
-        //��mnt�����п���shrink����mnt����umount_list����
+        //将mnt中所有可以shrink的子mnt加入umount_list链表
         shrink_submounts(mnt, &umount_list);
 
 	retval = -EBUSY;
     /* 
-     * һ��û����������ʹ�õ�mnt������mnt_countӦ��Ϊ2,��Ϊ�ڴ�����ʱ��mnt_count�Ѿ�Ϊ1,
-     * SYSCALL_DEFINE2��ͨ��user_path -> lookup_mnt -> mntget ������mnt_count,
-     * mnt_countΪ2
+     * 一个没有其他进程使用的mnt在这里mnt_count应该为2,因为在创建的时候mnt_count已经为1,
+     * SYSCALL_DEFINE2中通过user_path -> lookup_mnt -> mntget 增加了mnt_count,
+     * mnt_count为2
      */
 	if (flags & MNT_DETACH || !propagate_mount_busy(mnt, 2)) {
 		if (!list_empty(&mnt->mnt_list))
@@ -1163,7 +1180,7 @@ static int do_umount(struct vfsmount *mnt, int flags)
 	if (retval)
 		security_sb_umount_busy(mnt);
 	up_write(&namespace_sem);
-    //��umount_list�����е�mnt�ͷ�
+    //将umount_list上所有的mnt释放
 	release_mounts(&umount_list);
 	return retval;
 }
@@ -1233,28 +1250,29 @@ static int mount_is_safe(struct path *path)
 #endif
 }
 
+//clone以mnt为根节点的挂载树(仅clone父子关系的mnt)
 struct vfsmount *copy_tree(struct vfsmount *mnt, struct dentry *dentry,
 					int flag)
 {
     /* 
-     * res���ڼ�¼clone������tree��root�ڵ�
-     * p,s���ڱ���mnt�Ĺ�����,����s��¼��ǰ�ڵ�,p��¼s�ĸ��ڵ�
-     * r���ڱ���mnt��һ����mnt
-     * q���ڼ�¼clone��ǰ����clone��mnt
+     * res用于记录clone出来的tree的root节点
+     * p,s用于遍历mnt的挂载树,其中s记录当前节点,p记录s的父节点
+     * r用于遍历mnt的一级子mnt
+     * q用于记录clone当前正在clone的mnt
     */
 	struct vfsmount *res, *p, *q, *r, *s;
 	struct path path;
 
 	if (!(flag & CL_COPY_ALL) && IS_MNT_UNBINDABLE(mnt))
         /* 
-         * ���cloneҪ���CL_COPY_ALL֮��ı�־����mnt�в��ɰ�����,�ͷ���NULL.
-         * �����֮�������cloneҪ��CL_COPY_ALL,�Ϳ��Բ���mnt�Ƿ��в��ɰ�����,����ִ��.
-         * ����,���mnt�ɰ�,����Ҳ����Ҫ����clone��־��.
+         * 如果clone要求除CL_COPY_ALL之外的标志并且mnt有不可绑定属性,就返回NULL.
+         * 简而言之就是如果clone要求CL_COPY_ALL,就可以不管mnt是否有不可绑定属性,向下执行.
+         * 或者,如果mnt可绑定,这样也不需要关心clone标志了.
          */
-        //��do_loopbackֱ�ӵ�����,flag == 0,��ֻҪmnt���ɰ󶨾ͷ���NULL.
+        //在do_loopback直接调用中,flag == 0,故只要mnt不可绑定就返回NULL.
         return NULL;
 
-    //����clone mnt�������ĸ��ڵ�
+    //首先clone mnt挂载树的根节点
 	res = q = clone_mnt(mnt, dentry, flag);
 	if (!q)
 		goto Enomem;
@@ -1262,45 +1280,45 @@ struct vfsmount *copy_tree(struct vfsmount *mnt, struct dentry *dentry,
 
 	p = mnt;
 	list_for_each_entry(r, &mnt->mnt_mounts, mnt_child) {
-        //����һ����mnt
+        //遍历一级子mnt
 		if (!is_subdir(r->mnt_mountpoint, dentry))
-            //r��mnt����mnt,��r�Ĺ��ص�Ҳ������dentry����Ŀ¼
+            //r是mnt的子mnt,故r的挂载点也必须是dentry的子目录
 			continue;
 
-        //����mnt�Ķ��������µ���mnt
+        //遍历mnt的二级及以下的子mnt
 		for (s = r; s; s = next_mnt(s, r)) {
 			if (!(flag & CL_COPY_ALL) && IS_MNT_UNBINDABLE(s)) {
                  /* 
-                  * ���cloneҪ���CL_COPY_ALL֮��ı�־����s�в��ɰ�����,
-                  * clone��ʱ������������mntΪroot�Ĺ�����
+                  * 如果clone要求除CL_COPY_ALL之外的标志并且s有不可绑定属性,
+                  * clone的时候就跳过以这个mnt为root的挂载树
                   */
 				s = skip_mnt_tree(s);
 				continue;
 			}
 			while (p != s->mnt_parent) {
                 /* 
-                 * �����������������һ�α�����ʱ��,s,pָ����һ���ڵ�����һ���ӽڵ�,
-                 * ���α�����ʱ��next_mnt(s, r)���ص�s��p�ĸ��ڵ�(Ҳ�п�����ancestor),
-                 * Ϊ�˱�֤qһֱ��¼clone tree�е�ǰ�ڵ�ĸ��ڵ�,��������Ҫһֱ��parent׷��
+                 * 条件成立的情况是上一次遍历的时候,s,p指向了一个节点的最后一个子节点,
+                 * 本次遍历的时候next_mnt(s, r)返回的s是p的父节点(也有可能是ancestor),
+                 * 为了保证q一直记录clone tree中当前节点的父节点,故这里需要一直向parent追溯
                  */
 				p = p->mnt_parent;
 				q = q->mnt_parent;
 			}
 			p = s;
-            //��Ϊq�������ı�,�����ȼ�¼q�ĸ�mnt
+            //因为q在下面会改变,这里先记录q的父mnt
 			path.mnt = q;
 			path.dentry = p->mnt_mountpoint;
 			q = clone_mnt(p, p->mnt_root, flag);
 			if (!q)
 				goto Enomem;
 			spin_lock(&vfsmount_lock);
-            //q��clone tree�ĸ��ڵ�--resͬһ�����ռ�
+            //q和clone tree的根节点--res同一命名空间
 			list_add_tail(&q->mnt_list, &res->mnt_list);
 			attach_mnt(q, &path);
 			spin_unlock(&vfsmount_lock);
 		}
 	}
-    //����clone tree��root�ڵ�
+    //返回clone tree的root节点
 	return res;
 Enomem:
 	if (res) {
@@ -1423,11 +1441,11 @@ static int invent_group_ids(struct vfsmount *mnt, bool recurse)
  * Must be called without spinlocks held, since this function can sleep
  * in allocations.
  */
-//��source_mnt����������(�������mnt,�����ֻ��source_mnt)�ҵ�path
+//将source_mnt整个挂载树(如果有子mnt,否则就只挂source_mnt)挂到path
 static int attach_recursive_mnt(struct vfsmount *source_mnt,
 			struct path *path, struct path *parent_path)
 {
-    //tree_list�м�¼propagation��mnt,����������ͷ�Ǿֲ�����,��������ʱ�Ͳ���Ҫ����
+    //tree_list中记录propagation的mnt,这个这个链表头是局部变量,操作链表时就不需要加锁
 	LIST_HEAD(tree_list);
 	struct vfsmount *dest_mnt = path->mnt;
 	struct dentry *dest_dentry = path->dentry;
@@ -1439,37 +1457,37 @@ static int attach_recursive_mnt(struct vfsmount *source_mnt,
 		if (err)
 			goto out;
 	}
-    //������propagation��mnt����tree_list
+    //将所有propagation的mnt加入tree_list
 	err = propagate_mnt(dest_mnt, dest_dentry, source_mnt, &tree_list);
 	if (err)
 		goto out_cleanup_ids;
 
 	if (IS_MNT_SHARED(dest_mnt)) {
         /* 
-         * ���dest_mnt��share mnt,��ô��source_mnt(�´�����mnt)��
-         * ������mnt(����source_mnt����)ȫ������MNT_SHARED��־,source_mnt��peer�Ĺ�����־
-         * ��propagate_mnt���Ѿ��������
+         * 如果dest_mnt是share mnt,那么将source_mnt(新创建的mnt)的
+         * 所有子mnt(包括source_mnt本身)全部添加MNT_SHARED标志,source_mnt的peer的共享标志
+         * 在propagate_mnt中已经处理完成
          */
 		for (p = source_mnt; p; p = next_mnt(p, source_mnt))
 			set_mnt_shared(p);
 	}
 
 	spin_lock(&vfsmount_lock);
-    //��������source_mnt
+    //单独处理source_mnt
 	if (parent_path) {
-        //����ƶ�һ���ɵ�mnt���µ�·��,��Ҫ����ӾɵĹ�������ȡ��
+        //如果移动一个旧的mnt到新的路径,需要将其从旧的挂载树上取下
 		detach_mnt(source_mnt, parent_path);
-        //path��¼�µĹ��ص��·����Ϣ,��source_mnt���ص�path
+        //path记录新的挂载点的路径信息,将source_mnt挂载到path
 		attach_mnt(source_mnt, path);
 		touch_mnt_namespace(current->nsproxy->mnt_ns);
 	} else {
-        //���´�����mnt�͹��ص��������
+        //将新创建的mnt和挂载点关联起来
 		mnt_set_mountpoint(dest_mnt, dest_dentry, source_mnt);
 		commit_tree(source_mnt);
 	}
 
 	list_for_each_entry_safe(child, p, &tree_list, mnt_hash) {
-        //���д���source_mnt��propagation 
+        //集中处理source_mnt的propagation 
 		list_del_init(&child->mnt_hash);
 		commit_tree(child);
 	}
@@ -1483,21 +1501,22 @@ static int attach_recursive_mnt(struct vfsmount *source_mnt,
 	return err;
 }
 
-//mnt���´�����mnt,path�б�����ص��·����Ϣ,��mnt�������������޽ӵ�path��
+//mnt是新创建的mnt,path中保存挂载点的路径信息,将mnt的整个挂载树嫁接到path上
 static int graft_tree(struct vfsmount *mnt, struct path *path)
 {
 	int err;
+	//建立mnt tree时不能有MS_NOUSER,即不能被用户挂载
 	if (mnt->mnt_sb->s_flags & MS_NOUSER)
-        //���mnt�е�sb��ֹ�û����صĻ�
+        //如果mnt中的sb禁止用户挂载的话
 		return -EINVAL;
 
 	if (S_ISDIR(path->dentry->d_inode->i_mode) !=
 	      S_ISDIR(mnt->mnt_root->d_inode->i_mode))
         /* 
-         * path->dentry�м�¼�˹��ص��·����Ϣ,mnt���豸���ڵ�mnt��clone,
-         * ����mnt->root�Ѿ�ָ�����豸Ŀ¼��denty.
+         * path->dentry中记录了挂载点的路径信息,mnt是设备所在的mnt的clone,
+         * 但其mnt->root已经指向了设备目录的denty.
          * 
-         * NOTE:�����������˼�����ļ����ļ�Ҳ�ܹ���,�ļ�Ҳ�����ǹ��ص�!!!
+         * NOTE:这里的隐含意思就是文件和文件也能挂载,文件也可以是挂载点!!!
          */
 		return -ENOTDIR;
 
@@ -1513,8 +1532,8 @@ static int graft_tree(struct vfsmount *mnt, struct path *path)
 	err = -ENOENT;
 	if (IS_ROOT(path->dentry) || !d_unhashed(path->dentry))
         /*
-         * ���path->dentry��mount�ĸ�Ŀ¼����path->dentry�Ѿ���hash������,
-         * ���������path->dentryһ����mount�ĸ�Ŀ¼
+         * 如果path->dentry是mount的根目录或者path->dentry已经在hash表中了,
+         * 正常情况下path->dentry一定是mount的根目录
         */
 		err = attach_recursive_mnt(mnt, path, NULL);
 out_unlock:
@@ -1530,14 +1549,14 @@ out_unlock:
 static int do_change_type(struct path *path, int flag)
 {
 	struct vfsmount *m, *mnt = path->mnt;
-    //recursive��־��������
+    //recursive标志单独处理
 	int recurse = flag & MS_REC;
-    //���recursive��־
+    //清除recursive标志
 	int type = flag & ~MS_REC;
 	int err = 0;
 
 	if (!capable(CAP_SYS_ADMIN))
-        //ֻ��root����ִ��
+        //只有root才能执行
 		return -EPERM;
 
 	if (path->dentry != path->mnt->mnt_root)
@@ -1556,6 +1575,7 @@ static int do_change_type(struct path *path, int flag)
 
 	spin_lock(&vfsmount_lock);
 	for (m = mnt; m; m = (recurse ? next_mnt(m, mnt) : NULL))
+        //改变mnt_flags
 		change_mnt_propagation(m, type);
 	spin_unlock(&vfsmount_lock);
 
@@ -1567,18 +1587,19 @@ static int do_change_type(struct path *path, int flag)
 /*
  * do loopback mount.
  */
+//nd中保存了挂载点的名称,old_name是设备名称 
 static int do_loopback(struct path *path, char *old_name,
 				int recurse)
 {
 	struct path old_path;
 	struct vfsmount *mnt = NULL;
-    //ȷ��ֻ��root���ܹ���
+    //确保只有root才能挂载
 	int err = mount_is_safe(path);
 	if (err)
 		return err;
 	if (!old_name || !*old_name)
 		return -EINVAL;
-    //old_path�б������豸��·����Ϣ
+    //old_path中保存了设备的路径信息
 	err = kern_path(old_name, LOOKUP_FOLLOW, &old_path);
 	if (err)
 		return err;
@@ -1586,25 +1607,25 @@ static int do_loopback(struct path *path, char *old_name,
 	down_write(&namespace_sem);
 	err = -EINVAL;
 	if (IS_MNT_UNBINDABLE(old_path.mnt))
-        //����豸���ɰ�,ֱ���˳�
+        //如果设备不可绑定,直接退出
 		goto out;
 
 	if (!check_mnt(path->mnt) || !check_mnt(old_path.mnt))
-        //�����ص��mnt���豸��mnt��namespace�Ƿ�͵�ǰ������ͬ
+        //检查挂载点的mnt和设备的mnt的namespace是否和当前进程相同
 		goto out;
 
 	err = -ENOMEM;
 	if (recurse)
-        //���mount --rbind,��copy old_path.mnt�������е���mount
+        //如果mount --rbind,就copy old_path.mnt及其所有的子mount
 		mnt = copy_tree(old_path.mnt, old_path.dentry, 0);
 	else
-        //���mount --bind,ֻclone old_path.mnt����
+        //如果mount --bind,只clone old_path.mnt本身
 		mnt = clone_mnt(old_path.mnt, old_path.dentry, 0);
 
 	if (!mnt)
 		goto out;
 
-    //��clone������mnt�޽ӵ����ص����ڵ�mnt�����mnt������peer��slave��mnt��ȥ
+    //将clone出来的mnt嫁接到挂载点所在的mnt及这个mnt的所有peer及slave的mnt上去
 	err = graft_tree(mnt, path);
 	if (err) {
 		LIST_HEAD(umount_list);
@@ -1685,25 +1706,25 @@ static inline int tree_contains_unbindable(struct vfsmount *mnt)
 	return 0;
 }
 
-//path�м�¼���ص��·����Ϣ,old_name���豸��
+//path中记录挂载点的路径信息,old_name是设备名
 static int do_move_mount(struct path *path, char *old_name)
 {
 	struct path old_path, parent_path;
 	struct vfsmount *p;
 	int err = 0;
 	if (!capable(CAP_SYS_ADMIN))
-        //ֻ��root�ܹ�����
+        //只有root能够操作
 		return -EPERM;
 	if (!old_name || !*old_name)
-        //����豸����ΪNULL��������ú�ΪNULL
+        //如果设备名称为NULL及其解引用后为NULL
 		return -EINVAL;
-    //old_path�м�¼�豸��ԭ·����Ϣ
+    //old_path中记录设备的原路径信息
 	err = kern_path(old_name, LOOKUP_FOLLOW, &old_path);
 	if (err)
 		return err;
 
 	down_write(&namespace_sem);
-    //�ҵ����һ�����ص�
+    //找到最后一个挂载点
 	while (d_mountpoint(path->dentry) &&
 	       follow_down(&path->mnt, &path->dentry))
 		;
@@ -1717,21 +1738,21 @@ static int do_move_mount(struct path *path, char *old_name)
 		goto out1;
 
 	if (!IS_ROOT(path->dentry) && d_unhashed(path->dentry))
-        //���path->dentry������ϵͳ�ĸ�Ŀ¼�������dentry�Ѿ���hash������,��ʱ��Ų�����ת��out1
+        //如果path->dentry是整个系统的根目录或者这个dentry已经在hash表中了,这时候才不会跳转到out1
 		goto out1;
 
 	err = -EINVAL;
 	if (old_path.dentry != old_path.mnt->mnt_root)
-        //ȷ���豸��dentry����mnt�ĸ�Ŀ¼
+        //确保设备的dentry是其mnt的根目录
 		goto out1;
 
 	if (old_path.mnt == old_path.mnt->mnt_parent)
-        //�豸��mnt���Ǹ��ļ�ϵͳ,Ҳ����˵�����ƶ�ϵͳ�ĸ�Ŀ¼
+        //设备的mnt不是根文件系统,也就是说不能移动系统的根目录
 		goto out1;
 
 	if (S_ISDIR(path->dentry->d_inode->i_mode) !=
 	      S_ISDIR(old_path.dentry->d_inode->i_mode))
-        //�豸�͹��ص���ļ����ͱ�����ͬ
+        //设备和挂载点的文件类型必须相同
 		goto out1;
 	/*
 	 * Don't move a mount residing in a shared parent.
@@ -1739,14 +1760,14 @@ static int do_move_mount(struct path *path, char *old_name)
 	if (old_path.mnt->mnt_parent &&
 	    IS_MNT_SHARED(old_path.mnt->mnt_parent))
         /*
-         * ���һ��mnt��parent���й�������,���mnt������move,��Ϊ���������,mnt��cloneҲ��
-         * ��parent��peer����mnt.����ƶ�����һ��mnt������Ҫ���ִ�����ʽ:
+         * 如果一个mnt的parent具有共享属性,这个mnt不允许move,因为这种情况下,mnt的clone也是
+         * 其parent的peer的子mnt.如果移动这样一个mnt可能需要两种处理方式:
          * 
-         * 1.������mnt�ƶ�.����������������mnt��parent��parent��peer���ز�ͬ��.Υ���˹������ص�����.
-         * 2.�ƶ�mnt,����������clone(Ҳ������parent��peer�º�mnt��Ӧ����mnt).����Ӱ����parent
-         *   peer�Ĺ�����
+         * 1.仅仅将mnt移动.但这种情况下造成了mnt的parent和parent的peer挂载不同步.违背了共享挂载的特性.
+         * 2.移动mnt,并且销毁其clone(也就是其parent的peer下和mnt对应的子mnt).这又影响其parent
+         *   peer的挂载树
          * 
-         * ���ݹ������������Ram Pai�Ļظ�,�������̫����,��û��ʵ��
+         * 根据共享子树设计者Ram Pai的回复,这种情况太复杂,就没有实现
         */
             goto out1;
 	/*
@@ -1756,13 +1777,13 @@ static int do_move_mount(struct path *path, char *old_name)
 	if (IS_MNT_SHARED(path->mnt) &&
 	    tree_contains_unbindable(old_path.mnt))
         /* 
-         * ������ص��ǹ�����,�����豸�Ĺ���������Щ�����в��ɹ�������,��������ǲ�����
-         * mount --move��.
+         * 如果挂载点是共享的,但是设备的挂载树中有些挂载有不可挂载属性,这种情况是不允许
+         * mount --move的.
          */
         goto out1;
 	err = -ELOOP;
     /* 
-     * ���ص��mnt�������豸mnt����mnt, ������Ϊ��һ����mnt�ƶ�����mnt�������������������
+     * 挂载点的mnt不能是设备mnt的子mnt, 这是因为将一个父mnt移动到子mnt会造成整个挂载树紊乱
      */
 	for (p = path->mnt; p->mnt_parent != p; p = p->mnt_parent)
 		if (p == old_path.mnt)
@@ -1780,7 +1801,7 @@ out1:
 out:
 	up_write(&namespace_sem);
 	if (!err)
-        //ԭ���صĸ�mnt��mnt��dentry����Ҫ--
+        //原挂载的父mnt的mnt及dentry计数要--
 		path_put(&parent_path);
 	path_put(&old_path);
 	return err;
@@ -1790,15 +1811,18 @@ out:
  * create a new mount for userspace and request it to be added into the
  * namespace's tree
  */
+//nd中保存了挂载点的名称,name是设备名称
 static int do_new_mount(struct path *path, char *type, int flags,
 			int mnt_flags, char *name, void *data)
 {
 	struct vfsmount *mnt;
 
+	//type为空,或者type超过page size
 	if (!type || !memchr(type, 0, PAGE_SIZE))
 		return -EINVAL;
 
 	/* we need capabilities... */
+	//检查进程的权能,只有root能mount,如果将下面的snippet去掉,普通用户也能mount 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
 
@@ -1813,7 +1837,7 @@ static int do_new_mount(struct path *path, char *type, int flags,
  * add a mount into a namespace's mount tree
  * - provide the option of adding the new mount to an expiration list
  */
-//path�б����˹��ص��·����Ϣ
+ //将安装点挂在目录树上
 int do_add_mount(struct vfsmount *newmnt, struct path *path,
 		 int mnt_flags, struct list_head *fslist)
 {
@@ -1823,7 +1847,7 @@ int do_add_mount(struct vfsmount *newmnt, struct path *path,
 	/* Something was mounted here while we slept */
 	while (d_mountpoint(path->dentry) &&
 	       follow_down(&path->mnt, &path->dentry))
-        //�ҵ����ص�������ص�����һ��vfsmount
+        //找到挂载到这个挂载点的最后一个vfsmount
 		;
 	err = -EINVAL;
 	if (!check_mnt(path->mnt))
@@ -1912,7 +1936,7 @@ static int select_submounts(struct vfsmount *parent, struct list_head *graveyard
 	int found = 0;
 
 repeat:
-    //�ҵ���һ����mount
+    //找到第一个子mount
 	next = this_parent->mnt_mounts.next;
 resume:
 	while (next != &this_parent->mnt_mounts) {
@@ -1921,18 +1945,18 @@ resume:
 
 		next = tmp->next;
 		if (!(mnt->mnt_flags & MNT_SHRINKABLE))
-            //ֻ��ӵ��MNT_SHRINKABLE��־��mnt����shrink
+            //只有拥有MNT_SHRINKABLE标志的mnt才能shrink
 			continue;
 		/*
 		 * Descend a level if the d_mounts list is non-empty.
 		 */
-        //����һ����mount����
+        //向下一级子mount遍历
 		if (!list_empty(&mnt->mnt_mounts)) {
 			this_parent = mnt;
 			goto repeat;
 		}
 
-        //����Ѿ����˹�������leave
+        //如果已经到了挂载树的leave
 		if (!propagate_mount_busy(mnt, 1)) {
 			list_move_tail(&mnt->mnt_expire, graveyard);
 			found++;
@@ -1956,15 +1980,15 @@ resume:
 static void shrink_submounts(struct vfsmount *mnt, struct list_head *umounts)
 {
     /* 
-     * graveyardֻ����ʱ���ڼ�¼mnt�п���shrink����mnt,���ջ���Ҫ����Щmnt����umounts��,
-     * umount�л���¼�˹�����������Ҫ�ͷŵĲ���
+     * graveyard只是临时用于记录mnt中可以shrink的子mnt,最终还需要将这些mnt加入umounts中,
+     * umount中还记录了共享子树中需要释放的部分
      */
 	LIST_HEAD(graveyard);
 	struct vfsmount *m;
 
 	/* extract submounts of 'mountpoint' from the expiration list */
 	while (select_submounts(mnt, &graveyard)) {
-        //��mnt����mnt��ʱ��Ż�������ѭ��
+        //当mnt有子mnt的时候才会进入这个循环
 		while (!list_empty(&graveyard)) {
 			m = list_first_entry(&graveyard, struct vfsmount,
 						mnt_expire);
@@ -1987,10 +2011,15 @@ static long exact_copy_from_user(void *to, const void __user * from,
 	const char __user *f = from;
 	char c;
 
+	//检查用户空间指针是否可读
 	if (!access_ok(VERIFY_READ, from, n))
 		return n;
 
 	while (n) {
+		//user和kernel传递数据时不能用memcpy函数,因为kernel和user内存不能直接互访
+		//__get_user,kernel从用户空间获得一个值
+		//__put_user,kernel向用户空间传递一个值
+		//__get_user(x,ptr),Returns zero on success, or -EFAULT on error. On error, the variable x is set to zero. 
 		if (__get_user(c, f)) {
 			memset(t, 0, n);
 			break;
@@ -2020,15 +2049,18 @@ int copy_mount_options(const void __user * data, unsigned long *where)
 	 * the remainder of the page.
 	 */
 	/* copy_from_user cannot cross TASK_SIZE ! */
+	//从data开始，拷贝一个page的数据。如果data+PAGE_SIZE超出TASK_SIZE,也就是到了内核空间,就不能拷贝
 	size = TASK_SIZE - (unsigned long)data;
 	if (size > PAGE_SIZE)
 		size = PAGE_SIZE;
 
 	i = size - exact_copy_from_user((void *)page, data, size);
+	//如果一个字节都没copy
 	if (!i) {
 		free_page(page);
 		return -EFAULT;
 	}
+	//如果不满一个page,将剩下的部分填0
 	if (i != PAGE_SIZE)
 		memset((char *)page + i, 0, PAGE_SIZE - i);
 	*where = page;
@@ -2056,42 +2088,45 @@ long do_mount(char *dev_name, char *dir_name, char *type_page,
 	int retval = 0;
 	int mnt_flags = 0;
     /*
-     * mountflags��ָ���ļ�ϵͳ�Ķ�д���ʱ�־������ֵ������
-     * MS_BIND��ִ��bind���أ�ʹ�ļ�������Ŀ¼�����ļ�ϵͳ�ڵ���һ�����Ͽ��ӡ�
-     * MS_DIRSYNC��ͬ��Ŀ¼�ĸ��¡�
-     * MS_MANDLOCK���������ļ���ִ��ǿ������
-     * MS_MOVE���ƶ���Ŀ¼����
-     * MS_NOATIME����Ҫ�����ļ��ϵķ���ʱ�䡣
-     * MS_NODEV�������������豸�ļ���
-     * MS_NODIRATIME������������Ŀ¼�ϵķ���ʱ�䡣
-     * MS_NOEXEC���������ڹ��ϵ��ļ�ϵͳ��ִ�г���
-     * MS_NOSUID��ִ�г���ʱ��������set-user-ID��set-group-IDλ��
-     * MS_RDONLY��ָ���ļ�ϵͳΪֻ����
-     * MS_REMOUNT�����¼����ļ�ϵͳ����������ı��ִ��ļ�ϵͳ��mountflag�����ݣ�������ʹ����ж�أ��ٹ����ļ�ϵͳ�ķ�ʽ��
-     * MS_SYNCHRONOUS��ͬ���ļ��ĸ��¡�
-     * MNT_FORCE��ǿ��ж�أ���ʹ�ļ�ϵͳ����æ״̬��
-     * MNT_EXPIRE�������ص��־Ϊ��ʱ��
+     * mountflags：指定文件系统的读写访问标志，可能值有以下
+     * MS_BIND：执行bind挂载，使文件或者子目录树在文件系统内的另一个点上可视。
+     * MS_DIRSYNC：同步目录的更新。
+     * MS_MANDLOCK：允许在文件上执行强制锁。
+     * MS_MOVE：移动子目录树。
+     * MS_NOATIME：不要更新文件上的访问时间。
+     * MS_NODEV：不允许访问设备文件。
+     * MS_NODIRATIME：不允许更新目录上的访问时间。
+     * MS_NOEXEC：不允许在挂上的文件系统上执行程序。
+     * MS_NOSUID：执行程序时，不遵照set-user-ID和set-group-ID位。
+     * MS_RDONLY：指定文件系统为只读。
+     * MS_REMOUNT：重新加载文件系统。这允许你改变现存文件系统的mountflag和数据，而无需使用先卸载，再挂上文件系统的方式。
+     * MS_SYNCHRONOUS：同步文件的更新。
+     * MNT_FORCE：强制卸载，即使文件系统处于忙状态。
+     * MNT_EXPIRE：将挂载点标志为过时。
      */
 
 
 	/* Discard magic */
+	//MS_MGC_VAL 和 MS_MGC_MSK是在以前的版本中定义的安装标志和掩码，现在的安装标志中已经不使用这些魔数了
+	//因此，当还有这个魔数时，则丢弃它。
 	if ((flags & MS_MGC_MSK) == MS_MGC_VAL)
 		flags &= ~MS_MGC_MSK;
 
 	/* Basic sanity checks */
-
+	//如果挂载字符串为空，或者字符串过长，超过PAGE_SIZE大小，则返回失败
 	if (!dir_name || !*dir_name || !memchr(dir_name, 0, PAGE_SIZE))
 		return -EINVAL;
+	//对于基于网络的文件系统dev_name可以为空
 	if (dev_name && !memchr(dev_name, 0, PAGE_SIZE))
 		return -EINVAL;
-
+	//如果data_page超过PAGE_SIZE长度，将超出部分截断
 	if (data_page)
 		((char *)data_page)[PAGE_SIZE - 1] = 0;
 
 	/* Separate the per-mountpoint flags */
-    /* ����Ѱ�װ�ļ�ϵͳ�����еİ�װ��־MS_NOSUID��MS_NODEV��MS_NOATIME��MS_NODIRATIME��MS_NODEV��MS_NOEXEC
-	 * ����һ�������ã���������ǣ������Ѱ�װ�ļ�ϵͳ������������Ӧ�ı�־
-     *��MNT_NOSUID��MNT_NODEV��MNT_NOEXEC��MNT_NOATIME��MNT_NODIRATIME)
+    /* 如果已安装文件系统对象中的安装标志MS_NOSUID、MS_NODEV、MS_NOATIME、MS_NODIRATIME、MS_NODEV或MS_NOEXEC
+	 * 中任一个被设置，则清除它们，并在已安装文件系统对象中设置相应的标志
+     *（MNT_NOSUID、MNT_NODEV、MNT_NOEXEC、MNT_NOATIME、MNT_NODIRATIME)
      */
 	if (flags & MS_NOSUID)
 		mnt_flags |= MNT_NOSUID;
@@ -2121,15 +2156,19 @@ long do_mount(char *dev_name, char *dir_name, char *type_page,
 	if (retval)
 		goto dput_out;
 
+	//如果MS_REMOUNT标志被指定，其目的通常是改变超级块对象s_flags字段的安装标志，
 	if (flags & MS_REMOUNT)
+		//修改挂载选项
 		retval = do_remount(&path, flags & ~MS_REMOUNT, mnt_flags,
 				    data_page);
 	else if (flags & MS_BIND)
-        //path�м�¼���ص��·����Ϣ
+        //path中记录挂载点的路径信息
 		retval = do_loopback(&path, dev_name, flags & MS_REC);
 	else if (flags & (MS_SHARED | MS_PRIVATE | MS_SLAVE | MS_UNBINDABLE))
+		//改变挂载标志或涉及的各个vfsmount实例之间建立所需的数据结构的关联
 		retval = do_change_type(&path, flags);
 	else if (flags & MS_MOVE)
+		//移动一个已经挂载的文件系统
 		retval = do_move_mount(&path, dev_name);
 	else
 		retval = do_new_mount(&path, type_page, flags, mnt_flags,
@@ -2222,8 +2261,8 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
 }
 
 /*
- *data��������Ǿ����ļ�ϵͳ�ڹ���ʱ���ض�ѡ�����ext2��˵��sb=n�����������ָ��sb��λ�ã� 
- *��Ȼsb��Ĭ��λ����1�� 
+ *data这个参数是具体文件系统在挂载时的特定选项，对于ext2来说有sb=n这个参数可以指定sb的位置， 
+ *虽然sb的默认位置是1。 
 */
 SYSCALL_DEFINE5(mount, char __user *, dev_name, char __user *, dir_name,
 		char __user *, type, unsigned long, flags, void __user *, data)
@@ -2234,15 +2273,18 @@ SYSCALL_DEFINE5(mount, char __user *, dev_name, char __user *, dir_name,
 	unsigned long dev_page;
 	char *dir_page;
 
+	//复制挂载选项
 	retval = copy_mount_options(type, &type_page);
 	if (retval < 0)
 		return retval;
 
+	//getname()在复制时遇到字符串结尾符“\0”就停止
 	dir_page = getname(dir_name);
 	retval = PTR_ERR(dir_page);
 	if (IS_ERR(dir_page))
 		goto out1;
 
+	//copy_mount_option拷贝整个页面，并返回该页面的起始地址。 
 	retval = copy_mount_options(dev_name, &dev_page);
 	if (retval < 0)
 		goto out2;
@@ -2470,6 +2512,7 @@ static void __init init_mount_tree(void)
 	init_waitqueue_head(&ns->poll);
 	ns->event = 0;
 	list_add(&mnt->mnt_list, &ns->list);
+	//namespace的根vfsmount
 	ns->root = mnt;
 	mnt->mnt_ns = ns;
 
@@ -2493,6 +2536,7 @@ void __init mnt_init(void)
 	mnt_cache = kmem_cache_create("mnt_cache", sizeof(struct vfsmount),
 			0, SLAB_HWCACHE_ALIGN | SLAB_PANIC, NULL);
 
+	//mount_hashtable只占用一个页面
 	mount_hashtable = (struct list_head *)__get_free_page(GFP_ATOMIC);
 
 	if (!mount_hashtable)
