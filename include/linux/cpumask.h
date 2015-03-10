@@ -1,4 +1,4 @@
-#ifndef __LINUX_CPUMASK_H
+﻿#ifndef __LINUX_CPUMASK_H
 #define __LINUX_CPUMASK_H
 
 /*
@@ -296,7 +296,9 @@ static inline const cpumask_t *get_cpu_mask(unsigned int cpu)
 #define CPU_MASK_LAST_WORD BITMAP_LAST_WORD_MASK(NR_CPUS)
 
 #if NR_CPUS <= BITS_PER_LONG
+//如果CPU的个数能够被一个位图容纳
 
+//将位图中能够使用的CPU全部置位
 #define CPU_MASK_ALL							\
 (cpumask_t) { {								\
 	[BITS_TO_LONGS(NR_CPUS)-1] = CPU_MASK_LAST_WORD			\
@@ -305,7 +307,9 @@ static inline const cpumask_t *get_cpu_mask(unsigned int cpu)
 #define CPU_MASK_ALL_PTR	(&CPU_MASK_ALL)
 
 #else
+//如果一个位图容纳不了全部的CPU
 
+//只有最后一个位图可能没有满,其他的位图全部被占满
 #define CPU_MASK_ALL							\
 (cpumask_t) { {								\
 	[0 ... BITS_TO_LONGS(NR_CPUS)-2] = ~0UL,			\

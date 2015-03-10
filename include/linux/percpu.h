@@ -1,4 +1,4 @@
-#ifndef __LINUX_PERCPU_H
+﻿#ifndef __LINUX_PERCPU_H
 #define __LINUX_PERCPU_H
 
 #include <linux/preempt.h>
@@ -81,6 +81,7 @@ struct percpu_data {
         (__typeof__(ptr))__p->ptrs[(cpu)];	          \
 })
 
+//如果是SMP系统,__percpu_alloc_mask函数实际上是mm/allocpercpu.c中实现的
 extern void *__percpu_alloc_mask(size_t size, gfp_t gfp, cpumask_t *mask);
 extern void percpu_free(void *__pdata);
 
@@ -88,6 +89,7 @@ extern void percpu_free(void *__pdata);
 
 #define percpu_ptr(ptr, cpu) ({ (void)(cpu); (ptr); })
 
+//如果是非SMP系统,per-CPU变量就是通过kzalloc分配的
 static __always_inline void *__percpu_alloc_mask(size_t size, gfp_t gfp, cpumask_t *mask)
 {
 	return kzalloc(size, gfp);

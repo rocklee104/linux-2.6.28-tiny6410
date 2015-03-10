@@ -1,4 +1,4 @@
-/* find_next_bit.c: fallback find next bit implementation
+﻿/* find_next_bit.c: fallback find next bit implementation
  *
  * Copyright (C) 2004 Red Hat, Inc. All Rights Reserved.
  * Written by David Howells (dhowells@redhat.com)
@@ -20,11 +20,19 @@
 /*
  * Find the next set bit in a memory region.
  */
+/** 
+ * find_next_bit 
+ * @param addr:位图起始地址 
+ * @param size:位图搜索的结束位置 
+ * @param offset:位图搜索的起始位置 
+ */
 unsigned long find_next_bit(const unsigned long *addr, unsigned long size,
 			    unsigned long offset)
 {
 	const unsigned long *p = addr + BITOP_WORD(offset);
+	//result记录offset以unsigned long对齐的部分
 	unsigned long result = offset & ~(BITS_PER_LONG-1);
+	//tmp记录offset未以unsigned long对齐的部分
 	unsigned long tmp;
 
 	if (offset >= size)

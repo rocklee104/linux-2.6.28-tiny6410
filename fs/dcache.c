@@ -537,6 +537,7 @@ restart:
 	if (count != NULL)
 		*count = cnt;
 	if (!list_empty(&referenced))
+		//将referenced链表头插入sb的s_dentry_lru链表中去
 		list_splice(&referenced, &sb->s_dentry_lru);
 	spin_unlock(&dcache_lock);
 }
@@ -568,6 +569,7 @@ restart:
 		prune_ratio = unused / count;
 	spin_lock(&sb_lock);
 	list_for_each_entry(sb, &super_blocks, s_list) {
+		//遍历系统中所有的super block
 		if (sb->s_nr_dentry_unused == 0)
 			continue;
 		sb->s_count++;
@@ -582,8 +584,10 @@ restart:
 		 */
 		spin_unlock(&sb_lock);
 		if (prune_ratio != 1)
+			//对于系统中每一个sb,回收的dentry占s_nr_dentry_unused的比率是一样的
 			w_count = (sb->s_nr_dentry_unused / prune_ratio) + 1;
 		else
+			//全部回收
 			w_count = sb->s_nr_dentry_unused;
 		pruned = w_count;
 		/*
@@ -592,6 +596,10 @@ restart:
 		 * end up holding a reference to an inode while the filesystem
 		 * is unmounted.  So we try to get s_umount, and make sure
 		 * s_root isn't NULL.
+		 */
+		 /*
+		  * 确保sb所在的文件系统没有处于卸载过程,否则可能和generic_shutdown_super()
+		  * 产生竞争,继而出现文件系统已经卸载，但是我们还持有其中一个inode.
 		 */
 		if (down_read_trylock(&sb->s_umount)) {
 			if ((sb->s_root != NULL) &&

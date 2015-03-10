@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  linux/init/main.c
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
@@ -404,6 +404,7 @@ static void __init setup_per_cpu_areas(void)
 
 	for_each_possible_cpu(i) {
 		__per_cpu_offset[i] = ptr - __per_cpu_start;
+        //为per-CPU区域创建副本
 		memcpy(ptr, __per_cpu_start, __per_cpu_end - __per_cpu_start);
 		ptr += size;
 	}

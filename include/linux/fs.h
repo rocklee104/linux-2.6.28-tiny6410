@@ -1,4 +1,4 @@
-#ifndef _LINUX_FS_H
+﻿#ifndef _LINUX_FS_H
 #define _LINUX_FS_H
 
 /*
@@ -112,31 +112,31 @@ extern int dir_notify_enable;
 /*
  * These are the fs-independent mount-flags: up to 32 flags are supported
  */
-//������Щ��־���û��ռ䴫�������ı�־,����д��mnt->mnt_flags
-//ָ���ļ�ϵͳΪֻ��
+//下面这些标志是用户空间传递下来的标志,不会写入mnt->mnt_flags
+//指定文件系统为只读
 #define MS_RDONLY	 1	/* Mount read-only */
-//ִ�г���ʱ��������set-user-ID��set-group-IDλ
+//执行程序时，不遵照set-user-ID和set-group-ID位
 #define MS_NOSUID	 2	/* Ignore suid and sgid bits */
-//�����������豸�ļ�
+//不允许访问设备文件
 #define MS_NODEV	 4	/* Disallow access to device special files */
-//�������ڹ��ϵ��ļ�ϵͳ��ִ�г���
+//不允许在挂上的文件系统上执行程序
 #define MS_NOEXEC	 8	/* Disallow program execution */
-//ͬ���ļ��ĸ���
+//同步文件的更新
 #define MS_SYNCHRONOUS	16	/* Writes are synced at once */
-//���¼����ļ�ϵͳ����������ı��ִ��ļ�ϵͳ��mountflag�����ݣ�������ʹ����ж�أ��ٹ����ļ�ϵͳ�ķ�ʽ
+//重新加载文件系统。这允许你改变现存文件系统的mountflag和数据，而无需使用先卸载，再挂上文件系统的方式
 #define MS_REMOUNT	32	/* Alter flags of a mounted FS */
-//�������ļ���ִ��ǿ����
+//允许在文件上执行强制锁
 #define MS_MANDLOCK	64	/* Allow mandatory locks on an FS */
-//ͬ��Ŀ¼�ĸ���
+//同步目录的更新
 #define MS_DIRSYNC	128	/* Directory modifications are synchronous */
-//��Ҫ�����ļ��ϵķ���ʱ��
+//不要更新文件上的访问时间
 #define MS_NOATIME	1024	/* Do not update access times. */
-//����������Ŀ¼�ϵķ���ʱ�䡣
+//不允许更新目录上的访问时间。
 #define MS_NODIRATIME	2048	/* Do not update directory access times */
-//ִ��bind���أ�ʹ�ļ�������Ŀ¼�����ļ�ϵͳ�ڵ���һ�����Ͽ��ӡ�
+//执行bind挂载，使文件或者子目录树在文件系统内的另一个点上可视。
 //1<<12
 #define MS_BIND		4096
-//�ƶ���Ŀ¼��
+//移动子目录树
 //1<<13
 #define MS_MOVE		8192
 //1<<14
@@ -572,7 +572,7 @@ struct address_space {
 
 struct block_device {
 	dev_t			bd_dev;  /* not a kdev_t - it's a search key */
-    //bdevfs�е�inode
+    //bdevfs中的inode
 	struct inode *		bd_inode;	/* will die */
 	int			bd_openers;
 	struct mutex		bd_mutex;	/* open/close mutex */
@@ -653,7 +653,7 @@ struct inode {
 	gid_t			i_gid;
 	dev_t			i_rdev;
 	u64			i_version;
-	//������inode��bdev_inode�ĳ�Ա,i_size��bd_set_size�б����óɿ��豸�Ĵ�С
+	//如果这个inode是bdev_inode的成员,i_size在bd_set_size中被设置成块设备的大小
 	loff_t			i_size;
 #ifdef __NEED_I_SIZE_ORDERED
 	seqcount_t		i_size_seqcount;
@@ -1116,14 +1116,14 @@ extern int send_sigurg(struct fown_struct *fown);
  *	Umount options
  */
 
-//ǿ��ж�أ���ʹ�ļ�ϵͳ����æ״̬
+//强制卸载，即使文件系统处于忙状态
 #define MNT_FORCE	0x00000001	/* Attempt to forcibily umount */
 /*
  * Perform  a  lazy  unmount: make the mount point unavailable for new accesses,
  * and actually perform the unmount when the mount point ceases to be busy.
 */
 #define MNT_DETACH	0x00000002	/* Just detach from the tree */
-//�����ص��־Ϊ��ʱ
+//将挂载点标志为过时
 #define MNT_EXPIRE	0x00000004	/* Mark for expiry */
 
 extern struct list_head super_blocks;
@@ -1165,7 +1165,9 @@ struct super_block {
 	struct hlist_head	s_anon;		/* anonymous dentries for (nfs) exporting */
 	struct list_head	s_files;
 	/* s_dentry_lru and s_nr_dentry_unused are protected by dcache_lock */
+	//管理当前文件系统中所有的未使用的dentry
 	struct list_head	s_dentry_lru;	/* unused dentry lru */
+	//当前文件系统中所有的未使用的dentry的计数
 	int			s_nr_dentry_unused;	/* # of dentry on lru */
 
 	struct block_device	*s_bdev;

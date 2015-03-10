@@ -1,4 +1,4 @@
-#ifndef _LINUX_LIST_H
+﻿#ifndef _LINUX_LIST_H
 #define _LINUX_LIST_H
 
 #include <linux/stddef.h>
@@ -273,6 +273,7 @@ static inline void __list_splice(const struct list_head *list,
  * @list: the new list to add.
  * @head: the place to add it in the first list.
  */
+//将list链表除其链表头外的元素头插入head和head->next之间
 static inline void list_splice(const struct list_head *list,
 				struct list_head *head)
 {

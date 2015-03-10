@@ -1,4 +1,4 @@
-#include <linux/kernel.h>
+﻿#include <linux/kernel.h>
 #include <linux/bitops.h>
 #include <linux/cpumask.h>
 #include <linux/module.h>
@@ -12,6 +12,7 @@ EXPORT_SYMBOL(__first_cpu);
 
 int __next_cpu(int n, const cpumask_t *srcp)
 {
+	//在位图中的NR_CPUS内,以n+1为起始位置查找
 	return min_t(int, NR_CPUS, find_next_bit(srcp->bits, NR_CPUS, n+1));
 }
 EXPORT_SYMBOL(__next_cpu);

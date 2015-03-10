@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (2004) Linus Torvalds
  *
  * Author: Zwane Mwaikambo <zwane@fsmlabs.com>
@@ -176,6 +176,7 @@ EXPORT_SYMBOL(_write_lock_bh);
 
 void __lockfunc _spin_lock(spinlock_t *lock)
 {
+	//如果kernel可抢占,那么关闭抢占.如果kernel不可抢占,那么什么都不做
 	preempt_disable();
 	spin_acquire(&lock->dep_map, 0, 0, _RET_IP_);
 	LOCK_CONTENDED(lock, _raw_spin_trylock, _raw_spin_lock);

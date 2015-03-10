@@ -1,4 +1,4 @@
-/*
+﻿/*
  *	linux/mm/filemap.c
  *
  * Copyright (C) 1994-1999  Linus Torvalds
@@ -655,6 +655,7 @@ struct page *find_get_page(struct address_space *mapping, pgoff_t offset)
 	void **pagep;
 	struct page *page;
 
+	//标记reader进入临界区
 	rcu_read_lock();
 repeat:
 	page = NULL;
@@ -677,6 +678,7 @@ repeat:
 			goto repeat;
 		}
 	}
+	//reader退出临界区
 	rcu_read_unlock();
 
 	return page;

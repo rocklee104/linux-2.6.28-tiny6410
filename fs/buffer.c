@@ -1258,8 +1258,8 @@ void mark_buffer_dirty(struct buffer_head *bh)
 			return;
 	}
 
-    //buffer本身不dirty, 设置buffer dirty成功
 	if (!test_set_buffer_dirty(bh))
+		//buffer本身不dirty, 设置b_state dirty
 		__set_page_dirty(bh->b_page, page_mapping(bh->b_page), 0);
 }
 

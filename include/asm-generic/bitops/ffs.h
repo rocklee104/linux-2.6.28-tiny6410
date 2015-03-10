@@ -1,4 +1,4 @@
-#ifndef _ASM_GENERIC_BITOPS_FFS_H_
+﻿#ifndef _ASM_GENERIC_BITOPS_FFS_H_
 #define _ASM_GENERIC_BITOPS_FFS_H_
 
 /**
@@ -9,6 +9,7 @@
  * the libc and compiler builtin ffs routines, therefore
  * differs in spirit from the above ffz (man ffs).
  */
+//找到第一个置位的bit,bit以1开始
 static inline int ffs(int x)
 {
 	int r = 1;
