@@ -1,4 +1,4 @@
-#ifndef __ASM_ARM_IRQFLAGS_H
+﻿#ifndef __ASM_ARM_IRQFLAGS_H
 #define __ASM_ARM_IRQFLAGS_H
 
 #ifdef __KERNEL__
@@ -17,7 +17,7 @@
 	"cpsid	i"						\
 	: "=r" (x) : : "memory", "cc");				\
 	})
-
+//tiny6410中开启和关闭中断就是调用这组函数
 #define raw_local_irq_enable()  __asm__("cpsie i	@ __sti" : : : "memory", "cc")
 #define raw_local_irq_disable() __asm__("cpsid i	@ __cli" : : : "memory", "cc")
 #define local_fiq_enable()  __asm__("cpsie f	@ __stf" : : : "memory", "cc")

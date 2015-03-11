@@ -551,12 +551,45 @@ asmlinkage void __init start_kernel(void)
 	 * Need to run as early as possible, to initialize the
 	 * lockdep hash:
 	 */
+    /*
+     * 这个函数主要作用是提供调试和错误的初始化,当函数出错时,系统提供查看函数调用栈的关系.
+     * 调用栈的形式一般如下：
+     * unwind backtrace:
+     * [0xffffffff810ef759]unw_backtrace+0x29/0x80
+     * [0xffffffff810ef7d4]test_write+0x24/0x90
+     * [0xffffffff81138940]vfs_write+0xd0/0x1a0
+     * [0xffffffff81138b14]sys_write+0x54/0xa0
+     * [0xffffffff814d7352]system_call_fastpath+0x16/0x1b
+     * 在这个调用栈里,从下至上地调用,发现最近发现错误的函数就是unw_backtrace
+     */
 	unwind_init();
+	/*
+     * lockdep是linux内核的一个调试模块,用来检查内核互斥机制尤其是自旋锁潜在的死锁问题. 
+     * 自旋锁由于是查询方式等待,不释放处理器,比一般的互斥机制更容易死锁,故引入lockdep
+     * 检查以下几种情况可能的死锁(lockdep将有专门的文章详细介绍,在此只是简单列举):  
+     * 1.同一个进程递归地加锁同一把锁.  
+     * 2.一把锁既在中断(或中断下半部)使能的情况下执行过加锁操作,又在中断(或中断下半部)里执行过加锁操作.
+     *   这样该锁有可能在锁定时由于中断发生又试图在同一处理器上加锁.  
+     * 3.加锁后导致依赖图产生成闭环,这是典型的死锁现象. 
+     */
 	lockdep_init();
+	//这个函数主要作用是对调试对象进行早期的初始化，其实就是HASH锁和静态对象池进行初始化。
 	debug_objects_early_init();
+    /*
+     * 这个函数主要作用是控制组进行早期的初始化.什么叫控制组(controlgroups)呢?
+     * 简单地说,控制组就是定义一组进程具有相同资源的占有程度,比如可以指定一组进程使用CPU为30%,磁盘IO为40%,
+     * 网络带宽为50%.因此通过控制组就可以把所有进程分配不同的资源.
+     */
 	cgroup_init_early();
 
+    //这个函数主要作用是关闭当前CPU的所有中断响应.在ARM体系里主要就是对CPSR寄存器进行操作.
 	local_irq_disable();
+    /*
+     * 这个函数主要作用是标记内核还在早期初始化代码阶段,并且中断在关闭状态.
+     * 如果有任何中断打开或请求中断的事情出现,都是会提出警告,以便跟踪代码错误情况.
+     * 早期代码初始化结束之后，就会调用函数early_boot_irqs_on来设置这个标志为真.
+     * 对于tiny6410来说,这个函数是空函数.
+     */
 	early_boot_irqs_off();
 	early_init_irq_lock_class();
 
