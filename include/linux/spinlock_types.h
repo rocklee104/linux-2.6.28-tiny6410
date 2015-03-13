@@ -1,4 +1,4 @@
-#ifndef __LINUX_SPINLOCK_TYPES_H
+﻿#ifndef __LINUX_SPINLOCK_TYPES_H
 #define __LINUX_SPINLOCK_TYPES_H
 
 /*
@@ -10,6 +10,7 @@
  */
 
 #if defined(CONFIG_SMP)
+//采用架构定义的raw_spinlock_t
 # include <asm/spinlock_types.h>
 #else
 # include <linux/spinlock_types_up.h>
@@ -34,6 +35,7 @@ typedef struct {
 #define SPINLOCK_MAGIC		0xdead4ead
 
 typedef struct {
+	//在SMP下是一个volatile unsigned int类型的变量
 	raw_rwlock_t raw_lock;
 #ifdef CONFIG_GENERIC_LOCKBREAK
 	unsigned int break_lock;

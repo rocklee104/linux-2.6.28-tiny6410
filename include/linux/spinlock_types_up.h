@@ -1,4 +1,4 @@
-#ifndef __LINUX_SPINLOCK_TYPES_UP_H
+﻿#ifndef __LINUX_SPINLOCK_TYPES_UP_H
 #define __LINUX_SPINLOCK_TYPES_UP_H
 
 #ifndef __LINUX_SPINLOCK_TYPES_H
@@ -28,6 +28,7 @@ typedef struct { } raw_spinlock_t;
 
 #endif
 
+//UP不需要lock
 typedef struct {
 	/* no debug version on UP */
 } raw_rwlock_t;

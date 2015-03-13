@@ -1,4 +1,4 @@
-#ifndef __ASM_SPINLOCK_H
+﻿#ifndef __ASM_SPINLOCK_H
 #define __ASM_SPINLOCK_H
 
 #if __LINUX_ARM_ARCH__ < 6
@@ -23,23 +23,31 @@
 
 #define __raw_spin_lock_flags(lock, flags) __raw_spin_lock(lock)
 
+//如果tiny6410开启了SMP,就会用下面这个__raw_spin_lock
 static inline void __raw_spin_lock(raw_spinlock_t *lock)
 {
 	unsigned long tmp;
 
 	__asm__ __volatile__(
+//从&lock->lock将值读取到tmp
 "1:	ldrex	%0, [%1]\n"
+//测试tmp的值是否为0
 "	teq	%0, #0\n"
 #ifdef CONFIG_CPU_32v6K
 "	wfene\n"
 #endif
+//如果是0,将1写入&lock->lock这个地址中,tmp保存返回值
 "	strexeq	%0, %2, [%1]\n"
+//判断tmp中的值是否是0
 "	teqeq	%0, #0\n"
+//如果是0,表示写入失败,从头开始
 "	bne	1b"
 	: "=&r" (tmp)
 	: "r" (&lock->lock), "r" (1)
+	//状态寄存器可能会改变
 	: "cc");
 
+	//保证屏障之后的代码已经被加了lock
 	smp_mb();
 }
 
@@ -63,11 +71,14 @@ static inline int __raw_spin_trylock(raw_spinlock_t *lock)
 	}
 }
 
+//如果tiny6410开启了SMP,就会用下面这个__raw_spin_unlock
 static inline void __raw_spin_unlock(raw_spinlock_t *lock)
 {
+	//保证解锁之前的代码不会出现在屏障之后
 	smp_mb();
 
 	__asm__ __volatile__(
+	//因为进入临界区的处理器只有一个,故不需要用strex,将lock置0
 "	str	%1, [%0]\n"
 #ifdef CONFIG_CPU_32v6K
 "	mcr	p15, 0, %1, c7, c10, 4\n" /* DSB */
@@ -91,11 +102,14 @@ static inline void __raw_write_lock(raw_rwlock_t *rw)
 	unsigned long tmp;
 
 	__asm__ __volatile__(
+//从&rw->lock将值读取到tmp
 "1:	ldrex	%0, [%1]\n"
+//测试tmp的值是否为0
 "	teq	%0, #0\n"
 #ifdef CONFIG_CPU_32v6K
 "	wfene\n"
 #endif
+//修改rw->lock的值为0x80000000
 "	strexeq	%0, %2, [%1]\n"
 "	teq	%0, #0\n"
 "	bne	1b"
@@ -131,6 +145,7 @@ static inline void __raw_write_unlock(raw_rwlock_t *rw)
 	smp_mb();
 
 	__asm__ __volatile__(
+	//只需要将rw->lock清0
 	"str	%1, [%0]\n"
 #ifdef CONFIG_CPU_32v6K
 "	mcr	p15, 0, %1, c7, c10, 4\n" /* DSB */
@@ -156,17 +171,20 @@ static inline void __raw_write_unlock(raw_rwlock_t *rw)
  * currently active.  However, we know we won't have any write
  * locks.
  */
+ //在SMP环境下才会用下面的函数
 static inline void __raw_read_lock(raw_rwlock_t *rw)
 {
 	unsigned long tmp, tmp2;
 
 	__asm__ __volatile__(
+//读取&rw->lock中的值到tmp
 "1:	ldrex	%0, [%2]\n"
 "	adds	%0, %0, #1\n"
 "	strexpl	%1, %0, [%2]\n"
 #ifdef CONFIG_CPU_32v6K
 "	wfemi\n"
 #endif
+//避免多个reader更新lock值可能引起的混乱
 "	rsbpls	%0, %1, #0\n"
 "	bmi	1b"
 	: "=&r" (tmp), "=&r" (tmp2)
@@ -183,10 +201,15 @@ static inline void __raw_read_unlock(raw_rwlock_t *rw)
 	smp_mb();
 
 	__asm__ __volatile__(
+//读取&rw->lock中的值到tmp		
 "1:	ldrex	%0, [%2]\n"
+//tmp = tmp - 1;
 "	sub	%0, %0, #1\n"
+//将tmp写入&rw->lock,并将返回值写入tmp2
 "	strex	%1, %0, [%2]\n"
+//tmp2 == 0,表示lock值更新成功
 "	teq	%1, #0\n"
+//lock值更新失败,需要重新更新
 "	bne	1b"
 #ifdef CONFIG_CPU_32v6K
 "\n	cmp	%0, #0\n"

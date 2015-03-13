@@ -1,4 +1,4 @@
-#ifndef __ASM_ARM_SYSTEM_H
+﻿#ifndef __ASM_ARM_SYSTEM_H
 #define __ASM_ARM_SYSTEM_H
 
 #ifdef __KERNEL__
@@ -138,6 +138,10 @@ extern unsigned int user_debug;
 #define mb()	do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
 #define rmb()	do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
 #define wmb()	do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
+/* 
+ * 如果tiny6410开启了smp,调用的是__asm__ __volatile__("": : :"memory"),
+ * 这就强制cpu从内存中取数据,寄存器中的数据不能使用了			
+*/
 #define smp_mb()	barrier()
 #define smp_rmb()	barrier()
 #define smp_wmb()	barrier()
@@ -145,6 +149,7 @@ extern unsigned int user_debug;
 #define mb()		dmb()
 #define rmb()		dmb()
 #define wmb()		dmb()
+//如果tiny6410没有开启smp
 #define smp_mb()	dmb()
 #define smp_rmb()	dmb()
 #define smp_wmb()	dmb()

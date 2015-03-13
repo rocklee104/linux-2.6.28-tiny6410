@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Runtime locking correctness validator
  *
  *  Copyright (C) 2006,2007 Red Hat, Inc., Ingo Molnar <mingo@redhat.com>
@@ -368,6 +368,7 @@ do {								\
 } while (0)
 
 #else /* CONFIG_LOCK_STAT */
+//没有开启lock调试
 
 #define lock_contended(lockdep_map, ip) do {} while (0)
 #define lock_acquired(lockdep_map) do {} while (0)

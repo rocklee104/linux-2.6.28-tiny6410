@@ -72,6 +72,7 @@ void __lockfunc _read_lock(rwlock_t *lock)
 {
 	preempt_disable();
 	rwlock_acquire_read(&lock->dep_map, 0, 0, _RET_IP_);
+	//实际代码是_raw_read_lock(lock);
 	LOCK_CONTENDED(lock, _raw_read_trylock, _raw_read_lock);
 }
 EXPORT_SYMBOL(_read_lock);
@@ -177,7 +178,10 @@ EXPORT_SYMBOL(_write_lock_bh);
 
 void __lockfunc _spin_lock(spinlock_t *lock)
 {
-	//如果kernel可抢占,那么关闭抢占.如果kernel不可抢占,那么什么都不做
+	/* 
+	 * 如果kernel可抢占,那么关闭抢占.如果kernel不可抢占,那么什么都不做.
+	 * spin_lock上锁之前会关闭抢占
+	*/
 	preempt_disable();
 	spin_acquire(&lock->dep_map, 0, 0, _RET_IP_);
 	LOCK_CONTENDED(lock, _raw_spin_trylock, _raw_spin_lock);

@@ -87,6 +87,7 @@ extern int __lockfunc generic__raw_read_trylock(raw_rwlock_t *lock);
 #ifdef CONFIG_SMP
 # include <asm/spinlock.h>
 #else
+//对于UP环境来说,就不需要上锁了
 # include <linux/spinlock_up.h>
 #endif
 

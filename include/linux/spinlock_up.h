@@ -1,4 +1,4 @@
-#ifndef __LINUX_SPINLOCK_UP_H
+﻿#ifndef __LINUX_SPINLOCK_UP_H
 #define __LINUX_SPINLOCK_UP_H
 
 #ifndef __LINUX_SPINLOCK_H
@@ -49,6 +49,7 @@ static inline void __raw_spin_unlock(raw_spinlock_t *lock)
 /*
  * Read-write spinlocks. No debug version.
  */
+//tiny6410调用此__raw_read_lock,因为tiny6410非SMP
 #define __raw_read_lock(lock)		do { (void)(lock); } while (0)
 #define __raw_write_lock(lock)		do { (void)(lock); } while (0)
 #define __raw_read_trylock(lock)	({ (void)(lock); 1; })
