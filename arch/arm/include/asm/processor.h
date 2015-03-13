@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  arch/arm/include/asm/processor.h
  *
  *  Copyright (C) 1995-1999 Russell King
@@ -109,6 +109,7 @@ extern int kernel_thread(int (*fn)(void *), void *arg, unsigned long flags);
 #if __LINUX_ARM_ARCH__ >= 5
 
 #define ARCH_HAS_PREFETCH
+//内存系统在不久的将来可能要从某个地址加载数据
 static inline void prefetch(const void *ptr)
 {
 	__asm__ __volatile__(

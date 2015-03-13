@@ -1,4 +1,4 @@
-#ifndef __LINUX_COMPILER_H
+﻿#ifndef __LINUX_COMPILER_H
 #define __LINUX_COMPILER_H
 
 #ifndef __ASSEMBLY__
@@ -31,6 +31,7 @@ extern void __chk_io_ptr(const volatile void __iomem *);
 # define __releases(x)
 # define __acquire(x) (void)0
 # define __release(x) (void)0
+//tiny6410使用的__cond_lock
 # define __cond_lock(x,c) (c)
 #endif
 

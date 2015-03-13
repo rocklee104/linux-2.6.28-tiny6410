@@ -95,8 +95,14 @@ static void d_free(struct dentry *dentry)
 		dentry->d_op->d_release(dentry);
 	/* if dentry was never inserted into hash, immediate free is OK */
 	if (hlist_unhashed(&dentry->d_hash))
+		//hlist是通过RCU保护的,如果不在hlist中,就可以直接删除
 		__d_free(dentry);
 	else
+		/*
+		 * 如果dentry在hlist中,就需要调用call_rcu注册回调函数,伺机删除.
+		 * 因为读取RCU之前会将kernel抢占关闭,所以是要时间片开始轮转,就
+		 * 说明没有reader持有旧的指针,就可以将旧指针删除.
+		 */
 		call_rcu(&dentry->d_u.d_rcu, d_callback);
 }
 
@@ -177,6 +183,7 @@ static struct dentry *d_kill(struct dentry *dentry)
 {
 	struct dentry *parent;
 
+	//从其父目录的子目录链表中删除
 	list_del(&dentry->d_u.d_child);
 	dentry_stat.nr_dentry--;	/* For d_free, below */
 	/*drops the locks, at that point nobody can reach this dentry */
@@ -441,7 +448,7 @@ static void prune_one_dentry(struct dentry * dentry)
 {
 	//从hash表中删除
 	__d_drop(dentry);
-	//从子目录链表中删除
+	//将dentry完全删除
 	dentry = d_kill(dentry);
 
 	/*
@@ -451,11 +458,12 @@ static void prune_one_dentry(struct dentry * dentry)
 	spin_lock(&dcache_lock);
 	while (dentry) {
 		if (!atomic_dec_and_lock(&dentry->d_count, &dentry->d_lock))
+			//如果没有对dentry上锁,也就是dentry的d_count域不是1的情况,直接返回
 			return;
 
-	//释放inode
 		if (dentry->d_op && dentry->d_op->d_delete)
 			dentry->d_op->d_delete(dentry);
+		//将dentry从其d_lru域链入的链表上取下来(这个链表不一定是sb的lru链表)
 		dentry_lru_del_init(dentry);
 	//释放dentry空间
 		__d_drop(dentry);
@@ -472,8 +480,15 @@ static void prune_one_dentry(struct dentry * dentry)
  * which flags are set. This means we don't need to maintain multiple
  * similar copies of this loop.
  */
+/**
+ * @sb    : 特定的super block
+ * @count : 如果count是NULL, 就要除去super block上所有的dentry
+ * @flags : 如果flags不是0, 就需要一些特定的处理方式去处理这些dentry.如果
+ *          flags == 0, 那么就只要除去dentry就行了.
+ */
 static void __shrink_dcache_sb(struct super_block *sb, int *count, int flags)
 {
+    //被引用过
 	LIST_HEAD(referenced);
 	LIST_HEAD(tmp);
 	struct dentry *dentry;
@@ -487,9 +502,11 @@ static void __shrink_dcache_sb(struct super_block *sb, int *count, int flags)
 		cnt = *count;
 restart:
 	if (count == NULL)
+        //将当前sb上lru链表中所有的dentry,放到tmp链表中去
 		list_splice_init(&sb->s_dentry_lru, &tmp);
 	else {
 		while (!list_empty(&sb->s_dentry_lru)) {
+            //从lru链表的尾端取出dentry,最尾端的dentry最不经常使用
 			dentry = list_entry(sb->s_dentry_lru.prev,
 					struct dentry, d_lru);
 			BUG_ON(dentry->d_sb != sb);
@@ -502,10 +519,20 @@ restart:
 			 */
 			if ((flags & DCACHE_REFERENCED)
 				&& (dentry->d_flags & DCACHE_REFERENCED)) {
+                /*
+                 *  如果flags是DCACHE_REFERENCED,表示当前调用__shrink_dcache_sb需要
+                 *  根据使用频率来区别对待dentry,对于d_flags域是DCACHE_REFERENCED的
+                 *  dentry,也就是有使用过,但是目前没有其他地方使用,刚分配到lru上的
+                 *  dentry,不能将其直接删除,而是去除其DCACHE_REFERENCED标志,重新将其
+                 *  放回lru链表中去.而域没有DCACHE_REFERENCED标志的dentry接下来的工作
+                 *  就是将其删除.
+                 */
 				dentry->d_flags &= ~DCACHE_REFERENCED;
+                //将dentry从lru上取下,尾插入referenced链表
 				list_move_tail(&dentry->d_lru, &referenced);
 				spin_unlock(&dentry->d_lock);
 			} else {
+                //将dentry从lru上取下,尾插入tmp链表
 				list_move_tail(&dentry->d_lru, &tmp);
 				spin_unlock(&dentry->d_lock);
 				cnt--;

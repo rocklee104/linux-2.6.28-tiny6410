@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  arch/arm/include/asm/atomic.h
  *
  *  Copyright (C) 1996 Russell King.
@@ -45,6 +45,7 @@ static inline void atomic_set(atomic_t *v, int i)
 	: "cc");
 }
 
+//tiny6410使用的atomic_add_return,将原子变量v的值加i,然后返回计算后的值
 static inline int atomic_add_return(int i, atomic_t *v)
 {
 	unsigned long tmp;
@@ -63,6 +64,7 @@ static inline int atomic_add_return(int i, atomic_t *v)
 	return result;
 }
 
+//tiny6410使用的atomic_sub_return,将原子变量v的值减i,然后返回计算后的值
 static inline int atomic_sub_return(int i, atomic_t *v)
 {
 	unsigned long tmp;
@@ -194,6 +196,7 @@ static inline int atomic_add_unless(atomic_t *v, int a, int u)
 #define atomic_dec(v)		(void) atomic_sub_return(1, v)
 
 #define atomic_inc_and_test(v)	(atomic_add_return(1, v) == 0)
+//tiny6410的atomic_dec_and_test定义,如果原子变量v - 1的值等于0
 #define atomic_dec_and_test(v)	(atomic_sub_return(1, v) == 0)
 #define atomic_inc_return(v)    (atomic_add_return(1, v))
 #define atomic_dec_return(v)    (atomic_sub_return(1, v))

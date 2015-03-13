@@ -1,4 +1,4 @@
-#ifndef __LINUX_SPINLOCK_H
+﻿#ifndef __LINUX_SPINLOCK_H
 #define __LINUX_SPINLOCK_H
 
 /*
@@ -355,6 +355,10 @@ do {						\
  * @lock.  Returns false for all other cases.
  */
 extern int _atomic_dec_and_lock(atomic_t *atomic, spinlock_t *lock);
+/*
+ * 对于tiny6410来说,atomic_dec_and_lock就是_atomic_dec_and_lock(atomic, lock),
+ * atomic减1为0,就lock;否则不lock
+ */
 #define atomic_dec_and_lock(atomic, lock) \
 		__cond_lock(lock, _atomic_dec_and_lock(atomic, lock))
 

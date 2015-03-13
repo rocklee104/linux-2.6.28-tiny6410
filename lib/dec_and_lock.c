@@ -1,4 +1,4 @@
-#include <linux/module.h>
+﻿#include <linux/module.h>
 #include <linux/spinlock.h>
 #include <asm/atomic.h>
 
@@ -17,6 +17,7 @@
  * because the spin-lock and the decrement must be
  * "atomic".
  */
+ //atomic减1为0,就lock;否则不lock.返回1表示lock上了,返回0表示没有lock
 int _atomic_dec_and_lock(atomic_t *atomic, spinlock_t *lock)
 {
 #ifdef CONFIG_SMP
@@ -27,7 +28,9 @@ int _atomic_dec_and_lock(atomic_t *atomic, spinlock_t *lock)
 	/* Otherwise do it the slow way */
 	spin_lock(lock);
 	if (atomic_dec_and_test(atomic))
+		//如果atomic的值减1为0,就返回1,这个是时候就不会调用到spin_unlock了
 		return 1;
+	//如果atomic的值减1不为0,就解锁
 	spin_unlock(lock);
 	return 0;
 }

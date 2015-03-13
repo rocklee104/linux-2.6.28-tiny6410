@@ -67,6 +67,7 @@ EXPORT_SYMBOL(_write_trylock);
  */
 #if !defined(CONFIG_GENERIC_LOCKBREAK) || defined(CONFIG_DEBUG_LOCK_ALLOC)
 
+//tiny6410调用read_lock就会调用下面这个_read_lock
 void __lockfunc _read_lock(rwlock_t *lock)
 {
 	preempt_disable();
