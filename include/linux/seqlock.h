@@ -1,4 +1,4 @@
-#ifndef __LINUX_SEQLOCK_H
+﻿#ifndef __LINUX_SEQLOCK_H
 #define __LINUX_SEQLOCK_H
 /*
  * Reader/writer consistent mechanism without starving writers. This type of
@@ -50,6 +50,7 @@ typedef struct {
 		spin_lock_init(&(x)->lock);		\
 	} while (0)
 
+//定义一个sequence lock,主要就是将sequence初始化为0并且初始化spin_lock
 #define DEFINE_SEQLOCK(x) \
 		seqlock_t x = __SEQLOCK_UNLOCKED(x)
 
@@ -59,6 +60,7 @@ typedef struct {
  */
 static inline void write_seqlock(seqlock_t *sl)
 {
+	//spin_lock能够保证smp环境下的数据同步
 	spin_lock(&sl->lock);
 	++sl->sequence;
 	smp_wmb();
@@ -67,6 +69,7 @@ static inline void write_seqlock(seqlock_t *sl)
 static inline void write_sequnlock(seqlock_t *sl)
 {
 	smp_wmb();
+	//sequence & 1 == 0表示写入过程结束
 	sl->sequence++;
 	spin_unlock(&sl->lock);
 }
@@ -90,6 +93,7 @@ static __always_inline unsigned read_seqbegin(const seqlock_t *sl)
 repeat:
 	ret = sl->sequence;
 	smp_rmb();
+	//sequence最低位为0才表示写入结束
 	if (unlikely(ret & 1)) {
 		cpu_relax();
 		goto repeat;

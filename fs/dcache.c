@@ -261,7 +261,7 @@ repeat:
 		//已经有了DCACHE_UNHASHED标志,这时候就需要彻底删除
 		goto kill_it;
   	if (list_empty(&dentry->d_lru)) {
-		//如果此dentry没在lru list中,并且没有DCACHE_UNHASHED标志,表示这个dentry最近被使用过
+		//如果此dentry没在lru list中,并且这个dentry还在hash表中,表示这个dentry最近被使用过
   		dentry->d_flags |= DCACHE_REFERENCED;
 		//将其加入dentry_unused
 		dentry_lru_add(dentry);
@@ -1462,19 +1462,23 @@ struct dentry * __d_lookup(struct dentry * parent, struct qstr * name)
 	unsigned int len = name->len;
 	unsigned int hash = name->hash;
 	const unsigned char *str = name->name;
-	//找到hash值所在的链表头
+	/* 
+	 * 找到hash值所在的链表头,这个过程在__d_lockup函数中没有加锁,这就导致一个问题:
+	 * 在获取到head之后,遍历hlist之前,这个dentry就被移动到别的hlist上去了.这就会
+	 * 使查找失败,
+	 */
 	struct hlist_head *head = d_hash(parent,hash);
 	struct dentry *found = NULL;
 	struct hlist_node *node;
 	struct dentry *dentry;
 
-	//进行rcu之前, 必须rcu_read_lock
+	//进行rcu之前, 必须rcu_read_lock,实际上就是关闭抢占
 	rcu_read_lock();
 	
 	/* 
 	 * dentry是需要使用的结构体指针,node是hash链表中的节点,head是链表头,
 	 * d_hash是结构体中用于连入hash表的成员
-	*/
+	 */
 	hlist_for_each_entry_rcu(dentry, node, head, d_hash) {
 		struct qstr *qstr;
 
