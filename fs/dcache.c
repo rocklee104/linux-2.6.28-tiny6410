@@ -998,12 +998,14 @@ struct dentry *d_alloc(struct dentry * parent, const struct qstr *name)
 		return NULL;
 
 	if (name->len > DNAME_INLINE_LEN-1) {
+		//如果条件成立,那么dname需要分配空间用来保存文件名称
 		dname = kmalloc(name->len + 1, GFP_KERNEL);
 		if (!dname) {
 			kmem_cache_free(dentry_cache, dentry); 
 			return NULL;
 		}
 	} else  {
+		//否则dname指向d_iname空间,和d_iname共用空间
 		dname = dentry->d_iname;
 	}	
 	dentry->d_name.name = dname;
@@ -1697,22 +1699,38 @@ void d_rehash(struct dentry * entry)
  * then no longer matches the actual (corrupted) string of the target.
  * The hash value has to match the hash queue that the dentry is on..
  */
+/*dentry有ext name的时候,文件名以ext name为准,没有ext name的时候,ext name指向其int name*/
 static void switch_names(struct dentry *dentry, struct dentry *target)
 {
+	//通过d_alloc分配的dentry,其d_iname和dname.name是一样的
 	if (dname_external(target)) {
+		/* 
+		 * 如果target的external name和internal name指向的空间不一致,
+		 * 就说明存在external name.
+		 */
 		if (dname_external(dentry)) {
 			/*
 			 * Both external: swap the pointers
 			 */
+			//交换target和dentry的external name,dentry和target的internal name还是没有改变
 			do_switch(target->d_name.name, dentry->d_name.name);
 		} else {
 			/*
 			 * dentry:internal, target:external.  Steal target's
 			 * storage and make target internal.
 			 */
+		    /*
+ 			 * 这个分支走完后,dentry的int name没有改变,其ext name指向target的ext name.
+ 			 * target的int name被赋值成dentry的int name.ext name指针指向自己的int name.
+			 */
 			memcpy(target->d_iname, dentry->d_name.name,
 					dentry->d_name.len + 1);
+			//dentry name指向target的external name的空间
 			dentry->d_name.name = target->d_name.name;
+			/* 
+			 * target的external name和internal name使用同一空间,这时target就不再
+			 * 具有external name空间.
+			 */
 			target->d_name.name = target->d_iname;
 		}
 	} else {
@@ -1721,6 +1739,10 @@ static void switch_names(struct dentry *dentry, struct dentry *target)
 			 * dentry:external, target:internal.  Give dentry's
 			 * storage to target and make dentry internal
 			 */
+			/*
+ 			 * 这个分支走完后,target的int name没有改变,其ext name指向dentry的ext name.
+ 			 * dentry的int name被赋值成target的int name, ext name指针指向自己的int name.
+			 */
 			memcpy(dentry->d_iname, target->d_name.name,
 					target->d_name.len + 1);
 			target->d_name.name = dentry->d_name.name;
@@ -1728,6 +1750,10 @@ static void switch_names(struct dentry *dentry, struct dentry *target)
 		} else {
 			/*
 			 * Both are internal.  Just copy target to dentry
+			 */
+			/* 
+			 * 执行完这个分支,dentry中的int(ext) name和target的ext(int) name一样了.
+			 * 而target的ext(int) name并没有改变.
 			 */
 			memcpy(dentry->d_iname, target->d_name.name,
 					target->d_name.len + 1);
@@ -1781,20 +1807,35 @@ static void d_move_locked(struct dentry * dentry, struct dentry * target)
 	if (d_unhashed(dentry))
 		goto already_unhashed;
 
+	//将dentry重其hash table中取下来
 	hlist_del_rcu(&dentry->d_hash);
 
 already_unhashed:
+	//获取target的hlist链表头
 	list = d_hash(target->d_parent, target->d_name.hash);
+	//将dentry头插到target的hlist
 	__d_rehash(dentry, list);
 
 	/* Unhash the target: dput() will then get rid of it */
+	//将target从hlist中取下来
 	__d_drop(target);
 
+	//将dentry从其父目录的链表中取下来
 	list_del(&dentry->d_u.d_child);
+	//将target从其父目录的链表中取下来
 	list_del(&target->d_u.d_child);
 
 	/* Switch the names.. */
+	//交换dentry和target的name string
 	switch_names(dentry, target);
+	/* 
+	 * 交换dentry和target的name hash,不管dentry是否有ext name,
+	 * d_name.hash总是其name的hash.
+	 * 
+	 * 因为:
+	 * 1.在存在ext name时,d_name.name指向name string的空间.
+	 * 2.不存在ext name时,d_name.name指向d_iname.
+	 */
 	do_switch(dentry->d_name.hash, target->d_name.hash);
 
 	/* ... and switch the parents */
@@ -1803,12 +1844,14 @@ already_unhashed:
 		target->d_parent = target;
 		INIT_LIST_HEAD(&target->d_u.d_child);
 	} else {
+		//交换dentry和target的parent
 		do_switch(dentry->d_parent, target->d_parent);
 
 		/* And add them back to the (new) parent lists */
 		list_add(&target->d_u.d_child, &target->d_parent->d_subdirs);
 	}
 
+	//将dentry加入target原来的parent的子文件链表中
 	list_add(&dentry->d_u.d_child, &dentry->d_parent->d_subdirs);
 	spin_unlock(&target->d_lock);
 	fsnotify_d_move(dentry);

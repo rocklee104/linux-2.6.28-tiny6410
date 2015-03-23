@@ -1,4 +1,4 @@
-#ifndef _LINUX_NAMEI_H
+﻿#ifndef _LINUX_NAMEI_H
 #define _LINUX_NAMEI_H
 
 #include <linux/dcache.h>
@@ -17,6 +17,10 @@ enum { MAX_NESTED_LINKS = 8 };
 
 struct nameidata {
 	struct path	path;
+	/* 
+	 * 路径中最后一个分量,对于目录来说,last.name[last.len]可以为 '/'或者'\0',
+	 * 而文件,对文件来说last.name[last.len] = '\0'
+	*/
 	struct qstr	last;
 	unsigned int	flags;
 	int		last_type;
@@ -32,6 +36,13 @@ struct nameidata {
 /*
  * Type of the last component on LOOKUP_PARENT
  */
+/* 
+LAST_NORM：最后一个分量是普通文件名,普通文件和目录都属于LAST_NORM
+LAST_ROOT：最后一个分量是“/”（也就是整个路径名为“/”）
+LAST_DOT：最后一个分量是“.”
+LAST_DOTDOT：最后一个分量是“..”
+LAST_BIND：最后一个分量是链接到特殊文件系统的符号链接
+*/
 enum {LAST_NORM, LAST_ROOT, LAST_DOT, LAST_DOTDOT, LAST_BIND};
 
 /*

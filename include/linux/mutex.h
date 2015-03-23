@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Mutexes: blocking mutual exclusion locks
  *
  * started by Ingo Molnar:
@@ -136,6 +136,7 @@ extern void mutex_lock(struct mutex *lock);
 extern int __must_check mutex_lock_interruptible(struct mutex *lock);
 extern int __must_check mutex_lock_killable(struct mutex *lock);
 
+//tiny6410使用的mutex_lock_nested
 # define mutex_lock_nested(lock, subclass) mutex_lock(lock)
 # define mutex_lock_interruptible_nested(lock, subclass) mutex_lock_interruptible(lock)
 # define mutex_lock_killable_nested(lock, subclass) mutex_lock_killable(lock)

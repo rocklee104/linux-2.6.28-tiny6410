@@ -2610,6 +2610,12 @@ SYSCALL_DEFINE2(link, const char __user *, oldname, const char __user *, newname
  *	   ->i_mutex on parents, which works but leads to some truely excessive
  *	   locking].
  */
+/*
+ * old_dir: old_dentry的父目录的inode
+ * old_dentry: 源文件(目录)的dentry
+ * new_dir: new_dentry的父目录的inode
+ * new_dentry: 目标文件(目录)的dentry
+*/
 static int vfs_rename_dir(struct inode *old_dir, struct dentry *old_dentry,
 			  struct inode *new_dir, struct dentry *new_dentry)
 {
@@ -2681,6 +2687,12 @@ static int vfs_rename_other(struct inode *old_dir, struct dentry *old_dentry,
 	return error;
 }
 
+/*
+ * old_dir: old_dentry的父目录的inode
+ * old_dentry: 源文件(目录)的dentry
+ * new_dir: new_dentry的父目录的inode
+ * new_dentry: 目标文件(目录)的dentry
+*/
 int vfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	       struct inode *new_dir, struct dentry *new_dentry)
 {
@@ -2727,7 +2739,9 @@ int vfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 SYSCALL_DEFINE4(renameat, int, olddfd, const char __user *, oldname,
 		int, newdfd, const char __user *, newname)
 {
+	//old_dir是移动文件(目录)时,这个文件(目录)的父目录,new_dir是目标文件(目录)的父目录
 	struct dentry *old_dir, *new_dir;
+	//old_dentry是真正的源文件(目录),new_dentry是真正的目标文件(目录)，
 	struct dentry *old_dentry, *new_dentry;
 	struct dentry *trap;
 	struct nameidata oldnd, newnd;
@@ -2735,6 +2749,9 @@ SYSCALL_DEFINE4(renameat, int, olddfd, const char __user *, oldname,
 	char *to;
 	int error;
 
+	/* 
+	 * oldnd保存了oldname的nameidate,from保存了oldname的内核空间字符串,
+	 */
 	error = user_path_parent(olddfd, oldname, &oldnd, &from);
 	if (error)
 		goto exit;
@@ -2744,6 +2761,7 @@ SYSCALL_DEFINE4(renameat, int, olddfd, const char __user *, oldname,
 		goto exit1;
 
 	error = -EXDEV;
+	//如果oldnd和newnd不处在同一vfsmount中,就退出
 	if (oldnd.path.mnt != newnd.path.mnt)
 		goto exit2;
 
@@ -2762,6 +2780,7 @@ SYSCALL_DEFINE4(renameat, int, olddfd, const char __user *, oldname,
 
 	trap = lock_rename(new_dir, old_dir);
 
+	//获取oldnd的dentry,这个dentry是实际dentry的parent
 	old_dentry = lookup_hash(&oldnd);
 	error = PTR_ERR(old_dentry);
 	if (IS_ERR(old_dentry))
@@ -2773,21 +2792,29 @@ SYSCALL_DEFINE4(renameat, int, olddfd, const char __user *, oldname,
 	/* unless the source is a directory trailing slashes give -ENOTDIR */
 	if (!S_ISDIR(old_dentry->d_inode->i_mode)) {
 		error = -ENOTDIR;
+		//对于非目录,last.name[last.len]一定是'\0'
 		if (oldnd.last.name[oldnd.last.len])
 			goto exit4;
 		if (newnd.last.name[newnd.last.len])
 			goto exit4;
 	}
 	/* source should not be ancestor of target */
+	/*
+	 * 被移动的source和target目录不能是父子(祖先及子孙)关系:
+	 * 1.source不能是target的祖先
+	 * 2.target不能是source的祖先
+	*/
 	error = -EINVAL;
 	if (old_dentry == trap)
 		goto exit4;
+	//获取newnd的dentry,这个dentry是实际dentry的parent
 	new_dentry = lookup_hash(&newnd);
 	error = PTR_ERR(new_dentry);
 	if (IS_ERR(new_dentry))
 		goto exit4;
 	/* target should not be an ancestor of source */
 	error = -ENOTEMPTY;
+	//如果new_dentry和old_dentry有父子关系(祖孙关系)
 	if (new_dentry == trap)
 		goto exit5;
 
@@ -2813,6 +2840,7 @@ exit:
 	return error;
 }
 
+//rename系统调用
 SYSCALL_DEFINE2(rename, const char __user *, oldname, const char __user *, newname)
 {
 	return sys_renameat(AT_FDCWD, oldname, AT_FDCWD, newname);

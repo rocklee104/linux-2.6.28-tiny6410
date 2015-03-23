@@ -217,6 +217,7 @@ static inline void d_drop(struct dentry *dentry)
 
 static inline int dname_external(struct dentry *dentry)
 {
+	//这里比较的不是name和d_name字符串,而是这两个指针是否指向同一地址
 	return dentry->d_name.name != dentry->d_iname;
 }
 

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Read-Copy Update mechanism for mutual exclusion 
  *
  * This program is free software; you can redistribute it and/or modify
@@ -181,6 +181,10 @@ struct rcu_head {
  * code.
  */
 
+/*
+ * __builtin_constant_p是编译器gcc内置函数,用于判断一个值是否为编译时常量,
+ * 如果是常数,函数返回1,否则返回0
+ */
 #define rcu_assign_pointer(p, v) \
 	({ \
 		if (!__builtin_constant_p(v) || \
