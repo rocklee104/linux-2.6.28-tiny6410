@@ -655,7 +655,7 @@ struct page *find_get_page(struct address_space *mapping, pgoff_t offset)
 	void **pagep;
 	struct page *page;
 
-	//标记reader进入临界区
+	//标记reader进入临界区,实际上就是关闭抢占
 	rcu_read_lock();
 repeat:
 	page = NULL;

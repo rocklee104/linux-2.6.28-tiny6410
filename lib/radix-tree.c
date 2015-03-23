@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2001 Momchil Velikov
  * Portions Copyright (C) 2001 Christoph Hellwig
  * Copyright (C) 2005 SGI, Christoph Lameter
@@ -48,6 +48,7 @@
 
 struct radix_tree_node {
 	unsigned int	height;		/* Height from the bottom */
+	//有几个slot中保存了有效数据
 	unsigned int	count;
 	struct rcu_head	rcu_head;
 	void		*slots[RADIX_TREE_MAP_SIZE];

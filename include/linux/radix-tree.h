@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2001 Momchil Velikov
  * Portions Copyright (C) 2001 Christoph Hellwig
  * Copyright (C) 2006 Nick Piggin
@@ -59,6 +59,7 @@ static inline int radix_tree_is_indirect_ptr(void *ptr)
 
 /* root tags are stored in gfp_mask, shifted by __GFP_BITS_SHIFT */
 struct radix_tree_root {
+	//不包括page的树的高度
 	unsigned int		height;
 	gfp_t			gfp_mask;
 	struct radix_tree_node	*rnode;
