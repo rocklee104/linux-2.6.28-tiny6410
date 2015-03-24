@@ -43,11 +43,17 @@ static inline void *radix_tree_ptr_to_indirect(void *ptr)
 	return (void *)((unsigned long)ptr | RADIX_TREE_INDIRECT_PTR);
 }
 
+//ptr指向的是radix_tree_node,最低位清0.
 static inline void *radix_tree_indirect_to_ptr(void *ptr)
 {
 	return (void *)((unsigned long)ptr & ~RADIX_TREE_INDIRECT_PTR);
 }
 
+/* 
+ * indirect pointer指向radix_tree_node而不是data item.如果root->rnode
+ * 指针的最低位是1,表示root->rnode指向了radix_tree_node,如果是0,表示
+ * root->rnode指向data item.
+ */
 static inline int radix_tree_is_indirect_ptr(void *ptr)
 {
 	return (int)((unsigned long)ptr & RADIX_TREE_INDIRECT_PTR);

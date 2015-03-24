@@ -68,6 +68,10 @@ struct radix_tree_path {
  * The height_to_maxindex array needs to be one deeper than the maximum
  * path as height 0 holds only 1 entry.
  */
+/* 
+ * 将对应height的最大index value存入数组，方便获取不同高度树的最大索引值,
+ * 这里加1是因为,存在树的高度为0的情况
+ */
 static unsigned long height_to_maxindex[RADIX_TREE_MAX_PATH + 1] __read_mostly;
 
 /*
@@ -370,15 +374,20 @@ void **radix_tree_lookup_slot(struct radix_tree_root *root, unsigned long index)
 	unsigned int height, shift;
 	struct radix_tree_node *node, **slot;
 
+	//rnode用rcu保护起来
 	node = rcu_dereference(root->rnode);
 	if (node == NULL)
 		return NULL;
 
 	if (!radix_tree_is_indirect_ptr(node)) {
+		//如果root->rnode指向了data item.这种情况下index只能为0.
 		if (index > 0)
+			//如果要求搜索的index > 0,这种情况是不存在的,返回null
 			return NULL;
+		//如果要求搜索的index == 0,返回指向data item的指针的地址
 		return (void **)&root->rnode;
 	}
+	//获取间接node
 	node = radix_tree_indirect_to_ptr(node);
 
 	height = node->height;
