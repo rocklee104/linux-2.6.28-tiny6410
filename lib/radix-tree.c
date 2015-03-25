@@ -1203,9 +1203,21 @@ static __init unsigned long __maxindex(unsigned int height)
 	unsigned int width = height * RADIX_TREE_MAP_SHIFT;
 	int shift = RADIX_TREE_INDEX_BITS - width;
 
+	/*
+ 	 * height * RADIX_TREE_MAP_SHIFT 大于RADIX_TREE_INDEX_BITS,
+ 	 * 表示当前树的寻址能力大于所有的页索引.但是我们不需要那么大
+ 	 * 的寻址范围.最大寻址为页索引的最大值就好.
+ 	 */
+
+	/*
+	 * C语言中对位移边界有要求:
+	 * 1.位移的数不能是负数
+	 * 2.位移的长度不能超过被位移数的bit长度
+	*/
 	if (shift < 0)
 		return ~0UL;
 	if (shift >= BITS_PER_LONG)
+		//因为页索引是一个unsigned long型,那么在查找一个page时shift就不能超过BITS_PER_LONG
 		return 0UL;
 	return ~0UL >> shift;
 }
