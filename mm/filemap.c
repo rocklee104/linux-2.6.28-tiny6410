@@ -665,6 +665,7 @@ repeat:
 		if (unlikely(!page || page == RADIX_TREE_RETRY))
 			goto repeat;
 
+		//增加页的引用计数
 		if (!page_cache_get_speculative(page))
 			goto repeat;
 
@@ -674,6 +675,7 @@ repeat:
 		 * include/linux/pagemap.h for details.
 		 */
 		if (unlikely(page != *pagep)) {
+			//如果我们找到的page和slot中指向的不一致,就再找一次
 			page_cache_release(page);
 			goto repeat;
 		}

@@ -369,12 +369,13 @@ EXPORT_SYMBOL(radix_tree_insert);
  *	exclusive from other writers. Any dereference of the slot must be done
  *	using radix_tree_deref_slot.
  */
+//找到index对应radix tree中的slot,整个tree都用rcu保护起来了(data item除外)
 void **radix_tree_lookup_slot(struct radix_tree_root *root, unsigned long index)
 {
 	unsigned int height, shift;
 	struct radix_tree_node *node, **slot;
 
-	//rnode用rcu保护起来
+	//获取rcu保护的数据指针
 	node = rcu_dereference(root->rnode);
 	if (node == NULL)
 		return NULL;

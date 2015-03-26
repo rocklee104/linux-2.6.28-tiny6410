@@ -141,6 +141,7 @@ do {									\
  * locked across slot lookup and dereference.  More likely, will be used with
  * radix_tree_replace_slot(), as well, so caller will hold tree write locked.
  */
+//获取slot指向的data item,这时候如果slot指向了indirect pointer,就返回RADIX_TREE_RETRY
 static inline void *radix_tree_deref_slot(void **pslot)
 {
 	void *ret = rcu_dereference(*pslot);
