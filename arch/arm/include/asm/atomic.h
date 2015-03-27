@@ -188,6 +188,7 @@ static inline int atomic_add_unless(atomic_t *v, int a, int u)
 		c = old;
 	return c != u;
 }
+//increments the reference count only when it is not zero, and returns success or failure
 #define atomic_inc_not_zero(v) atomic_add_unless((v), 1, 0)
 
 #define atomic_add(i, v)	(void) atomic_add_return(i, v)

@@ -305,6 +305,7 @@ int radix_tree_insert(struct radix_tree_root *root,
 
 	/* Make sure the tree is high enough.  */
 	if (index > radix_tree_maxindex(root->height)) {
+		//如果index超过当前高度的树的索引范围
 		error = radix_tree_extend(root, index);
 		if (error)
 			return error;
