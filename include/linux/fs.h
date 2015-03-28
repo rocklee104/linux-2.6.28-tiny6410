@@ -609,7 +609,10 @@ struct block_device {
  * Radix-tree tags, for tagging dirty and writeback pages within the pagecache
  * radix trees
  */
+//radix-tree 中radix_tree_node->tag两个64位的数组用于标记子节点的page状态
+//表示页是脏的
 #define PAGECACHE_TAG_DIRTY	0
+//表示页正在被回写磁盘
 #define PAGECACHE_TAG_WRITEBACK	1
 
 int mapping_tagged(struct address_space *mapping, int tag);

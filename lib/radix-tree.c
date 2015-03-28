@@ -83,6 +83,7 @@ static struct kmem_cache *radix_tree_node_cachep;
  * Per-cpu pool of preloaded nodes
  */
 struct radix_tree_preload {
+	//当前结构中有多少radix_tree_node已经分配了空间
 	int nr;
 	struct radix_tree_node *nodes[RADIX_TREE_MAX_PATH];
 };
@@ -164,8 +165,11 @@ radix_tree_node_alloc(struct radix_tree_root *root)
 		 */
 		rtp = &__get_cpu_var(radix_tree_preloads);
 		if (rtp->nr) {
+			//获取rtp->nr中最后一个node
 			ret = rtp->nodes[rtp->nr - 1];
+			//舍弃rtp->nr中最后一个node已经preload的空间
 			rtp->nodes[rtp->nr - 1] = NULL;
+			//减少rtp->nr中已分配空间的node计数
 			rtp->nr--;
 		}
 	}
@@ -206,6 +210,7 @@ radix_tree_node_free(struct radix_tree_node *node)
  * success, return zero, with preemption disabled.  On error, return -ENOMEM
  * with preemption not disabled.
  */
+ //分配RADIX_TREE_MAX_PATH个radix tree node
 int radix_tree_preload(gfp_t gfp_mask)
 {
 	struct radix_tree_preload *rtp;
@@ -252,6 +257,7 @@ static int radix_tree_extend(struct radix_tree_root *root, unsigned long index)
 
 	/* Figure out what the height should be.  */
 	height = root->height + 1;
+	//计算当前radix tree需要的高度
 	while (index > radix_tree_maxindex(height))
 		height++;
 
@@ -266,18 +272,26 @@ static int radix_tree_extend(struct radix_tree_root *root, unsigned long index)
 			return -ENOMEM;
 
 		/* Increase the height.  */
+		//node->slots[0]指向root->rnode
 		node->slots[0] = radix_tree_indirect_to_ptr(root->rnode);
 
 		/* Propagate the aggregated tag info into the new root */
 		for (tag = 0; tag < RADIX_TREE_MAX_TAGS; tag++) {
 			if (root_tag_get(root, tag))
+			   /* 
+			    * 如果root的gfp_mask设置了write_back或dirty标志,
+				* 就要将node中对应write_back或dirty的tag的第0位置位,
+				*/
 				tag_set(node, tag, 0);
 		}
 
+		//一次高度只增加1
 		newheight = root->height+1;
 		node->height = newheight;
 		node->count = 1;
+		//插入的这个node肯定是tree node
 		node = radix_tree_ptr_to_indirect(node);
+		//更改root->rnode为刚才插入的node
 		rcu_assign_pointer(root->rnode, node);
 		root->height = newheight;
 	} while (height > root->height);

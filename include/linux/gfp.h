@@ -1,4 +1,4 @@
-#ifndef __LINUX_GFP_H
+﻿#ifndef __LINUX_GFP_H
 #define __LINUX_GFP_H
 
 #include <linux/mmzone.h>
@@ -34,9 +34,13 @@ struct vm_area_struct;
  * __GFP_MOVABLE: Flag that this page will be movable by the page migration
  * mechanism or reclaimed
  */
+//分配器可以休眠
 #define __GFP_WAIT	((__force gfp_t)0x10u)	/* Can wait and reschedule? */
+//分配器可以访问紧急事件缓冲池
 #define __GFP_HIGH	((__force gfp_t)0x20u)	/* Should access emergency pools? */
+//分配器可以启动磁盘I/O
 #define __GFP_IO	((__force gfp_t)0x40u)	/* Can start physical IO? */
+//分配器可以启动文件系统I/O
 #define __GFP_FS	((__force gfp_t)0x80u)	/* Can call down to low-level FS? */
 #define __GFP_COLD	((__force gfp_t)0x100u)	/* Cache-cold page required */
 #define __GFP_NOWARN	((__force gfp_t)0x200u)	/* Suppress page allocation failure warning */
@@ -51,6 +55,7 @@ struct vm_area_struct;
 #define __GFP_RECLAIMABLE ((__force gfp_t)0x80000u) /* Page is reclaimable */
 #define __GFP_MOVABLE	((__force gfp_t)0x100000u)  /* Page is movable */
 
+//用于hight == 0, radix tree root中直接保存数据的情况
 #define __GFP_BITS_SHIFT 21	/* Room for 21 __GFP_FOO bits */
 #define __GFP_BITS_MASK ((__force gfp_t)((1 << __GFP_BITS_SHIFT) - 1))
 
