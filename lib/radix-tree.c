@@ -47,6 +47,7 @@
 	((RADIX_TREE_MAP_SIZE + BITS_PER_LONG - 1) / BITS_PER_LONG)
 
 struct radix_tree_node {
+	//以当前node为root的树的高度
 	unsigned int	height;		/* Height from the bottom */
 	//有几个slot中保存了有效数据
 	unsigned int	count;
@@ -262,6 +263,7 @@ static int radix_tree_extend(struct radix_tree_root *root, unsigned long index)
 		height++;
 
 	if (root->rnode == NULL) {
+		//当rnode == NULL的时候,rnode的创建是通过radix_tree_insert完成的
 		root->height = height;
 		goto out;
 	}
@@ -319,12 +321,13 @@ int radix_tree_insert(struct radix_tree_root *root,
 
 	/* Make sure the tree is high enough.  */
 	if (index > radix_tree_maxindex(root->height)) {
-		//如果index超过当前高度的树的索引范围
+		//如果index超过当前高度的树的索引范围,就对radix tree扩容
 		error = radix_tree_extend(root, index);
 		if (error)
 			return error;
 	}
 
+	//slot实际的地址可能是root->rnode最低位清0的结果
 	slot = radix_tree_indirect_to_ptr(root->rnode);
 
 	height = root->height;
@@ -333,14 +336,21 @@ int radix_tree_insert(struct radix_tree_root *root,
 	offset = 0;			/* uninitialised var warning */
 	while (height > 0) {
 		if (slot == NULL) {
+			//没有子节点
 			/* Have to add a child node.  */
 			if (!(slot = radix_tree_node_alloc(root)))
 				return -ENOMEM;
 			slot->height = height;
 			if (node) {
 				rcu_assign_pointer(node->slots[offset], slot);
+				//node中使用的count数量要++
 				node->count++;
 			} else
+			   /* 
+				* root->rnode == NULL的时候,root node在这里创建(height > 0).
+				* 当height == 0时,rnode节点直接指向data item.这时后rnode的地址
+				* 需要或上RADIX_TREE_INDIRECT_PTR.
+				*/
 				rcu_assign_pointer(root->rnode,
 					radix_tree_ptr_to_indirect(slot));
 		}
@@ -358,10 +368,12 @@ int radix_tree_insert(struct radix_tree_root *root,
 
 	if (node) {
 		node->count++;
+		//item & RADIX_TREE_INDIRECT_PTR == 0
 		rcu_assign_pointer(node->slots[offset], item);
 		BUG_ON(tag_get(node, 0, offset));
 		BUG_ON(tag_get(node, 1, offset));
 	} else {
+		//当height == 0,这时候就将item作为radix tree的root
 		rcu_assign_pointer(root->rnode, item);
 		BUG_ON(root_tag_get(root, 0));
 		BUG_ON(root_tag_get(root, 1));

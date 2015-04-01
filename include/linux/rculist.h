@@ -182,6 +182,7 @@ static inline void list_splice_init_rcu(struct list_head *list,
 	 * an empty list.
 	 */
 
+	//因为会调用synchronize_rcu(), synchronize_sched(),所以会有a full grace-period latency
 	sync();
 
 	/*
