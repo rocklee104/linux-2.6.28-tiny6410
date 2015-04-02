@@ -1,4 +1,4 @@
-#ifndef LINUX_MM_INLINE_H
+﻿#ifndef LINUX_MM_INLINE_H
 #define LINUX_MM_INLINE_H
 
 /**
@@ -13,6 +13,11 @@
  * We would like to get this info without a page flag, but the state
  * needs to survive until the page is last deleted from the LRU, which
  * could be as far down as __page_cache_release.
+ */
+/* 
+ * page的LRU有两个:
+ * 1.file LRU:普通文件系统就使用这个LRU
+ * 2.anonymous LRU:tmpfs或者其他ram或者swap使用这个
  */
 static inline int page_is_file_cache(struct page *page)
 {

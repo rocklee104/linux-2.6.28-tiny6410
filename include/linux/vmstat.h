@@ -1,4 +1,4 @@
-#ifndef _LINUX_VMSTAT_H
+﻿#ifndef _LINUX_VMSTAT_H
 #define _LINUX_VMSTAT_H
 
 #include <linux/types.h>
@@ -257,6 +257,7 @@ static inline void __inc_zone_state(struct zone *zone, enum zone_stat_item item)
 	atomic_long_inc(&vm_stat[item]);
 }
 
+//tiny6410非smp下调用
 static inline void __inc_zone_page_state(struct page *page,
 			enum zone_stat_item item)
 {

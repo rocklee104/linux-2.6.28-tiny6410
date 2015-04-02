@@ -459,6 +459,7 @@ int add_to_page_cache_locked(struct page *page, struct address_space *mapping,
 
 	VM_BUG_ON(!PageLocked(page));
 
+	//在没有定义CONFIG_CGROUP_MEM_RES_CTLR的情况下是空函数
 	error = mem_cgroup_cache_charge(page, current->mm,
 					gfp_mask & ~__GFP_HIGHMEM);
 	if (error)
@@ -466,6 +467,7 @@ int add_to_page_cache_locked(struct page *page, struct address_space *mapping,
 
 	error = radix_tree_preload(gfp_mask & ~__GFP_HIGHMEM);
 	if (error == 0) {
+		//radix_tree_preload分配成功,page引用计数++
 		page_cache_get(page);
 		page->mapping = mapping;
 		page->index = offset;
@@ -473,11 +475,14 @@ int add_to_page_cache_locked(struct page *page, struct address_space *mapping,
 		spin_lock_irq(&mapping->tree_lock);
 		error = radix_tree_insert(&mapping->page_tree, offset, page);
 		if (likely(!error)) {
+			//地址空间中page的数量++
 			mapping->nrpages++;
 			__inc_zone_page_state(page, NR_FILE_PAGES);
 		} else {
 			page->mapping = NULL;
+			//在没有定义CONFIG_CGROUP_MEM_RES_CTLR的情况下是空函数
 			mem_cgroup_uncharge_cache_page(page);
+			//释放page
 			page_cache_release(page);
 		}
 
@@ -490,6 +495,11 @@ out:
 }
 EXPORT_SYMBOL(add_to_page_cache_locked);
 
+/*
+ * The advantage of doing this(将原有的一个LRU分成两个,一个是file LRU,另一个是anon LRU)
+ * is that the VM will not have to scan over lots of anonymous pages (which we generally
+ * do not want to swap out), just to find the page cache pages that it should evict.
+ */
 int add_to_page_cache_lru(struct page *page, struct address_space *mapping,
 				pgoff_t offset, gfp_t gfp_mask)
 {
@@ -504,6 +514,7 @@ int add_to_page_cache_lru(struct page *page, struct address_space *mapping,
 	if (mapping_cap_swap_backed(mapping))
 		SetPageSwapBacked(page);
 
+	//add_to_page_cache成功返回0
 	ret = add_to_page_cache(page, mapping, offset, gfp_mask);
 	if (ret == 0) {
 		if (page_is_file_cache(page))
