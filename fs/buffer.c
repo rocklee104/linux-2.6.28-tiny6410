@@ -943,9 +943,7 @@ int remove_inode_buffers(struct inode *inode)
 * 当指定一个用作数据区的页以及每个buffer的大小时，创建合适数量的buffer.使用bh->b_this_page
 * 链接这些创建的buffer.如果无法创建更多的buffer, 就返回NULL
 */
-/*
-* alloc_page_buffers - 分割一个page成size大小的块缓 
-*/ 
+// alloc_page_buffers - 分割一个page成size大小的块缓,返回bh链表的头 
 struct buffer_head *alloc_page_buffers(struct page *page, unsigned long size,
 		int retry)
 {
@@ -1027,6 +1025,7 @@ link_dev_buffers(struct page *page, struct buffer_head *head)
 		tail = bh;
 		bh = bh->b_this_page;
 	} while (bh);
+	//完成双向循环链表的衔接
 	tail->b_this_page = head;
 	attach_page_buffers(page, head);
 }
@@ -1039,6 +1038,7 @@ static void
 init_page_buffers(struct page *page, struct block_device *bdev,
 			sector_t block, int size)
 {
+	//获取page的private指针
 	struct buffer_head *head = page_buffers(page);
 	struct buffer_head *bh = head;
 	int uptodate = PageUptodate(page);
@@ -1049,12 +1049,14 @@ init_page_buffers(struct page *page, struct block_device *bdev,
 			bh->b_bdev = bdev;
 			bh->b_blocknr = block;
 			if (uptodate)
+				//如果page uptodate,那么所有的buffer也需要uptodate
 				set_buffer_uptodate(bh);
 			//b_blocknr和b_bdev指向了块设备的有效数据就表示mapped
 			set_buffer_mapped(bh);
 		}
         //如果bh被map过了，就什么都不做，跳到下一个buffer
 		block++;
+		//page中bh链表中的下个bh
 		bh = bh->b_this_page;
 	} while (bh != head);
 }
@@ -1078,6 +1080,7 @@ grow_dev_page(struct block_device *bdev, sector_t block,
 	if (!page)
 		return NULL;
 
+	//加入mapping后这个page一定是被locked
 	BUG_ON(!PageLocked(page));
 
 	if (page_has_buffers(page)) {
@@ -1142,9 +1145,9 @@ grow_buffers(struct block_device *bdev, sector_t block, int size)
 		sizebits++;
 	} while ((size << sizebits) < PAGE_SIZE);
 
-    /*
-     *size一般小于等于一个页。通过上面那个循环，可以得出2^sizebits个size等于一个页。 
-     *而size一般是一个block size大小。block >> sizebits就可以得到起始页号index。
+   /*
+    * size一般小于等于一个页。通过上面那个循环，可以得出2^sizebits个size等于一个页。 
+    * 而size一般是一个block size大小。block >> sizebits就可以得到起始页号index。
     */
 	index = block >> sizebits;
 
@@ -1163,6 +1166,7 @@ grow_buffers(struct block_device *bdev, sector_t block, int size)
 	}
 	block = index << sizebits;
 	/* Create a page with the proper size buffers.. */
+	//调用find_or_create_page后page是locked状态
 	page = grow_dev_page(bdev, block, index, size);
 	if (!page)
 		return 0;
@@ -1172,6 +1176,7 @@ grow_buffers(struct block_device *bdev, sector_t block, int size)
 	return 1;
 }
 
+//先调用__find_get_block搜索bh,如果没有搜索到就调用grow_buffers创建
 static struct buffer_head *
 __getblk_slow(struct block_device *bdev, sector_t block, int size)
 {
@@ -1191,9 +1196,9 @@ __getblk_slow(struct block_device *bdev, sector_t block, int size)
 		struct buffer_head * bh;
 		int ret;
 
-        /*
-         *1.如果数据不在页缓存中，或虽然在页缓存中，但对应的页没有与之关联的缓冲区，返回NULL。 
-         *2.如果数据在页缓存中，且对应页有相关缓存区，则返回指向所要缓冲头的指针。
+       /*
+        * 1.如果数据不在页缓存中，或虽然在页缓存中，但对应的页没有与之关联的缓冲区，返回NULL。 
+        * 2.如果数据在页缓存中，且对应页有相关缓存区，则返回指向所要缓冲头的指针。
         */
 		bh = __find_get_block(bdev, block, size);
 		if (bh)
@@ -3211,9 +3216,9 @@ static inline int buffer_busy(struct buffer_head *bh)
 }
 
 /*
- *移除与page相关的所有bufferhead,返回首个bh的地址， 
- *后续需要这个地址来释放所有的bh,成功返回1，失败返回0。 
-*/
+ * 移除与page相关的所有bufferhead,返回首个bh的地址， 
+ * 后续需要这个地址来释放所有的bh,成功返回1，失败返回0。 
+ */
 static int
 drop_buffers(struct page *page, struct buffer_head **buffers_to_free)
 {
@@ -3266,7 +3271,7 @@ int try_to_free_buffers(struct page *page)
 		goto out;
 	}
 
-    //因为要操作mapping中的radix tree,这里就需要对mapping加锁
+    //因为要操作mapping不为空,就需要获取lock
 	spin_lock(&mapping->private_lock);
 	ret = drop_buffers(page, &buffers_to_free);
 

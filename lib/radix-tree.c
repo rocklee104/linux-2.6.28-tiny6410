@@ -402,7 +402,7 @@ void **radix_tree_lookup_slot(struct radix_tree_root *root, unsigned long index)
 	unsigned int height, shift;
 	struct radix_tree_node *node, **slot;
 
-	//获取rcu保护的数据指针
+	//仅仅是加了内存栅
 	node = rcu_dereference(root->rnode);
 	if (node == NULL)
 		return NULL;

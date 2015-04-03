@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  linux/mm/swap.c
  *
  *  Copyright (C) 1991, 1992, 1993, 1994  Linus Torvalds
@@ -36,6 +36,7 @@
 /* How many pages do we try to swap or page in/out together? */
 int page_cluster;
 
+//声明一个struct pagevec类型的数组,数组每一个成员代表一个LRU
 static DEFINE_PER_CPU(struct pagevec[NR_LRU_LISTS], lru_add_pvecs);
 static DEFINE_PER_CPU(struct pagevec, lru_rotate_pvecs);
 
@@ -198,10 +199,12 @@ EXPORT_SYMBOL(mark_page_accessed);
 
 void __lru_cache_add(struct page *page, enum lru_list lru)
 {
+	//找到对应LRU的搬运工--pagevec
 	struct pagevec *pvec = &get_cpu_var(lru_add_pvecs)[lru];
 
 	page_cache_get(page);
 	if (!pagevec_add(pvec, page))
+		//如果pagevec中的slot完全满了,就将pagevec中的page加入lru
 		____pagevec_lru_add(pvec, lru);
 	put_cpu_var(lru_add_pvecs);
 }
@@ -443,11 +446,13 @@ void ____pagevec_lru_add(struct pagevec *pvec, enum lru_list lru)
 		VM_BUG_ON(PageActive(page));
 		VM_BUG_ON(PageUnevictable(page));
 		VM_BUG_ON(PageLRU(page));
+		//page->flags中置位PG_lru
 		SetPageLRU(page);
 		file = is_file_lru(lru);
 		zone->recent_scanned[file]++;
 		if (is_active_lru(lru)) {
 			SetPageActive(page);
+			//有新的page从inactive状态转换成active状态
 			zone->recent_rotated[file]++;
 		}
 		add_page_to_lru_list(zone, page, lru);
@@ -455,6 +460,7 @@ void ____pagevec_lru_add(struct pagevec *pvec, enum lru_list lru)
 	if (zone)
 		spin_unlock_irq(&zone->lru_lock);
 	release_pages(pvec->pages, pvec->nr, pvec->cold);
+	//清空pagevec,下次操作LRU的时候继续使用
 	pagevec_reinit(pvec);
 }
 

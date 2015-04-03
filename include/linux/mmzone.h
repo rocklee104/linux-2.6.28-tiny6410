@@ -1,4 +1,4 @@
-#ifndef _LINUX_MMZONE_H
+ï»¿#ifndef _LINUX_MMZONE_H
 #define _LINUX_MMZONE_H
 
 #ifndef __ASSEMBLY__
@@ -131,15 +131,21 @@ enum zone_stat_item {
 #define LRU_FILE 2
 
 enum lru_list {
+	/*0*/
 	LRU_INACTIVE_ANON = LRU_BASE,
+	/*1*/
 	LRU_ACTIVE_ANON = LRU_BASE + LRU_ACTIVE,
+	/*2*/
 	LRU_INACTIVE_FILE = LRU_BASE + LRU_FILE,
+	/*3*/
 	LRU_ACTIVE_FILE = LRU_BASE + LRU_FILE + LRU_ACTIVE,
 #ifdef CONFIG_UNEVICTABLE_LRU
 	LRU_UNEVICTABLE,
 #else
+	/*3*/
 	LRU_UNEVICTABLE = LRU_ACTIVE_FILE, /* avoid compiler errors in dead code */
 #endif
+	/*4*/
 	NR_LRU_LISTS
 };
 
@@ -215,6 +221,7 @@ enum zone_type {
 	ZONE_DMA,
 #endif
 #ifdef CONFIG_ZONE_DMA32
+//6410ç”¨ä¸åˆ°
 	/*
 	 * x86_64 needs two ZONE_DMAs because it supports devices that are
 	 * only able to do DMA to the lower 16M but also 32 bit devices that
@@ -229,6 +236,7 @@ enum zone_type {
 	 */
 	ZONE_NORMAL,
 #ifdef CONFIG_HIGHMEM
+//6410 256MBçš„å†…å­˜,æ²¡æœ‰é«˜ç«¯å†…å­˜T-T
 	/*
 	 * A memory area that is only addressable by the kernel through
 	 * mapping portions into its own address space. This is for example
@@ -319,6 +327,7 @@ struct zone {
 
 	/* Fields commonly accessed by the page reclaim scanner */
 	spinlock_t		lru_lock;
+	//zoneä¸­çš„pageæ ¹æ®ç±»å‹çš„ä¸åŒ,é€šè¿‡NR_LRU_LISTSä¸ªLRUé“¾æ¥èµ·æ¥
 	struct {
 		struct list_head list;
 		unsigned long nr_scan;
@@ -332,7 +341,9 @@ struct zone {
 	 *
 	 * The anon LRU stats live in [0], file LRU stats in [1]
 	 */
+	//åˆ†åˆ«è®°å½•anon LRUå’Œfile LRUè¢«æœ‰å¤šå°‘ä¸ªpageä»inactiveè½¬æ¢åˆ°actives
 	unsigned long		recent_rotated[2];
+	//åˆ†åˆ«è®°å½•anon LRUå’Œfile LRUè¢«scançš„æ¬¡æ•°
 	unsigned long		recent_scanned[2];
 
     /*
@@ -399,17 +410,17 @@ struct zone {
 	 * free_area_init_core() performs the initialization of them.
 	 */
 	/*
-	 * µ±¶ÔÒ»¸öpage×öI/O²Ù×÷µÄÊ±ºò,pageĞèÒª±»Ëø×¡,ÒÔ·ÀÖ¹²»ÕıÈ·µÄÊı¾İ±»·ÃÎÊ.
-	 * 1. ½ø³ÌÔÚ·ÃÎÊpageÇ°£¬µ÷ÓÃwait_on_page*º¯Êı,Ê¹½ø³Ì¼ÓÈëÒ»¸öµÈ´ı¶ÓÁĞ
-	 *    (Èç¹ûÃ»ÓĞÆäËü½ø³ÌÕıÔÚ·ÃÎÊ¸ÃÒ³£¬¾ÍÖ±½Ó»ñµÃ·ÃÎÊÈ¨ÏŞ£¬·ñÔò¼ÓÈëµÈ´ı¶ÓÁĞ).
+	 * å½“å¯¹ä¸€ä¸ªpageåšI/Oæ“ä½œçš„æ—¶å€™,pageéœ€è¦è¢«é”ä½,ä»¥é˜²æ­¢ä¸æ­£ç¡®çš„æ•°æ®è¢«è®¿é—®.
+	 * 1. è¿›ç¨‹åœ¨è®¿é—®pageå‰ï¼Œè°ƒç”¨wait_on_page*å‡½æ•°,ä½¿è¿›ç¨‹åŠ å…¥ä¸€ä¸ªç­‰å¾…é˜Ÿåˆ—
+	 *    (å¦‚æœæ²¡æœ‰å…¶å®ƒè¿›ç¨‹æ­£åœ¨è®¿é—®è¯¥é¡µï¼Œå°±ç›´æ¥è·å¾—è®¿é—®æƒé™ï¼Œå¦åˆ™åŠ å…¥ç­‰å¾…é˜Ÿåˆ—).
 	 * 
-	 * 2. µ±Ç°·ÃÎÊpageµÄ½ø³ÌÍê³É×Ô¼ºµÄ·ÃÎÊ¶¯×÷ºó,»áµ÷ÓÃunlock_page»½ĞÑÔÚ¸ÃÒ³
-	 *    ÉÏwaitµÄ½ø³Ì£¬ Òò¶ø½ø³Ì¼´¿É»ñµÃ¶ÔÒ³µÄ·ÃÎÊÈ¨.
+	 * 2. å½“å‰è®¿é—®pageçš„è¿›ç¨‹å®Œæˆè‡ªå·±çš„è®¿é—®åŠ¨ä½œå,ä¼šè°ƒç”¨unlock_pageå”¤é†’åœ¨è¯¥é¡µ
+	 *    ä¸Šwaitçš„è¿›ç¨‹ï¼Œ å› è€Œè¿›ç¨‹å³å¯è·å¾—å¯¹é¡µçš„è®¿é—®æƒ.
 	*/
 	wait_queue_head_t	* wait_table;
-	//µÈ´ı¶ÓÁĞÍ·µÄ¸öÊı
+	//ç­‰å¾…é˜Ÿåˆ—å¤´çš„ä¸ªæ•°
 	unsigned long		wait_table_hash_nr_entries;
-	//µÈ´ı¶ÓÁĞÍ·¸öÊıÊÇ2µÄ¶àÉÙ´ÎÃİ
+	//ç­‰å¾…é˜Ÿåˆ—å¤´ä¸ªæ•°æ˜¯2çš„å¤šå°‘æ¬¡å¹‚
 	unsigned long		wait_table_bits;
 
 	/*

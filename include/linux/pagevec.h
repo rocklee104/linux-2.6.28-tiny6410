@@ -1,4 +1,4 @@
-/*
+﻿/*
  * include/linux/pagevec.h
  *
  * In many places it is efficient to batch an operation up against multiple
@@ -14,9 +14,14 @@
 struct page;
 struct address_space;
 
+/* 
+ * pagevec是一个容器.page在加入LRU之前需要先加入pagevec,当pagevec中的
+ * page满后,再加入zone的LRU链表中去.
+ */
 struct pagevec {
 	unsigned long nr;
 	unsigned long cold;
+	//PAGEVEC_SIZE个指针加上2个unsigned long,struct pagevec刚好是2的n次方
 	struct page *pages[PAGEVEC_SIZE];
 };
 
@@ -56,6 +61,7 @@ static inline unsigned pagevec_space(struct pagevec *pvec)
 /*
  * Add a page to a pagevec.  Returns the number of slots still available.
  */
+//返回LRU中空闲slot的个数
 static inline unsigned pagevec_add(struct pagevec *pvec, struct page *page)
 {
 	pvec->pages[pvec->nr++] = page;

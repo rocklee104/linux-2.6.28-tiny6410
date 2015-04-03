@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Generic waiting primitives.
  *
  * (C) 2004 William Irwin, Oracle
@@ -71,7 +71,7 @@ prepare_to_wait(wait_queue_head_t *q, wait_queue_t *wait, int state)
 	wait->flags &= ~WQ_FLAG_EXCLUSIVE;
 	spin_lock_irqsave(&q->lock, flags);
 	if (list_empty(&wait->task_list))
-        //���waitû�м����κεȴ�����,�ͽ������q
+        //如果wait没有加入任何等待队列,就将其加入q
 		__add_wait_queue(q, wait);
 	set_current_state(state);
 	spin_unlock_irqrestore(&q->lock, flags);
@@ -199,7 +199,7 @@ __wait_on_bit(wait_queue_head_t *wq, struct wait_bit_queue *q,
 	do {
 		prepare_to_wait(wq, &q->wait, mode);
 		if (test_bit(q->key.bit_nr, q->key.flags))
-            //������Ե�bit����λ,��Ҫִ��action
+            //如果测试的bit被置位,就要执行action
 			ret = (*action)(q->key.flags);
 	} while (test_bit(q->key.bit_nr, q->key.flags) && !ret);
 	finish_wait(wq, &q->wait);
@@ -210,15 +210,24 @@ EXPORT_SYMBOL(__wait_on_bit);
 int __sched out_of_line_wait_on_bit(void *word, int bit,
 					int (*action)(void *), unsigned mode)
 {
-    //��ȡ�ȴ�����ͷ
+    //获取等待队列头
 	wait_queue_head_t *wq = bit_waitqueue(word, bit);
-    //��ʼ������Ϊwait��struct wait_bit_queue
+    //初始化名称为wait的struct wait_bit_queue
 	DEFINE_WAIT_BIT(wait, word, bit);
 
 	return __wait_on_bit(wq, &wait, action, mode);
 }
 EXPORT_SYMBOL(out_of_line_wait_on_bit);
 
+/*
+ * 1.将q加入等待队列wq 
+ * 2.判断q->key.flags中第q->key.bit_nr位是否被置位： 
+ *   a.如果被置位就执行action(一般类似于schedule的休眠),等到其他进程唤醒等待队列的时候，
+ *    就调用test_and_set_bit看是否置位，如果还是置位，返回1,循环继续。
+ *   b.如果没有被置位，就不执行action,调用test_and_set_bit置位。
+ *    由于test_bit测试过没有没有置位，test_and_set_bit将会返回0,循环退出。
+ * 3.将q->wait移除等待队列
+ */
 int __sched
 __wait_on_bit_lock(wait_queue_head_t *wq, struct wait_bit_queue *q,
 			int (*action)(void *), unsigned mode)
@@ -287,7 +296,7 @@ wait_queue_head_t *bit_waitqueue(void *word, int bit)
 	const struct zone *zone = page_zone(virt_to_page(word));
 	unsigned long val = (unsigned long)word << shift | bit;
 
-    //��ȡword������zone�еĵȴ�����ͷ
+    //获取word所属的zone中的等待队列头
 	return &zone->wait_table[hash_long(val, zone->wait_table_bits)];
 }
 EXPORT_SYMBOL(bit_waitqueue);

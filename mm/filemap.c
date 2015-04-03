@@ -452,6 +452,7 @@ int filemap_write_and_wait_range(struct address_space *mapping,
  * This function is used to add a page to the pagecache. It must be locked.
  * This function does not add the page to the LRU.  The caller must do that.
  */
+//在调用这个函数之前,page must be locked
 int add_to_page_cache_locked(struct page *page, struct address_space *mapping,
 		pgoff_t offset, gfp_t gfp_mask)
 {
@@ -512,14 +513,17 @@ int add_to_page_cache_lru(struct page *page, struct address_space *mapping,
 	 * (called in add_to_page_cache) needs to know where they're going too.
 	 */
 	if (mapping_cap_swap_backed(mapping))
+		//如果mapping的back device info有BDI_CAP_SWAP_BACKED标志,将page也设置成swap backed
 		SetPageSwapBacked(page);
 
 	//add_to_page_cache成功返回0
 	ret = add_to_page_cache(page, mapping, offset, gfp_mask);
 	if (ret == 0) {
 		if (page_is_file_cache(page))
+			//如果page属于普通文件系统
 			lru_cache_add_file(page);
 		else
+			//如果page的back device info是内存文件系统或内存设备
 			lru_cache_add_active_anon(page);
 	}
 	return ret;
@@ -670,8 +674,10 @@ struct page *find_get_page(struct address_space *mapping, pgoff_t offset)
 	rcu_read_lock();
 repeat:
 	page = NULL;
+	//找到slot
 	pagep = radix_tree_lookup_slot(&mapping->page_tree, offset);
 	if (pagep) {
+		//通过slot找到page
 		page = radix_tree_deref_slot(pagep);
 		if (unlikely(!page || page == RADIX_TREE_RETRY))
 			goto repeat;
@@ -751,11 +757,14 @@ struct page *find_or_create_page(struct address_space *mapping,
 	struct page *page;
 	int err;
 repeat:
+	//在mapping中查找索引是index的页,并lock这个page
 	page = find_lock_page(mapping, index);
 	if (!page) {
+		//没有找到就需要分配
 		page = __page_cache_alloc(gfp_mask);
 		if (!page)
 			return NULL;
+		//分配完后,需要即将page加入mapping及zone的LRU中
 		err = add_to_page_cache_lru(page, mapping, index, gfp_mask);
 		if (unlikely(err)) {
 			page_cache_release(page);

@@ -650,15 +650,32 @@ static inline int mapping_writably_mapped(struct address_space *mapping)
 #endif
 
 struct inode {
+	//用于将inode接入hash表中
 	struct hlist_node	i_hash;
+   /*
+    * i_list用作连接一下3个链表中的一个： 
+    * 1.inode_unused:inode未使用链表,inode是clean的,并且i_count为0,链表头是inode_unused
+    * 2.inode_in_use:inode正在使用链表,inode是clean的,并且i_count>0,链表头是inode_in_use 
+    * 3.dirty链表:dirty的inode链表，链表头是sb->s_dirty 
+    * 
+    * 4.用于记录整个fs中的inode的链表
+    * i_state的值等于I_DIRTY_SYNC，I_DIRTY_DATASYNC，I_DIRTY_PAGES其中一个， 
+    * 就表示inode dirty
+    */
 	struct list_head	i_list;
+    //链表元素,用于记录整个fs的inode,链表头是super_block->s_inodes
 	struct list_head	i_sb_list;
+	//链表头,成员是struct dentry中的d_alias
 	struct list_head	i_dentry;
+	//inode number
 	unsigned long		i_ino;
+	//有多少进程访问此INODE
 	atomic_t		i_count;
+	//inode的硬连接引用计数
 	unsigned int		i_nlink;
 	uid_t			i_uid;
 	gid_t			i_gid;
+	//关联的设备号
 	dev_t			i_rdev;
 	u64			i_version;
 	//如果这个inode是bdev_inode的成员,i_size在bd_set_size中被设置成块设备的大小
@@ -672,6 +689,7 @@ struct inode {
 	unsigned int		i_blkbits;
 	blkcnt_t		i_blocks;
 	unsigned short          i_bytes;
+	//文件的格式,权限等一些模式
 	umode_t			i_mode;
 	spinlock_t		i_lock;	/* i_blocks, i_bytes, maybe i_size */
 	struct mutex		i_mutex;
@@ -680,7 +698,9 @@ struct inode {
 	const struct file_operations	*i_fop;	/* former ->i_op->default_file_ops */
 	struct super_block	*i_sb;
 	struct file_lock	*i_flock;
+	//指向address_space对象的指针
 	struct address_space	*i_mapping;
+	//文件的address_space对象
 	struct address_space	i_data;
 #ifdef CONFIG_QUOTA
 	struct dquot		*i_dquot[MAXQUOTAS];
@@ -691,12 +711,16 @@ struct inode {
 		struct block_device	*i_bdev;
 		struct cdev		*i_cdev;
 	};
+	//拥有一组次设备号的设备文件的索引
 	int			i_cindex;
 
+	//inode版本号
 	__u32			i_generation;
 
 #ifdef CONFIG_DNOTIFY
+	//目录通知事件的位掩码
 	unsigned long		i_dnotify_mask; /* Directory notify events */
+	//用于目录通知
 	struct dnotify_struct	*i_dnotify; /* for directory notifications */
 #endif
 
@@ -705,11 +729,14 @@ struct inode {
 	struct mutex		inotify_mutex;	/* protects the watches list */
 #endif
 
+	//inode的状态标志,比如I_NEW
 	unsigned long		i_state;
 	unsigned long		dirtied_when;	/* jiffies of first dirtying */
 
+	//fs的安装标志
 	unsigned int		i_flags;
 
+	//写进程的引用计数
 	atomic_t		i_writecount;
 #ifdef CONFIG_SECURITY
 	void			*i_security;

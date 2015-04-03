@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  kernel/sched.c
  *
  *  Kernel scheduler and related syscalls
@@ -5639,6 +5639,7 @@ EXPORT_SYMBOL(cond_resched_softirq);
  * This is a shortcut for kernel-space yielding - it marks the
  * thread runnable and calls sys_sched_yield().
  */
+//放弃当前处理器给其他进程
 void __sched yield(void)
 {
 	set_current_state(TASK_RUNNING);
