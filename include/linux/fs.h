@@ -875,23 +875,32 @@ struct file {
 		struct list_head	fu_list;
 		struct rcu_head 	fu_rcuhead;
 	} f_u;
+	//提供了文件名和inode之间的联系
 	struct path		f_path;
 #define f_dentry	f_path.dentry
 #define f_vfsmnt	f_path.mnt
+	//文件操作调用的各个函数
 	const struct file_operations	*f_op;
+	//访问本文件的的进程数目的计数器
 	atomic_long_t		f_count;
+	//open系统调用时传递的额外标志,如O_RDONLY,O_NONBLOCK和O_SYNC,为了检查用户请求是否是非阻塞式操作
 	unsigned int 		f_flags;
+	//打开文件时传递的模式参数,通过FMODE_READ和FMODE_WRITE位来标识文件是否可读可写
 	fmode_t			f_mode;
+	//文件位置指针
 	loff_t			f_pos;
 	struct fown_struct	f_owner;
 	unsigned int		f_uid, f_gid;
+	//是否预读数据,如何预读 
 	struct file_ra_state	f_ra;
 
+	//检查file实例是否与相关inode兼容
 	u64			f_version;
 #ifdef CONFIG_SECURITY
 	void			*f_security;
 #endif
 	/* needed for tty driver, and maybe others */
+	//对于sysfs来说,这个指针就指向了sysfs_buffer
 	void			*private_data;
 
 #ifdef CONFIG_EPOLL
@@ -899,6 +908,7 @@ struct file {
 	struct list_head	f_ep_links;
 	spinlock_t		f_ep_lock;
 #endif /* #ifdef CONFIG_EPOLL */
+	//指向文件相关inode实例的地址空间映射
 	struct address_space	*f_mapping;
 #ifdef CONFIG_DEBUG_WRITECOUNT
 	unsigned long f_mnt_write_state;

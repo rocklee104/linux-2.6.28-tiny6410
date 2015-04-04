@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  arch/arm/include/asm/uaccess.h
  *
  * This program is free software; you can redistribute it and/or modify
@@ -404,6 +404,7 @@ static inline unsigned long __must_check copy_from_user(void *to, const void __u
 	return n;
 }
 
+//返回还有多少个字节未完成
 static inline unsigned long __must_check copy_to_user(void __user *to, const void *from, unsigned long n)
 {
 	if (access_ok(VERIFY_WRITE, to, n))
