@@ -157,6 +157,7 @@ radix_tree_node_alloc(struct radix_tree_root *root)
 	gfp_t gfp_mask = root_gfp_mask(root);
 
 	if (!(gfp_mask & __GFP_WAIT)) {
+		//分配器不能休眠
 		struct radix_tree_preload *rtp;
 
 		/*
