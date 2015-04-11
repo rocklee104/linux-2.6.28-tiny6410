@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  linux/drivers/base/map.c
  *
  * (C) Copyright Al Viro 2002,2003
@@ -56,9 +56,12 @@ int kobj_map(struct kobj_map *domain, dev_t dev, unsigned long range,
 	}
 	mutex_lock(domain->lock);
 	for (i = 0, p -= n; i < n; i++, p++, index++) {
+		//使用2级指针遍历插入可以减少一个用于记录当前节点前一个节点的指针
 		struct probe **s = &domain->probes[index % 255];
 		while (*s && (*s)->range < range)
+			//range从小到大排列
 			s = &(*s)->next;
+		//完成插入操作
 		p->next = *s;
 		*s = p;
 	}
