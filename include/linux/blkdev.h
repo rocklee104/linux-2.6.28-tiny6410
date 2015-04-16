@@ -1,4 +1,4 @@
-#ifndef _LINUX_BLKDEV_H
+﻿#ifndef _LINUX_BLKDEV_H
 #define _LINUX_BLKDEV_H
 
 #ifdef CONFIG_BLOCK
@@ -352,6 +352,7 @@ struct request_queue
 	 * The queue owner gets to use this for whatever they like.
 	 * ll_rw_blk doesn't touch it.
 	 */
+	//一般指向请求队列的所有者
 	void			*queuedata;
 
 	/*

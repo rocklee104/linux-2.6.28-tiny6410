@@ -25,14 +25,17 @@ struct kobj_map {
 		kobj_probe_t *get;
 		int (*lock)(dev_t, void *);
 		void *data;
+	//主设备号为数组下标
 	} *probes[255];
 	struct mutex *lock;
 };
 
+//range就是设备的数量
 int kobj_map(struct kobj_map *domain, dev_t dev, unsigned long range,
 	     struct module *module, kobj_probe_t *probe,
 	     int (*lock)(dev_t, void *), void *data)
 {
+	//主设备的个数
 	unsigned n = MAJOR(dev + range - 1) - MAJOR(dev) + 1;
 	unsigned index = MAJOR(dev);
 	unsigned i;
@@ -63,6 +66,7 @@ int kobj_map(struct kobj_map *domain, dev_t dev, unsigned long range,
 			s = &(*s)->next;
 		//完成插入操作
 		p->next = *s;
+		//s实际上就是*s前一个元素的next地址
 		*s = p;
 	}
 	mutex_unlock(domain->lock);
@@ -152,6 +156,7 @@ struct kobj_map *kobj_map_init(kobj_probe_t *base_probe, struct mutex *lock)
 	base->range = ~0;
 	base->get = base_probe;
 	for (i = 0; i < 255; i++)
+		//255个指针全都指向base
 		p->probes[i] = base;
 	p->lock = lock;
 	return p;

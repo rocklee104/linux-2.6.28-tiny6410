@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  gendisk handling
  */
 
@@ -1085,6 +1085,7 @@ dev_t blk_lookup_devt(const char *name, int partno)
 }
 EXPORT_SYMBOL(blk_lookup_devt);
 
+//minors是该磁盘使用的次设备号的数目
 struct gendisk *alloc_disk(int minors)
 {
 	return alloc_disk_node(minors, -1);

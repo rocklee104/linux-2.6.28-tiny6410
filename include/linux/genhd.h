@@ -1,4 +1,4 @@
-#ifndef _LINUX_GENHD_H
+﻿#ifndef _LINUX_GENHD_H
 #define _LINUX_GENHD_H
 
 /*
@@ -89,6 +89,7 @@ struct disk_stats {
 	
 struct hd_struct {
 	sector_t start_sect;
+	//通用磁盘的大小,单位是扇区
 	sector_t nr_sects;
 	struct device __dev;
 	struct kobject *holder_dir;
