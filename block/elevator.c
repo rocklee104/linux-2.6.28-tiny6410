@@ -1,4 +1,4 @@
-/*
+ï»¿/*
  *  Block device elevator/IO-scheduler.
  *
  *  Copyright (C) 2000 Andrea Arcangeli <andrea@suse.de> SuSE
@@ -39,7 +39,7 @@
 #include "blk.h"
 
 static DEFINE_SPINLOCK(elv_list_lock);
-//ËùÓÐµÄioµ÷¶ÈËã·¨¶¼»á±»Á´½Óµ½elv_listÖÐ
+//æ‰€æœ‰çš„ioè°ƒåº¦ç®—æ³•éƒ½ä¼šè¢«é“¾æŽ¥åˆ°elv_listä¸­
 static LIST_HEAD(elv_list);
 
 /*
@@ -488,9 +488,9 @@ void elv_dispatch_add_tail(struct request_queue *q, struct request *rq)
 EXPORT_SYMBOL(elv_dispatch_add_tail);
 
 /*
- *ELEVATOR_NO_MERGE£º¶ÓÁÐÒÑ¾­´æÔÚµÄÇëÇóÖÐ²»ÄÜ°üº¬bio½á¹¹£¬ÐèÒª´´½¨Ò»¸öÐÂÇëÇó¡£
- *ELEVATOR_BACK_MERGE£ºbio½á¹¹¿É×÷ÎªÄ©Î²µÄbio¶ø²åÈëµ½Ä³¸öÇëÇóÖÐ£»
- *ELEVATOR_FRONT_MERGE£ºbio½á¹¹¿É×÷ÎªÄ³¸öÇëÇóµÄµÚÒ»¸öbio±»²åÈë£»
+ *ELEVATOR_NO_MERGEï¼šé˜Ÿåˆ—å·²ç»å­˜åœ¨çš„è¯·æ±‚ä¸­ä¸èƒ½åŒ…å«bioç»“æž„ï¼Œéœ€è¦åˆ›å»ºä¸€ä¸ªæ–°è¯·æ±‚ã€‚
+ *ELEVATOR_BACK_MERGEï¼šbioç»“æž„å¯ä½œä¸ºæœ«å°¾çš„bioè€Œæ’å…¥åˆ°æŸä¸ªè¯·æ±‚ä¸­ï¼›
+ *ELEVATOR_FRONT_MERGEï¼šbioç»“æž„å¯ä½œä¸ºæŸä¸ªè¯·æ±‚çš„ç¬¬ä¸€ä¸ªbioè¢«æ’å…¥ï¼›
 */
 int elv_merge(struct request_queue *q, struct request **req, struct bio *bio)
 {
@@ -749,6 +749,7 @@ static inline struct request *__elv_next_request(struct request_queue *q)
 	}
 }
 
+//è¿”å›žä¸‹ä¸€ä¸ªéœ€è¦å¤„ç†çš„è¯·æ±‚æŒ‡é’ˆ
 struct request *elv_next_request(struct request_queue *q)
 {
 	struct request *rq;
@@ -853,20 +854,20 @@ void elv_dequeue_request(struct request_queue *q, struct request *rq)
 }
 
 /*
- * ¼ì²éÇëÇó¶ÓÁÐÖÐÊÇ·ñ´æÔÚ´ý´¦ÀíµÄÇëÇó--×¢Òâ,µ÷¶È¶ÓÁÐ¿ÉÄÜÊÇ¿ÕµÄ,
- * µ«ÊÇi/oµ÷¶È³ÌÐòµÄÆäËû¶ÓÁÐ¿ÉÄÜ°üº¬´ý´¦ÀíµÄÇëÇó.Èç¹ûÃ»ÓÐ´ý´¦ÀíµÄÇëÇó,
- * ÄÇÃ´¾Íµ÷ÓÃblk_plug_device²åÈëÇëÇó¶ÓÁÐ
+ * æ£€æŸ¥è¯·æ±‚é˜Ÿåˆ—ä¸­æ˜¯å¦å­˜åœ¨å¾…å¤„ç†çš„è¯·æ±‚--æ³¨æ„,è°ƒåº¦é˜Ÿåˆ—å¯èƒ½æ˜¯ç©ºçš„,
+ * ä½†æ˜¯i/oè°ƒåº¦ç¨‹åºçš„å…¶ä»–é˜Ÿåˆ—å¯èƒ½åŒ…å«å¾…å¤„ç†çš„è¯·æ±‚.å¦‚æžœæ²¡æœ‰å¾…å¤„ç†çš„è¯·æ±‚,
+ * é‚£ä¹ˆå°±è°ƒç”¨blk_plug_deviceæ’å…¥è¯·æ±‚é˜Ÿåˆ—
 */
 int elv_queue_empty(struct request_queue *q)
 {
 	elevator_t *e = q->elevator;
 
 	if (!list_empty(&q->queue_head))
-		//¶ÓÁÐ²»Îª¿Õ
+		//é˜Ÿåˆ—ä¸ä¸ºç©º
 		return 0;
 
 	if (e->ops->elevator_queue_empty_fn)
-		//¶ÓÁÐÎª¿Õ
+		//é˜Ÿåˆ—ä¸ºç©º
 		return e->ops->elevator_queue_empty_fn(q);
 
 	return 1;

@@ -144,10 +144,12 @@ enum rq_flag_bits {
  * as well!
  */
 struct request {
+	//链表成员，链表头是struct request_queue的queue_head
 	struct list_head queuelist;
 	struct call_single_data csd;
 	int cpu;
 
+	//指向包含请求的队列描述符的指针
 	struct request_queue *q;
 
 	unsigned int cmd_flags;
@@ -158,17 +160,25 @@ struct request {
 	 * hard_* are block layer internals, no driver should touch them!
 	 */
 
+	//设备上开始扇区的索引号(512 byte为单位的扇区)
 	sector_t sector;		/* next sector to submit */
+	//要传送的下一个扇区号
 	sector_t hard_sector;		/* next sector to complete */
+	//扇区数(512 byte为单位的扇区)
 	unsigned long nr_sectors;	/* no. of sectors left to submit */
+	//整个请求中要传送的扇区数(由通用块层更新)
 	unsigned long hard_nr_sectors;	/* no. of sectors left to complete */
 	/* no. of sectors left to submit in the current segment */
+	//当前bio的当前段中要传送的扇区数
 	unsigned int current_nr_sectors;
 
 	/* no. of sectors left to complete in the current segment */
+	//当前bio的当前段中要传送的扇区数(由通用块层更新)
 	unsigned int hard_cur_sectors;
 
+	//bio链表
 	struct bio *bio;
+	//请求链表中末尾的bio
 	struct bio *biotail;
 
 	struct hlist_node hash;	/* merge hash */
@@ -186,6 +196,7 @@ struct request {
 	 * two pointers are available for the IO schedulers, if they need
 	 * more they have to dynamically allocate it.
 	 */
+	//指向io调度程序私有数据的指针
 	void *elevator_private;
 	void *elevator_private2;
 
@@ -195,33 +206,46 @@ struct request {
 	/* Number of scatter-gather DMA addr+len pairs after
 	 * physical address coalescing is performed.
 	 */
+	//当相邻的页被合并后,在物理内存中被这个请求所占用的段的数目
 	unsigned short nr_phys_segments;
 
 	unsigned short ioprio;
 
+	//对硬件设备发出“特殊”命令的请求所使用的数据的指针
 	void *special;
+	//要传输或者要接收的缓冲区指针,该指针在内核虚拟地址空间中
 	char *buffer;
 
+	//与请求相关的标记（只适合多次数据传送的硬件设备）
 	int tag;
+	//用于记录当前传送中发生的io失败次数的计数器
 	int errors;
 
+	//请求的引用计数
 	int ref_count;
 
 	/*
 	 * when request is used as a packet command carrier
 	 */
+	//cmd字段中命令的长度
 	unsigned short cmd_len;
+	//由请求队列的prep_rq_fn方法准备好的预先内置命令所在的缓冲区
 	unsigned char __cmd[BLK_MAX_CDB];
 	unsigned char *cmd;
 
+	//通常,由data字段指向的缓冲区中数据的长度,表示当前请求要求数据传输的总的数据量
 	unsigned int data_len;
 	unsigned int extra_len;	/* length of alignment and padding */
+	//由sense字段指向的缓冲区的长度，如果sense是null,则为0
 	unsigned int sense_len;
+	//设备驱动程序为了跟踪所传送的数据而使用的指针
 	void *data;
+	//指向输出sense命令的缓冲区的指针
 	void *sense;
 
 	unsigned long deadline;
 	struct list_head timeout_list;
+	//请求的超时
 	unsigned int timeout;
 	int retries;
 
@@ -311,22 +335,42 @@ struct request_queue
 	/*
 	 * Together with queue_head for cacheline sharing
 	 */
+	//待处理请求队列的链表, 链表头，成员是struct request中的queuelist
 	struct list_head	queue_head;
+	//指向队列中首先可能合并的请求描述符
 	struct request		*last_merge;
+	//指向elevator对象的指针
 	elevator_t		*elevator;
 
 	/*
 	 * the queue request freelist, one for reads and one for writes
 	 */
+	//为分配请求描述符所使用的数据结构
 	struct request_list	rq;
 
+	/*
+	 * 指向块设备驱动程序需要实现的请求处理函数.当内核中的其他组件比如文件系统需要从
+	 * 底层块设备读取或者写入数据时,如果设备驱动程序采用的是request方式实现的,内核会
+	 * 调用该例程.因此该例程需要针对特定的设备实现底层的i/o操作.
+	*/
 	request_fn_proc		*request_fn;
+	/*
+	 * 如果驱动程序调用blk_init_queue来处理请求,那么在其调用链中,kernel会为当前请求队列
+	 * 的make_request_fn提供一个标准的实现__make_request.但如果驱动程序采用所谓的make_request
+	 * 方式实现,则驱动程序需要调用blk_queue_make_request为此处的make_request_fn提供一个实现,
+	 * 由于blk_queue_make_request函数的内部不负责创建设备的请求队列,所以make_request方式
+	 * 需要驱动程序调用blk_queue_make_request前显示地为设备创建一个请求队列.
+	*/
 	make_request_fn		*make_request_fn;
+	//该方法把这个请求处理的命令发送给硬件设备
 	prep_rq_fn		*prep_rq_fn;
+	//去掉块设备的方法
 	unplug_fn		*unplug_fn;
 	prepare_discard_fn	*prepare_discard_fn;
+	//当增加一个新段时，该方法返回可插入到某个已存在的bio结构中的字节数
 	merge_bvec_fn		*merge_bvec_fn;
 	prepare_flush_fn	*prepare_flush_fn;
+	//软中断执行函数,由具体driver指定
 	softirq_done_fn		*softirq_done_fn;
 	rq_timed_out_fn		*rq_timed_out_fn;
 	dma_drain_needed_fn	*dma_drain_needed;
@@ -341,29 +385,40 @@ struct request_queue
 	/*
 	 * Auto-unplugging state
 	 */
+	//插入设备时使用的动态定时器
 	struct timer_list	unplug_timer;
+	//如果请求队列中待处理请求数大于该值，将立即去掉请求设备
 	int			unplug_thresh;	/* After this many requests */
+	//去掉设备之前的延迟
 	unsigned long		unplug_delay;	/* After this many jiffies */
+	//去掉设备时使用的操作队列
 	struct work_struct	unplug_work;
 
+	/*
+	 * backing_dev_info存放了关于硬件块设备的i/o数据流量信息。
+	 * 例如它保存了关于预读以及关于请求队列拥堵状态的信息
+	 */
 	struct backing_dev_info	backing_dev_info;
 
 	/*
 	 * The queue owner gets to use this for whatever they like.
 	 * ll_rw_blk doesn't touch it.
 	 */
-	//一般指向请求队列的所有者
+	//指向块设备驱动程序的私有数据的指针
 	void			*queuedata;
 
 	/*
 	 * queue needs bounce pages for pages above this limit
 	 */
+	//在大于该叶框号时必须使用缓冲区回弹
 	unsigned long		bounce_pfn;
+	//回弹缓冲区使用的内存分配标志
 	gfp_t			bounce_gfp;
 
 	/*
 	 * various queue flags, see QUEUE_* below
 	 */
+	//描述请求队列状态的标志
 	unsigned long		queue_flags;
 
 	/*
@@ -372,38 +427,54 @@ struct request_queue
 	 * ->queue_lock.
 	 */
 	spinlock_t		__queue_lock;
+	//指向请求队列锁的指针
 	spinlock_t		*queue_lock;
 
 	/*
 	 * queue kobject
 	 */
+	//请求队列内嵌kobject结构
 	struct kobject kobj;
 
 	/*
 	 * queue settings
 	 */
+	//请求队列中允许的最大请求数
 	unsigned long		nr_requests;	/* Max # of requests */
+	//如果待处理请求数超出了该阀值，则认为该队列是拥挤的
 	unsigned int		nr_congestion_on;
+	//如果待处理请求数在该阀值内，则认为该队列是不拥挤的
 	unsigned int		nr_congestion_off;
+	//即使队列已满，仍可以由特殊进程"batch"提交的待处理请求队列的最大值(通常为32)
 	unsigned int		nr_batching;
 
+	//单个请求能处理的最大扇区数(可调的)
 	unsigned int		max_sectors;
+	//单个请求能处理的最大扇区数(硬件约束)
 	unsigned int		max_hw_sectors;
+	//单个请求所能处理的最大物理段数,当次request bio_vec的总数
 	unsigned short		max_phys_segments;
+	//单个请求所能处理的最大硬段数(分散-聚集DMA操作中的最大不同内存区数)
 	unsigned short		max_hw_segments;
+	//扇区中以字节为单位的大小，这是硬件中块的大小
 	unsigned short		hardsect_size;
+	//物理段的最大长度（以字节为单位）
 	unsigned int		max_segment_size;
 
+	//段合并的内存边界mask
 	unsigned long		seg_boundary_mask;
 	void			*dma_drain_buffer;
 	unsigned int		dma_drain_size;
 	unsigned int		dma_pad_mask;
+	//DMA缓冲去的起始地址和长度的对齐位图（default 511）
 	unsigned int		dma_alignment;
 
+	//空闲/busy标记的位图（用于带标记的请求）
 	struct blk_queue_tag	*queue_tags;
 	struct list_head	tag_busy_list;
 
 	unsigned int		nr_sorted;
+	//请求队列中待处理的请求数
 	unsigned int		in_flight;
 
 	unsigned int		rq_timeout;
@@ -413,7 +484,9 @@ struct request_queue
 	/*
 	 * sg stuff
 	 */
+	//用户定义的命令超时（仅由scsi通用块设备使用）
 	unsigned int		sg_timeout;
+	//基本没有使用
 	unsigned int		sg_reserved_size;
 	int			node;
 #ifdef CONFIG_BLK_DEV_IO_TRACE
@@ -592,6 +665,7 @@ enum {
 
 #define list_entry_rq(ptr)	list_entry((ptr), struct request, queuelist)
 
+//从request中得到传输的方向,返回0表示从设备都数据,非0表示向设备写数据
 #define rq_data_dir(rq)		((rq)->cmd_flags & 1)
 
 /*

@@ -1,4 +1,4 @@
-/*
+ï»¿/*
  *  linux/fs/block_dev.c
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
@@ -34,7 +34,7 @@ struct bdev_inode {
 
 static const struct address_space_operations def_blk_aops;
 
-//Í¨¹ıinodeÕÒµ½bdev_inode
+//é€šè¿‡inodeæ‰¾åˆ°bdev_inode
 static inline struct bdev_inode *BDEV_I(struct inode *inode)
 {
 	return container_of(inode, struct bdev_inode, vfs_inode);
@@ -94,11 +94,11 @@ EXPORT_SYMBOL(set_blocksize);
 int sb_set_blocksize(struct super_block *sb, int size)
 {
 	if (set_blocksize(sb->s_bdev, size))
-		//size²»·ûºÏÒªÇó
+		//sizeä¸ç¬¦åˆè¦æ±‚
 		return 0;
 	/* If we get here, we know size is power of two
 	 * and it's value is between 512 and PAGE_SIZE */
-	//size·ûºÏÒªÇó
+	//sizeç¬¦åˆè¦æ±‚
 	sb->s_blocksize = size;
 	sb->s_blocksize_bits = blksize_bits(size);
 	return sb->s_blocksize;
@@ -106,7 +106,7 @@ int sb_set_blocksize(struct super_block *sb, int size)
 
 EXPORT_SYMBOL(sb_set_blocksize);
 
-//±£Ö¤ÉèÖÃµÄ¿é´óĞ¡´óÓÚµÈÓÚÓ²¼şÊµ¼ÊµÄblock size
+//ä¿è¯è®¾ç½®çš„å—å¤§å°å¤§äºç­‰äºç¡¬ä»¶å®é™…çš„block size
 int sb_min_blocksize(struct super_block *sb, int size)
 {
 	int minsize = bdev_hardsect_size(sb->s_bdev);
@@ -330,7 +330,7 @@ static struct file_system_type bd_type = {
 	.kill_sb	= kill_anon_super,
 };
 
-//Î±ÎÄ¼şÏµÍ³bdevµÄvfsmountÖ¸Õë
+//ä¼ªæ–‡ä»¶ç³»ç»Ÿbdevçš„vfsmountæŒ‡é’ˆ
 static struct vfsmount *bd_mnt __read_mostly;
 struct super_block *blockdev_superblock;
 
@@ -360,7 +360,7 @@ static inline unsigned long hash(dev_t dev)
 	return MAJOR(dev)+MINOR(dev);
 }
 
-//bdevÎ±ÎÄ¼şÏµÍ³ÖĞÓëinode¹ØÁªµÄbdev.bd_devÖĞ±£´æÁËÕâ¸ö¿éÉè±¸µÄÉè±¸ºÅ
+//bdevä¼ªæ–‡ä»¶ç³»ç»Ÿä¸­ä¸inodeå…³è”çš„bdev.bd_devä¸­ä¿å­˜äº†è¿™ä¸ªå—è®¾å¤‡çš„è®¾å¤‡å·
 static int bdev_test(struct inode *inode, void *data)
 {
 	return BDEV_I(inode)->bdev.bd_dev == *(dev_t *)data;
@@ -372,16 +372,16 @@ static int bdev_set(struct inode *inode, void *data)
 	return 0;
 }
 
-//È«¾ÖÁ´±íÍ·,ÓÃÓÚ¼ÇÂ¼ÏµÍ³ÖĞËùÓĞµÄblock device
+//å…¨å±€é“¾è¡¨å¤´,ç”¨äºè®°å½•ç³»ç»Ÿä¸­æ‰€æœ‰çš„block device
 static LIST_HEAD(all_bdevs);
 
-//¸ù¾İÉè±¸ºÅ»ñÈ¡block device
-/** ´Ëº¯ÊıÊ×ÏÈ¸ù¾İdev_t»ñÈ¡inode: 
- * 1.´Óhash±íÖĞÕÒµ½hashÖµÆ¥ÅäµÄinode 
- * 2.´Óinode»ñÈ¡block device 
- * 3.ÔÙ´ÓblockdeviceÖĞ»ñÈ¡dev_t 
- * 4.Èç¹ûÕâ¸ödev_t¶ÔÏóºÍ´«ÈëµÄdataÏàµÈ£¬Õâ¸öinode¾ÍÊÇÎÒÃÇÒªÕÒµÄinode.
- * È»ºó¾Í¶ÔÕâ¸öÕÒµ½µÄinodeµÄblock device¶ÔÏó¸³Öµ¡£
+//æ ¹æ®è®¾å¤‡å·è·å–block device
+/** æ­¤å‡½æ•°é¦–å…ˆæ ¹æ®dev_tè·å–inode: 
+ * 1.ä»hashè¡¨ä¸­æ‰¾åˆ°hashå€¼åŒ¹é…çš„inode 
+ * 2.ä»inodeè·å–block device 
+ * 3.å†ä»blockdeviceä¸­è·å–dev_t 
+ * 4.å¦‚æœè¿™ä¸ªdev_tå¯¹è±¡å’Œä¼ å…¥çš„dataç›¸ç­‰ï¼Œè¿™ä¸ªinodeå°±æ˜¯æˆ‘ä»¬è¦æ‰¾çš„inode.
+ * ç„¶åå°±å¯¹è¿™ä¸ªæ‰¾åˆ°çš„inodeçš„block deviceå¯¹è±¡èµ‹å€¼ã€‚
  * @param dev
  * @return struct block_device* 
  */
@@ -390,8 +390,8 @@ struct block_device *bdget(dev_t dev)
 	struct block_device *bdev;
 	struct inode *inode;
 
-	/*ÕâÀïÏÈÔÚinodeµÄ¹şÏ£±íÖĞ½øĞĞ²éÕÒÓëdevÉè±¸ºÅ¶ÔÓ¦µÄinode£¬Èç¹ûÃ»ÕÒµ½µÄ»°£¬ 
-    ÔòÍ¨¹ıbdevÎ±ÎÄ¼şÏµÍ³´´½¨bdev_inode(°üº¬inodeºÍblock deviceµÄ½á¹¹Ìå)*/  
+	/*è¿™é‡Œå…ˆåœ¨inodeçš„å“ˆå¸Œè¡¨ä¸­è¿›è¡ŒæŸ¥æ‰¾ä¸devè®¾å¤‡å·å¯¹åº”çš„inodeï¼Œå¦‚æœæ²¡æ‰¾åˆ°çš„è¯ï¼Œ 
+    åˆ™é€šè¿‡bdevä¼ªæ–‡ä»¶ç³»ç»Ÿåˆ›å»ºbdev_inode(åŒ…å«inodeå’Œblock deviceçš„ç»“æ„ä½“)*/  
 	inode = iget5_locked(bd_mnt->mnt_sb, hash(dev),
 			bdev_test, bdev_set, &dev);
 
@@ -441,19 +441,19 @@ void bdput(struct block_device *bdev)
 
 EXPORT_SYMBOL(bdput);
  
-// /dev/ÖĞµÄinode->Í¨¹ıÉè±¸ºÅ»ñÈ¡bdev fsÖĞµÄinode->bdev fsÖĞµÄbdev
+// /dev/ä¸­çš„inode->é€šè¿‡è®¾å¤‡å·è·å–bdev fsä¸­çš„inode->bdev fsä¸­çš„bdev
 static struct block_device *bd_acquire(struct inode *inode)
 {
 	struct block_device *bdev;
 
 	spin_lock(&bdev_lock);
 	/*
-	 * Ö®Ç°µ÷ÓÃbd_acquire,inode(/devµÄtmpfs)ÖĞµÄi_bdev¾ÍÒÑ¾­Ö¸ÏòÁËblock device,
-	 * ·ñÔòÖ»ÓĞdev fsÖĞµÄinode->i_bdevÖ¸ÏòÁËblock device
+	 * ä¹‹å‰è°ƒç”¨bd_acquire,inode(/devçš„tmpfs)ä¸­çš„i_bdevå°±å·²ç»æŒ‡å‘äº†block device,
+	 * å¦åˆ™åªæœ‰dev fsä¸­çš„inode->i_bdevæŒ‡å‘äº†block device
 	*/ 
 	bdev = inode->i_bdev;
 	if (bdev) {
-		//Ôö¼ÓÒıÓÃ¼ÆÊı
+		//å¢åŠ å¼•ç”¨è®¡æ•°
 		atomic_inc(&bdev->bd_inode->i_count);
 		spin_unlock(&bdev_lock);
 		return bdev;
@@ -461,8 +461,8 @@ static struct block_device *bd_acquire(struct inode *inode)
 	spin_unlock(&bdev_lock);
 
 	/*
-	 * Í¨¹ıÉè±¸ºÅµÄĞÅÏ¢À´»ñÈ¡block deviceÊµÀı,Õâ¸öÉè±¸ºÅµÄ´«µİ¹ı³Ì:
-	 * Éè±¸Çı¶¯ÖĞ×¢²á->add_disk->udev->shmem_mknod->shmem_get_inode->init_special_inode
+	 * é€šè¿‡è®¾å¤‡å·çš„ä¿¡æ¯æ¥è·å–block deviceå®ä¾‹,è¿™ä¸ªè®¾å¤‡å·çš„ä¼ é€’è¿‡ç¨‹:
+	 * è®¾å¤‡é©±åŠ¨ä¸­æ³¨å†Œ->add_disk->udev->shmem_mknod->shmem_get_inode->init_special_inode
 	*/
 	bdev = bdget(inode->i_rdev);
 	if (bdev) {
@@ -477,7 +477,7 @@ static struct block_device *bd_acquire(struct inode *inode)
 			atomic_inc(&bdev->bd_inode->i_count);
 			inode->i_bdev = bdev;
 			inode->i_mapping = bdev->bd_inode->i_mapping;
-			//¶à¸öÉè±¸½ÚµãÖ¸ÏòÍ¬Ò»¸öÉè±¸
+			//å¤šä¸ªè®¾å¤‡èŠ‚ç‚¹æŒ‡å‘åŒä¸€ä¸ªè®¾å¤‡
 			list_add(&inode->i_devices, &bdev->bd_inodes);
 		}
 		spin_unlock(&bdev_lock);
@@ -503,7 +503,7 @@ void bd_forget(struct inode *inode)
 		iput(bdev->bd_inode);
 }
 
-//½«bd_holder×Ö¶ÎÉèÖÃÎªÒ»¸öÌØ¶¨µÄµØÖ·
+//å°†bd_holderå­—æ®µè®¾ç½®ä¸ºä¸€ä¸ªç‰¹å®šçš„åœ°å€
 int bd_claim(struct block_device *bdev, void *holder)
 {
 	int res;
@@ -511,20 +511,20 @@ int bd_claim(struct block_device *bdev, void *holder)
 
 	/* first decide result */
 	if (bdev->bd_holder == holder)
-		//bdevÒÑ¾­±»holder hold¹ıÒ»´ÎÁË
+		//bdevå·²ç»è¢«holder holdè¿‡ä¸€æ¬¡äº†
 		res = 0;	 /* already a holder */
 	else if (bdev->bd_holder != NULL)
-		//bdev±»ÆäËûµÄholder hold×¡ÁË
+		//bdevè¢«å…¶ä»–çš„holder holdä½äº†
 		res = -EBUSY; 	 /* held by someone else */
 	else if (bdev->bd_contains == bdev)
-		//bdevÃ»ÓĞ±»ÆäËûµÄholder hold×¡,²¢ÇÒÊÇÖ÷Éè±¸
+		//bdevæ²¡æœ‰è¢«å…¶ä»–çš„holder holdä½,å¹¶ä¸”æ˜¯ä¸»è®¾å¤‡
 		res = 0;  	 /* is a whole device which isn't held */
 
 	else if (bdev->bd_contains->bd_holder == bd_claim)
-		//bdevµÄholderÊÇNULL,²¢ÇÒÊÇ´ÓÉè±¸
+		//bdevçš„holderæ˜¯NULL,å¹¶ä¸”æ˜¯ä»è®¾å¤‡
 		res = 0; 	 /* is a partition of a device that is being partitioned */
 	else if (bdev->bd_contains->bd_holder != NULL)
-		//Ö÷Éè±¸±»ÆäËûholder hold×¡ÁË,´ÎÉè±¸Ò²¾Í²»ÄÜ±»hold×¡
+		//ä¸»è®¾å¤‡è¢«å…¶ä»–holder holdä½äº†,æ¬¡è®¾å¤‡ä¹Ÿå°±ä¸èƒ½è¢«holdä½
 		res = -EBUSY;	 /* is a partition of a held device */
 	else
 		res = 0;	 /* is a partition of an un-held device */
@@ -536,8 +536,8 @@ int bd_claim(struct block_device *bdev, void *holder)
 		 * be set to bd_claim before being set to holder
 		 */
         /*
-         * ¶ÔÓÚÖ÷Éè±¸À´Ëµ,bd_holders»á×Ô¼Ó2´Î,bd_holderÒ²»á±»ÉèÖÃÁ½´Î.
-         * µÚÒ»´ÎÉèÖÃÎªbd_claim,µÚ¶ş´ÎÉèÖÃÎªholder(Ò»°ãÊÇstruct file*)
+         * å¯¹äºä¸»è®¾å¤‡æ¥è¯´,bd_holdersä¼šè‡ªåŠ 2æ¬¡,bd_holderä¹Ÿä¼šè¢«è®¾ç½®ä¸¤æ¬¡.
+         * ç¬¬ä¸€æ¬¡è®¾ç½®ä¸ºbd_claim,ç¬¬äºŒæ¬¡è®¾ç½®ä¸ºholder(ä¸€èˆ¬æ˜¯struct file*)
         */
 		bdev->bd_contains->bd_holders ++;
 		bdev->bd_contains->bd_holder = bd_claim;
@@ -554,10 +554,10 @@ void bd_release(struct block_device *bdev)
 {
 	spin_lock(&bdev_lock);
 	if (!--bdev->bd_contains->bd_holders)
-		//Ê×ÏÈreleaseÖ÷Éè±¸
+		//é¦–å…ˆreleaseä¸»è®¾å¤‡
 		bdev->bd_contains->bd_holder = NULL;
 	if (!--bdev->bd_holders)
-		//ÔÙrelease´ÓÉè±¸
+		//å†releaseä»è®¾å¤‡
 		bdev->bd_holder = NULL;
 	spin_unlock(&bdev_lock);
 }
@@ -983,6 +983,7 @@ EXPORT_SYMBOL(revalidate_disk);
  * People changing diskettes in the middle of an operation deserve
  * to lose :-)
  */
+//å¦‚æœmediaæ²¡æœ‰æ”¹å˜,å°±è¿”å›0.å¦‚æœæ”¹å˜äº†å°±é‡æ–°ä½¿diskæœ‰æ•ˆ,å¹¶ä¸”è¿”å›1
 int check_disk_change(struct block_device *bdev)
 {
 	struct gendisk *disk = bdev->bd_disk;
@@ -990,20 +991,23 @@ int check_disk_change(struct block_device *bdev)
 
 	if (!bdops->media_changed)
 		return 0;
+	//è°ƒç”¨å—è®¾å¤‡ç›¸å…³çš„media_changedæ“ä½œå‡½æ•°
 	if (!bdops->media_changed(bdev->bd_disk))
+		//å¦‚æœmediaçŠ¶æ€æ²¡æœ‰æ”¹å˜,å°±è¿”å›0
 		return 0;
 
 	flush_disk(bdev);
 	if (bdops->revalidate_disk)
+		//å¦‚æœçŠ¶æ€æ”¹å˜,å¹¶ä¸”æœ‰revalidate_diskæ“ä½œå‡½æ•°,å°±è°ƒç”¨revalidate_disk,ä½¿å—è®¾å¤‡æœ‰æ•ˆ
 		bdops->revalidate_disk(bdev->bd_disk);
 	return 1;
 }
 
 EXPORT_SYMBOL(check_disk_change);
 /**
-* bd_set_size - ÉèÖÃblock deviceµÄblock size
-* @param bdev : block device ¶ÔÏó
-* @param size : ´ÅÅÌµÄÈİÁ¿
+* bd_set_size - è®¾ç½®block deviceçš„block size
+* @param bdev : block device å¯¹è±¡
+* @param size : ç£ç›˜çš„å®¹é‡
 */
 void bd_set_size(struct block_device *bdev, loff_t size)
 {
@@ -1011,7 +1015,7 @@ void bd_set_size(struct block_device *bdev, loff_t size)
 
 	bdev->bd_inode->i_size = size;
 	while (bsize < PAGE_CACHE_SIZE) {
-		//Èç¹ûÉÈÇø´óĞ¡Ğ¡ÓÚÒ³Ãæ´óĞ¡ 
+		//å¦‚æœæ‰‡åŒºå¤§å°å°äºé¡µé¢å¤§å° 
 		if (size & bsize)
 			break;
 		bsize <<= 1;
@@ -1057,14 +1061,14 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 	if (!disk)
 		goto out_unlock_kernel;
 
-	//´Ëblock deviceÃ»ÓĞ±»´ò¿ª¹ı
+	//æ­¤block deviceæ²¡æœ‰è¢«æ‰“å¼€è¿‡
 	mutex_lock_nested(&bdev->bd_mutex, for_part);
 	if (!bdev->bd_openers) {
 		bdev->bd_disk = disk;
 		bdev->bd_contains = bdev;
-        //Ã»ÓĞÊ¹ÓÃfdiskÖ®Ç°£¬ÊÇ²»»áÓĞ·ÖÇøĞÅÏ¢µÄ£¬¼´Ã»ÓĞsda1,sda2µÈÉè±¸
+        //æ²¡æœ‰ä½¿ç”¨fdiskä¹‹å‰ï¼Œæ˜¯ä¸ä¼šæœ‰åˆ†åŒºä¿¡æ¯çš„ï¼Œå³æ²¡æœ‰sda1,sda2ç­‰è®¾å¤‡
 		if (!partno) {
-			//block deviceÊÇÒ»¸ö´ÅÅÌ
+			//block deviceæ˜¯ä¸€ä¸ªç£ç›˜
 			struct backing_dev_info *bdi;
 
 			ret = -ENXIO;
@@ -1073,32 +1077,32 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 				goto out_clear;
 
 			if (disk->fops->open) {
-				//µ÷ÓÃ´ÅÅÌµÄopen
+				//è°ƒç”¨ç£ç›˜çš„open
 				ret = disk->fops->open(bdev, mode);
 				if (ret)
-					//Èç¹ûopenÊ§°Ü
+					//å¦‚æœopenå¤±è´¥
 					goto out_clear;
 			}
-			//disk->fops->openÓĞ¿ÉÄÜ»áĞŞ¸Äbd_openers
+			//disk->fops->openæœ‰å¯èƒ½ä¼šä¿®æ”¹bd_openers
 			if (!bdev->bd_openers) {
-				//¸øbdevµÄblock size ¸³Öµ¡£Ò»¸öÉÈÇø512×Ö½Ú,×óÒÆ9Î»
+				//ç»™bdevçš„block size èµ‹å€¼ã€‚ä¸€ä¸ªæ‰‡åŒº512å­—èŠ‚,å·¦ç§»9ä½
 				bd_set_size(bdev,(loff_t)get_capacity(disk)<<9);
-				//»ñÈ¡ÇëÇó¶ÓÁĞµÄbacking_dev_info
+				//è·å–è¯·æ±‚é˜Ÿåˆ—çš„backing_dev_info
 				bdi = blk_get_backing_dev_info(bdev);
 				if (bdi == NULL)
 					bdi = &default_backing_dev_info;
-				//inodeµØÖ·¿Õ¼äÖĞµÄbacking_dev_infoĞèÒªºÍÇëÇó¶ÓÁĞÖĞµÄÒ»ÖÂ 
+				//inodeåœ°å€ç©ºé—´ä¸­çš„backing_dev_infoéœ€è¦å’Œè¯·æ±‚é˜Ÿåˆ—ä¸­çš„ä¸€è‡´ 
 				bdev->bd_inode->i_data.backing_dev_info = bdi;
 			}
-			//ÔÚregister_diskÖĞÉèÖÃÁËÕâ¸ö±êÖ¾
+			//åœ¨register_diskä¸­è®¾ç½®äº†è¿™ä¸ªæ ‡å¿—
 			if (bdev->bd_invalidated)
-                //ÖØĞÂÉ¨Ãè·ÖÇø 
+                //é‡æ–°æ‰«æåˆ†åŒº 
 				rescan_partitions(disk, bdev);
 		} else {
-			//ÊÇ·ÖÇø
-            //Ö÷block deviceµÄ¶ÔÏó 
+			//æ˜¯åˆ†åŒº
+            //ä¸»block deviceçš„å¯¹è±¡ 
 			struct block_device *whole;
-			//Í¨¹ıÉè±¸ºÅÕÒµ½Ö÷Éè±¸
+			//é€šè¿‡è®¾å¤‡å·æ‰¾åˆ°ä¸»è®¾å¤‡
 			whole = bdget_disk(disk, 0);
 			ret = -ENOMEM;
 			if (!whole)
@@ -1107,7 +1111,7 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 			ret = __blkdev_get(whole, mode, 1);
 			if (ret)
 				goto out_clear;
-            //bdevµÄÖ÷Éè±¸Ö¸Ïòwhole
+            //bdevçš„ä¸»è®¾å¤‡æŒ‡å‘whole
 			bdev->bd_contains = whole;
 			bdev->bd_inode->i_data.backing_dev_info =
 			   whole->bd_inode->i_data.backing_dev_info;
@@ -1120,14 +1124,14 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 			bd_set_size(bdev, (loff_t)bdev->bd_part->nr_sects << 9);
 		}
 	} else {
-	//block device±»´ò¿ª¹ı
+	//block deviceè¢«æ‰“å¼€è¿‡
 		put_disk(disk);
 		module_put(disk->fops->owner);
 		disk = NULL;
-		//Èç¹û´Ëblock deviceÊÇÒ»¸öÖ÷Éè±¸
+		//å¦‚æœæ­¤block deviceæ˜¯ä¸€ä¸ªä¸»è®¾å¤‡
 		if (bdev->bd_contains == bdev) {
 			if (bdev->bd_disk->fops->open) {
-				//µ÷ÓÃ¾ßÌåÉè±¸µÄopen
+				//è°ƒç”¨å…·ä½“è®¾å¤‡çš„open
 				ret = bdev->bd_disk->fops->open(bdev, mode);
 				if (ret)
 					goto out_unlock_bdev;
@@ -1191,8 +1195,8 @@ static int blkdev_open(struct inode * inode, struct file * filp)
 		filp->f_mode |= FMODE_WRITE_IOCTL;
 
 	/*
-	 * ÕâÀïÎªÊ²Ã´²»ÓÃI_BDEVµÄÔ­ÒòÊÇµ÷ÓÃÕâ¸öº¯ÊıµÄÊ±ºò,
-	 * ¿ÉÄÜÔÚbdev fsÖĞ»¹Ã»ÓĞÉú³É¹ıÏàÓ¦µÄ½Úµã,Ê¹ÓÃbd_acquire¸ü¼Ó°²È«
+	 * è¿™é‡Œä¸ºä»€ä¹ˆä¸ç”¨I_BDEVçš„åŸå› æ˜¯è°ƒç”¨è¿™ä¸ªå‡½æ•°çš„æ—¶å€™,
+	 * å¯èƒ½åœ¨bdev fsä¸­è¿˜æ²¡æœ‰ç”Ÿæˆè¿‡ç›¸åº”çš„èŠ‚ç‚¹,ä½¿ç”¨bd_acquireæ›´åŠ å®‰å…¨
 	*/ 
 	bdev = bd_acquire(inode);
 	if (bdev == NULL)
@@ -1385,7 +1389,7 @@ struct block_device *open_bdev_exclusive(const char *path, fmode_t mode, void *h
 	struct block_device *bdev;
 	int error = 0;
 
-	//¸ù¾İÂ·¾¶Ãû»ñÈ¡block_device
+	//æ ¹æ®è·¯å¾„åè·å–block_device
 	bdev = lookup_bdev(path);
 	if (IS_ERR(bdev))
 		return bdev;

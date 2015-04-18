@@ -1,4 +1,4 @@
-/*
+﻿/*
  * 2.5 block I/O model
  *
  * Copyright (C) 2001 Jens Axboe <axboe@suse.de>
@@ -44,8 +44,11 @@
  * was unsigned short, but we might as well be ready for > 64kB I/O pages
  */
 struct bio_vec {
+	//指向段的页框中页描述符的指针
 	struct page	*bv_page;
+	//段的字节长度
 	unsigned int	bv_len;
+	//页框中段数据的偏移量
 	unsigned int	bv_offset;
 };
 
@@ -60,24 +63,34 @@ typedef void (bio_destructor_t) (struct bio *);
  * stacking drivers)
  */
 struct bio {
+	//本次传输的起始扇区号(512字节的扇区)
 	sector_t		bi_sector;	/* device address in 512 byte
 						   sectors */
+    //链接到请求队列的下一个bio
 	struct bio		*bi_next;	/* request queue link */
 	struct block_device	*bi_bdev;
+	/* 
+	 * bio的状态标志,比如BIO_UPTODATE,如果是写请求,最低有效位将被置位.
+	 * 判断读写一般使用bio_data_dir(bio),而不是直接查看该标志
+	 */
 	unsigned long		bi_flags;	/* status, command, etc */
-	//io������־,��BIO_RW,��16λ�Ƕ�д��־,��16λ�����ȼ���־
+	//io操作标志,如BIO_RW,低16位是读写标志,高16位是优先级标志
 	unsigned long		bi_rw;		/* bottom bits READ/WRITE,
 						 * top bits priority
 						 */
 
+	//bio_vec数组中段的数目
 	unsigned short		bi_vcnt;	/* how many bio_vec's */
+	//bio_vec数组中段的当前索引
 	unsigned short		bi_idx;		/* current index into bvl_vec */
 
 	/* Number of segments in this BIO after
 	 * physical address coalescing is performed.
 	 */
+	//合并之后bio中物理段的数目
 	unsigned int		bi_phys_segments;
 
+	//需要传送的字节数,通常使用bio_sectors(bio)宏获取每个扇区的大小
 	unsigned int		bi_size;	/* residual I/O count */
 
 	/*
@@ -87,20 +100,26 @@ struct bio {
 	unsigned int		bi_seg_front_size;
 	unsigned int		bi_seg_back_size;
 
+	//bio的bio_vec数组中允许的最大段数
 	unsigned int		bi_max_vecs;	/* max bvl_vecs we can hold */
 
 	unsigned int		bi_comp_cpu;	/* completion CPU */
 
+	//指向bio的bio_vec数组中的段的指针
 	struct bio_vec		*bi_io_vec;	/* the actual vec list */
 
+	//bio的io操作结束时调用的方法，比如读取磁盘数据，在dma将数据拷贝到指定page后就会调用这个回调函数
 	bio_end_io_t		*bi_end_io;
+	//bio的引用计数器
 	atomic_t		bi_cnt;		/* pin count */
 
+	//通用块层和块设备驱动程序的io完成方法使用的指针
 	void			*bi_private;
 #if defined(CONFIG_BLK_DEV_INTEGRITY)
 	struct bio_integrity_payload *bi_integrity;  /* data integrity */
 #endif
 
+	//释放bio时调用的析构方法
 	bio_destructor_t	*bi_destructor;	/* destructor */
 };
 
