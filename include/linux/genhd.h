@@ -146,6 +146,7 @@ struct gendisk {
 	 * non-critical accesses use RCU.  Always access through
 	 * helpers.
 	 */
+	//由partno索引的分区指针的数组
 	struct disk_part_tbl *part_tbl;
 	struct hd_struct part0;
 

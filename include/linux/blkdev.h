@@ -143,6 +143,7 @@ enum rq_flag_bits {
  * if you modify this structure, be sure to check block/blk-core.c:rq_init()
  * as well!
  */
+//hard_开头的成员仅用于块层内部,驱动程序不应该改变它们
 struct request {
 	//链表成员，链表头是struct request_queue的queue_head
 	struct list_head queuelist;
@@ -160,20 +161,20 @@ struct request {
 	 * hard_* are block layer internals, no driver should touch them!
 	 */
 
-	//设备上开始扇区的索引号(512 byte为单位的扇区)
+	//要提交的下一个sector(512 byte为单位)
 	sector_t sector;		/* next sector to submit */
-	//要传送的下一个扇区号
+	//要完成的下一个sector
 	sector_t hard_sector;		/* next sector to complete */
-	//扇区数(512 byte为单位的扇区)
+	//剩余需要提交的sector数(512 byte为单位的扇区)
 	unsigned long nr_sectors;	/* no. of sectors left to submit */
-	//整个请求中要传送的扇区数(由通用块层更新)
+	//剩余需要完成的sector数(由通用块层更新)
 	unsigned long hard_nr_sectors;	/* no. of sectors left to complete */
 	/* no. of sectors left to submit in the current segment */
-	//当前bio的当前段中要传送的扇区数
+	//当前segment中剩余的需提交的sector数
 	unsigned int current_nr_sectors;
 
 	/* no. of sectors left to complete in the current segment */
-	//当前bio的当前段中要传送的扇区数(由通用块层更新)
+	//当前segment中剩余的需完成的sector数(由通用块层更新)
 	unsigned int hard_cur_sectors;
 
 	//bio链表
@@ -196,7 +197,7 @@ struct request {
 	 * two pointers are available for the IO schedulers, if they need
 	 * more they have to dynamically allocate it.
 	 */
-	//指向io调度程序私有数据的指针
+	//指向io调度程序私有数据的指针,如需更多,请动态分配
 	void *elevator_private;
 	void *elevator_private2;
 

@@ -97,6 +97,7 @@ struct bio {
 	 * To keep track of the max segment size, we account for the
 	 * sizes of the first and last mergeable segments in this bio.
 	 */
+	//为了明了最大的segment尺寸,我们考虑这个bio中第一个和最后一个可合并的segment尺寸
 	unsigned int		bi_seg_front_size;
 	unsigned int		bi_seg_back_size;
 
@@ -215,6 +216,7 @@ struct bio {
 #define bio_discard(bio)	((bio)->bi_rw & (1 << BIO_RW_DISCARD))
 #define bio_empty_barrier(bio)	(bio_barrier(bio) && !bio_has_data(bio) && !bio_discard(bio))
 
+//bio中当前bio_vec需要传输的sector数量
 static inline unsigned int bio_cur_sectors(struct bio *bio)
 {
 	if (bio->bi_vcnt)
@@ -286,6 +288,7 @@ static inline void *bio_data(struct bio *bio)
 	     i < (bio)->bi_vcnt;					\
 	     bvl++, i++)
 
+//遍历bio中每个段
 #define bio_for_each_segment(bvl, bio, i)				\
 	__bio_for_each_segment(bvl, bio, i, (bio)->bi_idx)
 
@@ -444,6 +447,10 @@ extern struct bio_set *fs_bio_set;
  * bvec_kmap_irq and bvec_kunmap_irq!!
  *
  * This function MUST be inlined - it plays with the CPU interrupt flags.
+ */
+/* 
+ * 返回一个虚拟地址,这个地址可用于存取被给定的bio_vec入口指向的数据缓冲区.这个函数
+ * 会屏蔽中断并返回一个原子kmap,在bvec_kunmap_irq被调用前,驱动不能睡眠
  */
 static inline char *bvec_kmap_irq(struct bio_vec *bvec, unsigned long *flags)
 {

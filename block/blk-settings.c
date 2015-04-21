@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Functions related to setting various queue properties from drivers
  */
 #include <linux/kernel.h>
@@ -165,6 +165,10 @@ EXPORT_SYMBOL(blk_queue_make_request);
  *    blk_queue_bounce_limit to have lower memory pages allocated as bounce
  *    buffers for doing I/O to pages residing above @dma_addr.
  **/
+/* 
+ * 设置快设备执行dma时可以使用的最高物理地址dma_addr,如果一个请求包含超过这个限制,
+ * 系统将会给这个操作分配一个回弹缓冲区.这种方式的代价昂贵，因此应该尽量避免.
+ */
 void blk_queue_bounce_limit(struct request_queue *q, u64 dma_addr)
 {
 	unsigned long b_pfn = dma_addr >> PAGE_SHIFT;
@@ -200,6 +204,7 @@ EXPORT_SYMBOL(blk_queue_bounce_limit);
  *    Enables a low level driver to set an upper limit on the size of
  *    received requests.
  **/
+//设置任一请求可包含的最大扇区数
 void blk_queue_max_sectors(struct request_queue *q, unsigned int max_sectors)
 {
 	if ((max_sectors << 9) < PAGE_CACHE_SIZE) {
@@ -227,6 +232,7 @@ EXPORT_SYMBOL(blk_queue_max_sectors);
  *    physical data segments in a request.  This would be the largest sized
  *    scatter list the driver could handle.
  **/
+//设置一个请求中可包含的最大物理段(系统内存中不相邻的区)
 void blk_queue_max_phys_segments(struct request_queue *q,
 				 unsigned short max_segments)
 {
@@ -251,6 +257,7 @@ EXPORT_SYMBOL(blk_queue_max_phys_segments);
  *    address/length pairs the host adapter can actually give at once
  *    to the device.
  **/
+//设置一个请求中可包含的最大物理段(系统内存中不相邻的区)
 void blk_queue_max_hw_segments(struct request_queue *q,
 			       unsigned short max_segments)
 {
@@ -273,6 +280,7 @@ EXPORT_SYMBOL(blk_queue_max_hw_segments);
  *    Enables a low level driver to set an upper limit on the size of a
  *    coalesced segment
  **/
+//设置请求段的最大字节数
 void blk_queue_max_segment_size(struct request_queue *q, unsigned int max_size)
 {
 	if (max_size < PAGE_CACHE_SIZE) {
@@ -296,6 +304,10 @@ EXPORT_SYMBOL(blk_queue_max_segment_size);
  *   even internal read-modify-write operations). Usually the default
  *   of 512 covers most hardware.
  **/
+/*
+ * 设置硬件的sector size,所有由内核产生的请求都是这个大小的倍数并且正确对齐.
+ * 但是快设备和驱动之间的通信还是以512字节为单位进行的.
+ */
 void blk_queue_hardsect_size(struct request_queue *q, unsigned short size)
 {
 	q->hardsect_size = size;
@@ -412,6 +424,7 @@ EXPORT_SYMBOL_GPL(blk_queue_dma_drain);
  * @q:  the request queue for the device
  * @mask:  the memory boundary mask
  **/
+//通知内核当前驱动的能够处理的segment边界
 void blk_queue_segment_boundary(struct request_queue *q, unsigned long mask)
 {
 	if (mask < PAGE_CACHE_SIZE - 1) {
@@ -434,6 +447,7 @@ EXPORT_SYMBOL(blk_queue_segment_boundary);
  *    this is used when buiding direct io requests for the queue.
  *
  **/
+//设备dma传送时的内存对齐限制
 void blk_queue_dma_alignment(struct request_queue *q, int mask)
 {
 	q->dma_alignment = mask;
