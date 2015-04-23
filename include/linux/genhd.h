@@ -88,18 +88,24 @@ struct disk_stats {
 };
 	
 struct hd_struct {
+	//该分区的起始扇区
 	sector_t start_sect;
 	//通用磁盘的大小,单位是扇区
 	sector_t nr_sects;
+	//磁盘上的一个分区也被视为一个设备
 	struct device __dev;
 	struct kobject *holder_dir;
+	//policy为1表示分区只读,partno表示扇区编号
 	int policy, partno;
 #ifdef CONFIG_FAIL_MAKE_REQUEST
 	int make_it_fail;
 #endif
+	//统计磁盘队列使用情况的时间戳
 	unsigned long stamp;
+	//正在进行的io操作数
 	int in_flight;
 #ifdef	CONFIG_SMP
+	//SMP环境中,统计每个cpu使用磁盘的情况
 	struct disk_stats *dkstats;
 #else
 	struct disk_stats dkstats;
@@ -113,6 +119,11 @@ struct hd_struct {
 #define GENHD_FL_CD				8
 #define GENHD_FL_UP				16
 #define GENHD_FL_SUPPRESS_PARTITION_INFO	32
+/* 
+ * allows the disk to use extended partition numbers; 
+ * once the number of minor numbers given to alloc_disk() is exhausted, 
+ * any additional partitions will be numbered in the extended space
+ */
 #define GENHD_FL_EXT_DEVT			64 /* allow extended devt */
 
 #define BLK_SCSI_MAX_CMDS	(256)
@@ -126,6 +137,7 @@ struct blk_scsi_cmd_filter {
 
 struct disk_part_tbl {
 	struct rcu_head rcu_head;
+	//part[]中成员的个数
 	int len;
 	struct hd_struct *part[];
 };
@@ -134,8 +146,14 @@ struct gendisk {
 	/* major, first_minor and minors are input parameters only,
 	 * don't use directly.  Use disk_devt() and disk_max_parts().
 	 */
+	//磁盘主设备号
 	int major;			/* major number of driver */
+	//与磁盘关联的第一个次设备号, 如sda的次设备号
 	int first_minor;
+	/* 
+	 * 主次分区的总个数,如果为1,表示只有主分区,无法分配次分区,例/dev/sda 8,0, 
+     * 其主设备号是8,次设备号是0,first_minor=0,minors=16
+     */
 	int minors;                     /* maximum number of minors, =1 for
                                          * disks that can't be partitioned. */
 
@@ -146,18 +164,26 @@ struct gendisk {
 	 * non-critical accesses use RCU.  Always access through
 	 * helpers.
 	 */
-	//由partno索引的分区指针的数组
+	//磁盘分区表信息,由partno索引的分区指针的数组
 	struct disk_part_tbl *part_tbl;
+	//当前块设备的第一个分区
 	struct hd_struct part0;
 
 	struct block_device_operations *fops;
+	//指向磁盘请求队列的指针
 	struct request_queue *queue;
 	void *private_data;
 
+	/* 
+	 * 磁盘类型的标志,GENHD_FL_UP表示磁盘初始化并且可以使用,GENHD_FL_REMOVABLE: 
+	 * 如果是可移动磁盘就要设置该标志.
+	 */
 	int flags;
+	//标识该磁盘所属的硬件设备,指针指向驱动模型的一个对象
 	struct device *driverfs_dev;  // FIXME: remove
 	struct kobject *slave_dir;
 
+	//该指针指向这个数据结构记录磁盘中断的定时,由内核内置的随机数发生器使用
 	struct timer_rand_state *random;
 
 	atomic_t sync_io;		/* RAID */
@@ -182,7 +208,9 @@ static inline struct gendisk *part_to_disk(struct hd_struct *part)
 static inline int disk_max_parts(struct gendisk *disk)
 {
 	if (disk->flags & GENHD_FL_EXT_DEVT)
+		//使用扩展的的dev table
 		return DISK_MAX_PARTS;
+	//未使用扩展的dev table
 	return disk->minors;
 }
 
@@ -268,6 +296,7 @@ static inline void part_stat_set_all(struct hd_struct *part, int value)
 				sizeof(struct disk_stats));
 }
 
+//对于SMP环境,dkstats是一个per-CPU变量
 static inline int init_part_stats(struct hd_struct *part)
 {
 	part->dkstats = alloc_percpu(struct disk_stats);
@@ -295,6 +324,7 @@ static inline void part_stat_set_all(struct hd_struct *part, int value)
 	memset(&part->dkstats, value, sizeof(struct disk_stats));
 }
 
+//在UP环境中,返回1
 static inline int init_part_stats(struct hd_struct *part)
 {
 	return 1;

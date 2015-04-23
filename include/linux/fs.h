@@ -575,26 +575,49 @@ struct address_space {
 	 * of struct page's "mapping" pointer be used for PAGE_MAPPING_ANON.
 	 */
 
+//struct block_device可以表示一个完整的逻辑块设备,也可以表示逻辑块设备中的一个分区
 struct block_device {
 	dev_t			bd_dev;  /* not a kdev_t - it's a search key */
     //bdevfs中的inode
 	struct inode *		bd_inode;	/* will die */
+	//调用do_open打开该块设备的次数,调用do_open时,bd_openers++,调用完后bd_openers--
 	int			bd_openers;
 	struct mutex		bd_mutex;	/* open/close mutex */
 	struct semaphore	bd_mount_sem;
+	//链表头,链表成员是inode->i_devices, 该链表包含了表示该设备的设备特殊文件的所有inode
 	struct list_head	bd_inodes;
+	/*
+	 * 存放代表块设备持有者的线性地址。持有者并不是进行I/O数据传送的块设备驱动程序；
+	 * 准确地说，它是一个内核组件，使用设备并拥有独一无二的特权
+	 * (例如，它可以自由使用块设备描述符的bd_private字段)
+	 * 典型地，块设备的持有者是安装在该设备上的文件系统.
+	 * 当块设备文件被打开进行互斥访问时，另一个普遍的问题出现了:
+	 * 持有者就是对应的文件对象.
+	 */
 	void *			bd_holder;
+	/*
+	 * 同一个内核组件可以多次调用bdclaim()函数，每调用一次都增加bd_holders的值。
+	 * 为了释放块设备，内核组件必须调用bd_release()函数bd_holders次
+	 */
 	int			bd_holders;
 #ifdef CONFIG_SYSFS
 	struct list_head	bd_holder_list;
 #endif
+	//当block_device表示块设备中的某一分区时,bd_contains指向该分区所在的块设备
 	struct block_device *	bd_contains;
 	unsigned		bd_block_size;
+	//当block_device表示一个完整的块设备时,bd_part指向该块设备的分区结构信息
 	struct hd_struct *	bd_part;
 	/* number of times partitions within this device have been opened. */
+	//内核中引用该设备内分区的次数
 	unsigned		bd_part_count;
+	/* 
+	 * 设置为1时,表示该分区在内核中的信息无效,因为磁盘上的分区已经改变,
+	 * 下一次打开该设备时,将要重新扫描分区表.
+	 */
 	int			bd_invalidated;
 	struct gendisk *	bd_disk;
+	//链表元素,链表头是全局变量all_bdevs,用于记录所有的块设备
 	struct list_head	bd_list;
 	struct backing_dev_info *bd_inode_backing_dev_info;
 	/*

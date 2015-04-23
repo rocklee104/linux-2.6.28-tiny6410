@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Written by Mark Hemment, 1996 (markhe@nextd.demon.co.uk).
  *
  * (C) SGI 2006, Christoph Lameter
@@ -225,6 +225,7 @@ static inline void *kcalloc(size_t n, size_t size, gfp_t flags)
  * if available. Equivalent to kmalloc() in the non-NUMA single-node
  * case.
  */
+//tiny6410使用下面的kmalloc_node
 static inline void *kmalloc_node(size_t size, gfp_t flags, int node)
 {
 	return kmalloc(size, flags);

@@ -222,6 +222,7 @@ static struct blk_major_name {
 	struct blk_major_name *next;
 	int major;
 	char name[16];
+	//指针数组中含有255个struct blk_major_name指针
 } *major_names[BLKDEV_MAJOR_HASH_SIZE];
 
 /* index in the above - for now: assume no multimajor ranges */
@@ -253,6 +254,7 @@ int register_blkdev(unsigned int major, const char *name)
 
 	/* temporary */
 	if (major == 0) {
+		//在指针数组尾部开始寻找没有使用的过的major_name
 		for (index = ARRAY_SIZE(major_names)-1; index > 0; index--) {
 			if (major_names[index] == NULL)
 				break;
@@ -277,9 +279,11 @@ int register_blkdev(unsigned int major, const char *name)
 	p->major = major;
 	strlcpy(p->name, name, sizeof(p->name));
 	p->next = NULL;
+	//实际上的major可能大于255
 	index = major_to_index(major);
 
 	for (n = &major_names[index]; *n; n = &(*n)->next) {
+		//当调用需要自动分配major时,不会进入这个for循环
 		if ((*n)->major == major)
 			break;
 	}
@@ -313,6 +317,7 @@ void unregister_blkdev(unsigned int major, const char *name)
 	if (!*n || strcmp((*n)->name, name)) {
 		WARN_ON(1);
 	} else {
+		//将n从单向链表中取出来
 		p = *n;
 		*n = p->next;
 	}
@@ -757,6 +762,7 @@ static struct kobject *base_probe(dev_t devt, int *partno, void *data)
 	return NULL;
 }
 
+//block子系统的初始化
 static int __init genhd_device_init(void)
 {
 	int error;
@@ -887,8 +893,10 @@ static void disk_replace_part_tbl(struct gendisk *disk,
 {
 	struct disk_part_tbl *old_ptbl = disk->part_tbl;
 
+	//使用新的分区
 	rcu_assign_pointer(disk->part_tbl, new_ptbl);
 	if (old_ptbl)
+		//释放旧的分区
 		call_rcu(&old_ptbl->rcu_head, disk_free_ptbl_rcu_cb);
 }
 
@@ -920,9 +928,12 @@ int disk_expand_part_tbl(struct gendisk *disk, int partno)
 		return -EINVAL;
 
 	if (target <= len)
+		//如果partno小于磁盘上的分区个数
 		return 0;
 
+	//如果partno大于磁盘上的分区个数,就需要重新建立分区
 	size = sizeof(*new_ptbl) + target * sizeof(new_ptbl->part[0]);
+	//重新分配分区所需的空间
 	new_ptbl = kzalloc_node(size, GFP_KERNEL, disk->node_id);
 	if (!new_ptbl)
 		return -ENOMEM;
@@ -931,6 +942,7 @@ int disk_expand_part_tbl(struct gendisk *disk, int partno)
 	new_ptbl->len = target;
 
 	for (i = 0; i < len; i++)
+		//在旧分区个数内,新分区指向旧分区
 		rcu_assign_pointer(new_ptbl->part[i], old_ptbl->part[i]);
 
 	disk_replace_part_tbl(disk, new_ptbl);
@@ -1096,9 +1108,11 @@ struct gendisk *alloc_disk_node(int minors, int node_id)
 {
 	struct gendisk *disk;
 
+	//分配一个gendisk指针
 	disk = kmalloc_node(sizeof(struct gendisk),
 				GFP_KERNEL | __GFP_ZERO, node_id);
 	if (disk) {
+		//如果是UP环境,init_part_stats仅仅返回1
 		if (!init_part_stats(&disk->part0)) {
 			kfree(disk);
 			return NULL;
@@ -1109,13 +1123,16 @@ struct gendisk *alloc_disk_node(int minors, int node_id)
 			kfree(disk);
 			return NULL;
 		}
+		//分区表中第一个分区指向part0
 		disk->part_tbl->part[0] = &disk->part0;
 
 		disk->minors = minors;
 		rand_initialize_disk(disk);
+		//将整个磁盘作为一个设备
 		disk_to_dev(disk)->class = &block_class;
 		disk_to_dev(disk)->type = &disk_type;
 		device_initialize(disk_to_dev(disk));
+		//初始化异步通知工作队列
 		INIT_WORK(&disk->async_notify,
 			media_change_notify_thread);
 	}
