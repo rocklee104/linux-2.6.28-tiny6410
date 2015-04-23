@@ -33,6 +33,7 @@ struct kobject *block_depr;
  * results from going away underneath its user.
  */
 static DEFINE_MUTEX(ext_devt_mutex);
+//等同与定义一个全局 struct idr ext_devt_idr = IDR_INIT(ext_devt_idr)
 static DEFINE_IDR(ext_devt_idr);
 
 static struct device_type disk_type;
@@ -496,11 +497,14 @@ void add_disk(struct gendisk *disk)
 	 * be accompanied with EXT_DEVT flag.  Make sure all
 	 * parameters make sense.
 	 */
+	//如果minors大于0并且major和first_minor均为0
 	WARN_ON(disk->minors && !(disk->major || disk->first_minor));
+	//如果minors等于0并且flag没有GENHD_FL_EXT_DEVT标志
 	WARN_ON(!disk->minors && !(disk->flags & GENHD_FL_EXT_DEVT));
 
 	disk->flags |= GENHD_FL_UP;
 
+	//分配一个设备号
 	retval = blk_alloc_devt(&disk->part0, &devt);
 	if (retval) {
 		WARN_ON(1);

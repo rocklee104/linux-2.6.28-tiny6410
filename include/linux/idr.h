@@ -1,4 +1,4 @@
-/*
+﻿/*
  * include/linux/idr.h
  * 
  * 2002-10-18  written by Jim Houston jim.houston@ccur.com
@@ -49,7 +49,12 @@
 #define IDR_FREE_MAX MAX_LEVEL + MAX_LEVEL
 
 struct idr_layer {
+	/* 
+	 * 对于叶子来说,如果ary[i]指向了有意义的数据,bitmap中的第i位置位.
+	 * 对于非叶子节点,只有当ary[i]指向的节点中的bitmap为0xFFFFFFFF才置位第i位
+	 */
 	unsigned long		 bitmap; /* A zero bit means "space here" */
+	//IDR_BITS在32位操作系统是5,64位操作系统是6
 	struct idr_layer	*ary[1<<IDR_BITS];
 	int			 count;	 /* When zero, we can release it */
 	int			 layer;	 /* distance from leaf */
@@ -57,9 +62,13 @@ struct idr_layer {
 };
 
 struct idr {
+	//idr的top层，可以方便的理解为根节点。
 	struct idr_layer *top;
+	//id_free为首的形成一个链表，这个是预备队,并没有参与到top为根的节点中去
 	struct idr_layer *id_free;
+	//当前的层数
 	int		  layers; /* only valid without concurrent changes */
+	// 预备队的个数
 	int		  id_free_cnt;
 	spinlock_t	  lock;
 };

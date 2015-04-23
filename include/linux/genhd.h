@@ -95,7 +95,7 @@ struct hd_struct {
 	//磁盘上的一个分区也被视为一个设备
 	struct device __dev;
 	struct kobject *holder_dir;
-	//policy为1表示分区只读,partno表示扇区编号
+	//policy为1表示分区只读,partno表示分区编号
 	int policy, partno;
 #ifdef CONFIG_FAIL_MAKE_REQUEST
 	int make_it_fail;
@@ -120,8 +120,8 @@ struct hd_struct {
 #define GENHD_FL_UP				16
 #define GENHD_FL_SUPPRESS_PARTITION_INFO	32
 /* 
- * allows the disk to use extended partition numbers; 
- * once the number of minor numbers given to alloc_disk() is exhausted, 
+ * allows the disk to use extended partition numbers;
+ * once the number of minor numbers given to alloc_disk() is exhausted,
  * any additional partitions will be numbered in the extended space
  */
 #define GENHD_FL_EXT_DEVT			64 /* allow extended devt */
@@ -194,12 +194,15 @@ struct gendisk {
 	int node_id;
 };
 
+//通过分区返回通用磁盘指针
 static inline struct gendisk *part_to_disk(struct hd_struct *part)
 {
 	if (likely(part)) {
 		if (part->partno)
+			//如果当前分区编号大于0,返回其父device的gendisk
 			return dev_to_disk(part_to_dev(part)->parent);
 		else
+			//如果当前分区编号等于0,返回本身的gendisk
 			return dev_to_disk(part_to_dev(part));
 	}
 	return NULL;
