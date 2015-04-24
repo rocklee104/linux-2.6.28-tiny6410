@@ -29,6 +29,7 @@
 unsigned long find_next_bit(const unsigned long *addr, unsigned long size,
 			    unsigned long offset)
 {
+	//p记录离offset最近的以long对齐的地址
 	const unsigned long *p = addr + BITOP_WORD(offset);
 	//result记录offset以unsigned long对齐的部分
 	unsigned long result = offset & ~(BITS_PER_LONG-1);
@@ -40,7 +41,9 @@ unsigned long find_next_bit(const unsigned long *addr, unsigned long size,
 	size -= result;
 	offset %= BITS_PER_LONG;
 	if (offset) {
+		//offset未以long对齐
 		tmp = *(p++);
+		//offset以下的bit全部清0
 		tmp &= (~0UL << offset);
 		if (size < BITS_PER_LONG)
 			goto found_first;

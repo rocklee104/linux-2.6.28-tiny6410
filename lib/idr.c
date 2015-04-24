@@ -1,4 +1,4 @@
-/*
+﻿/*
  * 2002-10-18  written by Jim Houston jim.houston@ccur.com
  *	Copyright (C) 2002 by Concurrent Computer Corporation
  *	Distributed under the GNU GPL license version 2.
@@ -37,6 +37,7 @@
 
 static struct kmem_cache *idr_layer_cache;
 
+//从预备链表中取出一个idr_layer
 static struct idr_layer *get_from_free_list(struct idr *idp)
 {
 	struct idr_layer *p;
@@ -44,6 +45,7 @@ static struct idr_layer *get_from_free_list(struct idr *idp)
 
 	spin_lock_irqsave(&idp->lock, flags);
 	if ((p = idp->id_free)) {
+		//如果idr的预备链表不是空的,就将链表的头取出来
 		idp->id_free = p->ary[0];
 		idp->id_free_cnt--;
 		p->ary[0] = NULL;
@@ -68,6 +70,7 @@ static inline void free_layer(struct idr_layer *p)
 /* only called when idp->lock is held */
 static void __move_to_free_list(struct idr *idp, struct idr_layer *p)
 {
+	//将p头插入idp->id_free链表中
 	p->ary[0] = idp->id_free;
 	idp->id_free = p;
 	idp->id_free_cnt++;
@@ -117,6 +120,13 @@ static void idr_mark_full(struct idr_layer **pa, int id)
  * If the system is REALLY out of memory this function returns 0,
  * otherwise 1.
  */
+/* 
+ * 要获得一个ID号要分两个步骤,首先分配内存,其次是获得ID号.
+ * 本函数会导致睡眠,不能用锁.
+ * 
+ * 分配成功返回1,失败返回0.
+ */
+//一次性分配足够的预备idr_layer
 int idr_pre_get(struct idr *idp, gfp_t gfp_mask)
 {
 	while (idp->id_free_cnt < IDR_FREE_MAX) {
@@ -150,6 +160,7 @@ static int sub_alloc(struct idr *idp, int *starting_id, struct idr_layer **pa)
 		bm = ~p->bitmap;
 		m = find_next_bit(&bm, IDR_SIZE, n);
 		if (m == IDR_SIZE) {
+			//位图已满
 			/* no space available go back to previous layer. */
 			l++;
 			oid = id;
@@ -209,8 +220,10 @@ build_up:
 	p = idp->top;
 	layers = idp->layers;
 	if (unlikely(!p)) {
+		//如果idr的top是NULL,那么需要从预备链表中选取一个
 		if (!(p = get_from_free_list(idp)))
 			return -1;
+		//以为idr中只有一层,p就是叶子
 		p->layer = 0;
 		layers = 1;
 	}
@@ -229,6 +242,7 @@ build_up:
 			continue;
 		}
 		if (!(new = get_from_free_list(idp))) {
+			//如果从预分配链表中取出idr_layer失败
 			/*
 			 * The allocation failed.  If we built part of
 			 * the structure tear it down.
@@ -238,18 +252,22 @@ build_up:
 				p = p->ary[0];
 				new->ary[0] = NULL;
 				new->bitmap = new->count = 0;
+				//将之前分配成功的idr_layer放回free list
 				__move_to_free_list(idp, new);
 			}
 			spin_unlock_irqrestore(&idp->lock, flags);
 			return -1;
 		}
+		//新分配的这个节点将作为root
 		new->ary[0] = p;
 		new->count = 1;
 		new->layer = layers-1;
 		if (p->bitmap == IDR_FULL)
+			//p的bitmap满后,将new中对应于p的bitmap中的位置位
 			__set_bit(0, &new->bitmap);
 		p = new;
 	}
+	//idp的top使用新的idr_layer
 	rcu_assign_pointer(idp->top, p);
 	idp->layers = layers;
 	v = sub_alloc(idp, &id, pa);

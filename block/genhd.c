@@ -391,6 +391,7 @@ int blk_alloc_devt(struct hd_struct *part, dev_t *devt)
 	//如果partno不在disk的分区个数范围之内,就需要ext devt
 	/* allocate ext devt */
 	do {
+		//预分配idr
 		if (!idr_pre_get(&ext_devt_idr, GFP_KERNEL))
 			return -ENOMEM;
 		rc = idr_get_new(&ext_devt_idr, part, &idx);

@@ -43,6 +43,10 @@
 #define MAX_ID_MASK (MAX_ID_BIT - 1)
 
 /* Leave the possibility of an incomplete final layer */
+/* 
+ * idr和radix tree相似,使用一个key来找到对应的数据.
+ * 对于idr这个key是一个int,idr的层数受到了int长度的限制
+ */
 #define MAX_LEVEL (MAX_ID_SHIFT + IDR_BITS - 1) / IDR_BITS
 
 /* Number of id_layer structs to leave in free list */
@@ -56,7 +60,9 @@ struct idr_layer {
 	unsigned long		 bitmap; /* A zero bit means "space here" */
 	//IDR_BITS在32位操作系统是5,64位操作系统是6
 	struct idr_layer	*ary[1<<IDR_BITS];
+	//bitmap中有多少位置位
 	int			 count;	 /* When zero, we can release it */
+	//与叶子节点的距离,从0开始
 	int			 layer;	 /* distance from leaf */
 	struct rcu_head		 rcu_head;
 };
@@ -81,6 +87,7 @@ struct idr {
 	.id_free_cnt	= 0,					\
 	.lock		= __SPIN_LOCK_UNLOCKED(name.lock),	\
 }
+//定义并且初始化一个struct idr
 #define DEFINE_IDR(name)	struct idr name = IDR_INIT(name)
 
 /* Actions to be taken after a call to _idr_sub_alloc */
