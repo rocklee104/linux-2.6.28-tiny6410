@@ -89,6 +89,7 @@ void kobj_unmap(struct kobj_map *domain, dev_t dev, unsigned long range)
 		for (s = &domain->probes[index % 255]; *s; s = &(*s)->next) {
 			struct probe *p = *s;
 			if (p->dev == dev && p->range == range) {
+				//找到匹配项,在链表中将这一项取出来
 				*s = p->next;
 				if (!found)
 					found = p;
@@ -97,6 +98,7 @@ void kobj_unmap(struct kobj_map *domain, dev_t dev, unsigned long range)
 		}
 	}
 	mutex_unlock(domain->lock);
+	//即使found == NULL, kfree(NULL)也不会有任何问题
 	kfree(found);
 }
 

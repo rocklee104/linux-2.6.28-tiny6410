@@ -383,10 +383,12 @@ int blk_alloc_devt(struct hd_struct *part, dev_t *devt)
 
 	/* in consecutive minor range? */
 	if (part->partno < disk->minors) {
+		//如果partno在disk的分区个数范围之内
 		*devt = MKDEV(disk->major, disk->first_minor + part->partno);
 		return 0;
 	}
 
+	//如果partno不在disk的分区个数范围之内,就需要ext devt
 	/* allocate ext devt */
 	do {
 		if (!idr_pre_get(&ext_devt_idr, GFP_KERNEL))
