@@ -383,7 +383,7 @@ int blk_alloc_devt(struct hd_struct *part, dev_t *devt)
 
 	/* in consecutive minor range? */
 	if (part->partno < disk->minors) {
-		//如果partno在disk的分区个数范围之内
+		//如果partno在disk的分区个数范围之内,比如调用add_disk时.
 		*devt = MKDEV(disk->major, disk->first_minor + part->partno);
 		return 0;
 	}
@@ -507,7 +507,10 @@ void add_disk(struct gendisk *disk)
 
 	disk->flags |= GENHD_FL_UP;
 
-	//分配一个设备号
+	/* 
+	 * 注册的时候只会使用part0,分配一个主设备号.
+	 * 但是open设备调用rescan_partions时就会遍历所有分区
+	 */
 	retval = blk_alloc_devt(&disk->part0, &devt);
 	if (retval) {
 		WARN_ON(1);

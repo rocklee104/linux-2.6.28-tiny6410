@@ -145,6 +145,7 @@ static int sub_alloc(struct idr *idp, int *starting_id, struct idr_layer **pa)
 {
 	int n, m, sh;
 	struct idr_layer *p, *new;
+	//id的值根据IDR_BITS分成layers等分,每一份代表那一层的bitmap值
 	int l, id, oid;
 	unsigned long bm;
 
@@ -169,12 +170,18 @@ static int sub_alloc(struct idr *idp, int *starting_id, struct idr_layer **pa)
 			/* no space available go back to previous layer. */
 			l++;
 			oid = id;
-			//重新计算id,相当于id自加1
+			/* 
+			 * 重新计算id,当前layer中bitmap已满,说明这个layer的所有子节点的bitmap也全部满了.
+			 * 将id对应这一层及这层在叶子之间的所有层的bitmap全部置位,并且在此基础上加1.
+			 * 下次循环的时候将从这个新的id开始计算.
+			 */
 			id = (id | ((1 << (IDR_BITS * l)) - 1)) + 1;
 
 			/* if already at the top layer, we need to grow */
 			if (!(p = pa[l])) {
+				//pa[idp->layers]总是为NULL
 				*starting_id = id;
+				//最顶层的bitmap都满了,就需要增加树的高度
 				return IDR_NEED_TO_GROW;
 			}
 
@@ -222,6 +229,13 @@ static int sub_alloc(struct idr *idp, int *starting_id, struct idr_layer **pa)
 		p = p->ary[m];
 	}
 
+	/*
+	 * 对于一个layers == 3的树,
+	 * p[3]保存NULL,
+	 * p[2]保存layer1对应(id >> (IDR_BITS*2)) & IDR_MASK的节点.
+	 * p[1]保存layer2对应(id >> (IDR_BITS)) & IDR_MASK的节点.
+	 * p[0]保存layer3对应id  & IDRe_MASK的节点.
+	 */
 	pa[l] = p;
 	return id;
 }
@@ -230,6 +244,7 @@ static int idr_get_empty_slot(struct idr *idp, int starting_id,
 			      struct idr_layer **pa)
 {
 	struct idr_layer *p, *new;
+	//layer记录tree的idr_layer层数
 	int layers, v, id;
 	unsigned long flags;
 
@@ -243,7 +258,7 @@ build_up:
 		//如果idr的top是NULL,那么需要从预备链表中选取一个
 		if (!(p = get_from_free_list(idp)))
 			return -1;
-		//以为idr中只有一层,p就是叶子
+		//p是叶子节点,layer为0
 		p->layer = 0;
 		layers = 1;
 	}

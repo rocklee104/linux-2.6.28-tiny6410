@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  fs/partitions/check.c
  *
  *  Code extracted from drivers/block/genhd.c
@@ -546,6 +546,7 @@ int rescan_partitions(struct gendisk *disk, struct block_device *bdev)
 
 	/* add partitions */
 	for (p = 1; p < state->limit; p++) {
+		//重新扫描分区
 		sector_t size = state->parts[p].size;
 		sector_t from = state->parts[p].from;
 		if (!size)

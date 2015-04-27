@@ -74,7 +74,7 @@ struct idr {
 	struct idr_layer *top;
 	//id_free为首的形成一个链表，这个是预备队,并没有参与到top为根的节点中去
 	struct idr_layer *id_free;
-	//当前的层数
+	//当前tree的高度,表示当前tree有多少层idr_layer(包括top,但不包括leaves)
 	int		  layers; /* only valid without concurrent changes */
 	// 预备队的个数
 	int		  id_free_cnt;
