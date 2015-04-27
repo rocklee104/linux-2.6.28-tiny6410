@@ -689,6 +689,7 @@ asmlinkage void __init start_kernel(void)
 	cpu_hotplug_init();
 	kmem_cache_init();
 	debug_objects_mem_init();
+	//idr初始化
 	idr_init_cache();
 	setup_per_cpu_pageset();
 	numa_policy_init();

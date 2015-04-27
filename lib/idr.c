@@ -140,6 +140,7 @@ int idr_pre_get(struct idr *idp, gfp_t gfp_mask)
 }
 EXPORT_SYMBOL(idr_pre_get);
 
+//pa这个指针数组中下标小的成员保存key值低位表示的节点
 static int sub_alloc(struct idr *idp, int *starting_id, struct idr_layer **pa)
 {
 	int n, m, sh;
@@ -149,8 +150,11 @@ static int sub_alloc(struct idr *idp, int *starting_id, struct idr_layer **pa)
 
 	id = *starting_id;
  restart:
+ 	//找到idr的根top指向的idr_layer
 	p = idp->top;
+	//idr中的layers层数量
 	l = idp->layers;
+	//为了在while中计算,l使用后需要自减1
 	pa[l--] = NULL;
 	while (1) {
 		/*
@@ -158,12 +162,14 @@ static int sub_alloc(struct idr *idp, int *starting_id, struct idr_layer **pa)
 		 */
 		n = (id >> (IDR_BITS*l)) & IDR_MASK;
 		bm = ~p->bitmap;
+		//从位图中的第n位开始,查找第一个不为0的位,表示该位可用,为1的位表示已经被使用
 		m = find_next_bit(&bm, IDR_SIZE, n);
 		if (m == IDR_SIZE) {
 			//位图已满
 			/* no space available go back to previous layer. */
 			l++;
 			oid = id;
+			//重新计算id,相当于id自加1
 			id = (id | ((1 << (IDR_BITS * l)) - 1)) + 1;
 
 			/* if already at the top layer, we need to grow */
@@ -181,26 +187,38 @@ static int sub_alloc(struct idr *idp, int *starting_id, struct idr_layer **pa)
 			else
 				goto restart;
 		}
+		/* 
+		 * 期望的n值被占用,但可找到可用的m值，重新计算id值.
+         * 示例:如果id=0x0A01,则0x0A=10代表第一级的idr_layer的ary数组的索引,
+         * 0x01代表下一级的ary数组索引,最终ptr数据指针就保存在下一级的ary[0x01]处.
+         */
 		if (m != n) {
 			sh = IDR_BITS*l;
 			id = ((id >> sh) ^ n ^ m) << sh;
 		}
 		if ((id >= MAX_ID_BIT) || (id < 0))
+			//id超过所能分配的最大值(1 << 31)或者小于0,则出错返回
 			return IDR_NOMORE_SPACE;
 		if (l == 0)
+			//一层层循环计算直到到达叶子节点处l才为0,然后才跳出循环
 			break;
 		/*
 		 * Create the layer below if it is missing.
 		 */
+		//通过bitmap查得m位空闲,分配需要的节点
 		if (!p->ary[m]) {
 			new = get_from_free_list(idp);
 			if (!new)
 				return -1;
+			//new将要是p的子节点,故layer比p的layer小1
 			new->layer = l-1;
+			//p->ary[m]指向新分配的节点
 			rcu_assign_pointer(p->ary[m], new);
+			//bitmap中有效位加1
 			p->count++;
 		}
 		pa[l--] = p;
+		//向子节点遍历
 		p = p->ary[m];
 	}
 
@@ -217,7 +235,9 @@ static int idr_get_empty_slot(struct idr *idp, int starting_id,
 
 	id = starting_id;
 build_up:
+	//第一次申请id号时,根top指向的idr_layer为NULL
 	p = idp->top;
+	//第一次申请id号时,layers层数量idp->layers为0
 	layers = idp->layers;
 	if (unlikely(!p)) {
 		//如果idr的top是NULL,那么需要从预备链表中选取一个
@@ -231,6 +251,7 @@ build_up:
 	 * Add a new layer to the top of the tree if the requested
 	 * id is larger than the currently allocated space.
 	 */
+	//如果起始的id号超过该idr中设定的idr_layer层数所能设置的id号最大值,则需要扩展idr树
 	while ((layers < (MAX_LEVEL - 1)) && (id >= (1 << (layers*IDR_BITS)))) {
 		layers++;
 		if (!p->count) {
@@ -265,11 +286,13 @@ build_up:
 		if (p->bitmap == IDR_FULL)
 			//p的bitmap满后,将new中对应于p的bitmap中的位置位
 			__set_bit(0, &new->bitmap);
+		//设置p指向新加入的idr_layer节点
 		p = new;
 	}
 	//idp的top使用新的idr_layer
 	rcu_assign_pointer(idp->top, p);
 	idp->layers = layers;
+	//从idr的top指针指向的idr_layer树中获得id号,分配路径记录在pa数组中
 	v = sub_alloc(idp, &id, pa);
 	if (v == IDR_NEED_TO_GROW)
 		goto build_up;
@@ -281,6 +304,7 @@ static int idr_get_new_above_int(struct idr *idp, void *ptr, int starting_id)
 	struct idr_layer *pa[MAX_LEVEL];
 	int id;
 
+	//在该idr的idr_layer树中分配一个合适的id，并且分配的idr_layer路径记录在pa数组中
 	id = idr_get_empty_slot(idp, starting_id, pa);
 	if (id >= 0) {
 		/*

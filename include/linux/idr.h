@@ -46,10 +46,12 @@
 /* 
  * idr和radix tree相似,使用一个key来找到对应的数据.
  * 对于idr这个key是一个int,idr的层数受到了int长度的限制
+ * 32位系统下,MAX_IDR_SHIFT=31,MAX_LEVEL为7
  */
 #define MAX_LEVEL (MAX_ID_SHIFT + IDR_BITS - 1) / IDR_BITS
 
 /* Number of id_layer structs to leave in free list */
+//32位系统中IDR_FREE_MAX为14
 #define IDR_FREE_MAX MAX_LEVEL + MAX_LEVEL
 
 struct idr_layer {
