@@ -101,7 +101,9 @@ static void idr_mark_full(struct idr_layer **pa, int id)
 	 * tree.
 	 */
 	while (p->bitmap == IDR_FULL) {
+		//如果当前节点的bitmap已满,就需要将上层对应这个节点的bitmap置位
 		if (!(p = pa[++l]))
+			//如果遇到pa[l] == NULL,说明已经将id的所有节点遍历完成
 			break;
 		id = id >> IDR_BITS;
 		__set_bit((id & IDR_MASK), &p->bitmap);
@@ -140,7 +142,10 @@ int idr_pre_get(struct idr *idp, gfp_t gfp_mask)
 }
 EXPORT_SYMBOL(idr_pre_get);
 
-//pa这个指针数组中下标小的成员保存key值低位表示的节点
+/* 
+ * 获取空闲的id,并创建id对应的节点.并将这些对应于id的节点保存在pa数组中,
+ * pa这个指针数组中下标小的成员保存key值低位表示的节点.
+ */
 static int sub_alloc(struct idr *idp, int *starting_id, struct idr_layer **pa)
 {
 	int n, m, sh;
@@ -168,12 +173,13 @@ static int sub_alloc(struct idr *idp, int *starting_id, struct idr_layer **pa)
 		if (m == IDR_SIZE) {
 			//位图已满
 			/* no space available go back to previous layer. */
+			//本层已满,需要回退到上一层
 			l++;
 			oid = id;
 			/* 
 			 * 重新计算id,当前layer中bitmap已满,说明这个layer的所有子节点的bitmap也全部满了.
 			 * 将id对应这一层及这层在叶子之间的所有层的bitmap全部置位,并且在此基础上加1.
-			 * 下次循环的时候将从这个新的id开始计算.
+			 * 下次循环的时候将从这个新的id开始计算.会对上一层产生影响.
 			 */
 			id = (id | ((1 << (IDR_BITS * l)) - 1)) + 1;
 
@@ -190,6 +196,10 @@ static int sub_alloc(struct idr *idp, int *starting_id, struct idr_layer **pa)
 			 */
 			sh = IDR_BITS * (l + 1);
 			if (oid >> sh == id >> sh)
+				/* 
+				 * id = (id | ((1 << (IDR_BITS * l)) - 1)) + 1;这个操作只对本层和上层有影响,
+				 * 对更上层没有影响(进位),那么只需要重新对上层计算id.否则需要从top开始重新计算id
+				 */
 				continue;
 			else
 				goto restart;
@@ -266,7 +276,7 @@ build_up:
 	 * Add a new layer to the top of the tree if the requested
 	 * id is larger than the currently allocated space.
 	 */
-	//如果起始的id号超过该idr中设定的idr_layer层数所能设置的id号最大值,则需要扩展idr树
+	//如果起始的id号超过该idr中设定的idr_layer层数所能设置的id号最大值,则需要扩展idr树(增加高度)
 	while ((layers < (MAX_LEVEL - 1)) && (id >= (1 << (layers*IDR_BITS)))) {
 		layers++;
 		if (!p->count) {
@@ -294,7 +304,7 @@ build_up:
 			spin_unlock_irqrestore(&idp->lock, flags);
 			return -1;
 		}
-		//新分配的这个节点将作为root
+		//增长tree的高度时,首先只增长每一层的ary[0]
 		new->ary[0] = p;
 		new->count = 1;
 		new->layer = layers-1;
@@ -307,13 +317,18 @@ build_up:
 	//idp的top使用新的idr_layer
 	rcu_assign_pointer(idp->top, p);
 	idp->layers = layers;
-	//从idr的top指针指向的idr_layer树中获得id号,分配路径记录在pa数组中
+	/* 
+	 * 高度增长完成,需要调整id,并且分配id对应的节点.
+	 * 从idr的top指针指向的idr_layer树中获得id号,分配路径记录在pa数组中
+	 */
 	v = sub_alloc(idp, &id, pa);
 	if (v == IDR_NEED_TO_GROW)
+		//在sub_alloc时可能遇到顶层bitmap没有空闲位的情况,这时候需要再次增加树的高度
 		goto build_up;
 	return(v);
 }
 
+//将ptr插到idr tree的叶子节点下
 static int idr_get_new_above_int(struct idr *idp, void *ptr, int starting_id)
 {
 	struct idr_layer *pa[MAX_LEVEL];
@@ -326,8 +341,10 @@ static int idr_get_new_above_int(struct idr *idp, void *ptr, int starting_id)
 		 * Successfully found an empty slot.  Install the user
 		 * pointer and mark the slot full.
 		 */
+		//p[0]是id最底层的一个节点,在其bitmap对应id的slot中保存数据
 		rcu_assign_pointer(pa[0]->ary[id & IDR_MASK],
 				(struct idr_layer *)ptr);
+		//增加有效数据slot的计数
 		pa[0]->count++;
 		idr_mark_full(pa, id);
 	}
@@ -405,18 +422,27 @@ static void idr_remove_warning(int id)
 	dump_stack();
 }
 
+//减少id对应节点的计数,当计数等于0时,才能移除对应的节点
 static void sub_remove(struct idr *idp, int shift, int id)
 {
 	struct idr_layer *p = idp->top;
+	//指针数组,数组中成员是2级指针
 	struct idr_layer **pa[MAX_LEVEL];
+	//pa数组中第一个成员的地址
 	struct idr_layer ***paa = &pa[0];
 	struct idr_layer *to_free;
 	int n;
 
+	//将pa[0]设置成NULL
 	*paa = NULL;
+	//将pa[1]赋值为&idp->top
 	*++paa = &idp->top;
 
 	while ((shift > 0) && p) {
+		/* 
+		 * 清除对应于id的bitmap,并且将各层节点记录到了pa[]中,
+		 * pa[0] == NULL,pa[1]记录top节点,pa[2]记录layer1节点,pa[3]记录layer2节点...
+		 */
 		n = (id >> shift) & IDR_MASK;
 		__clear_bit(n, &p->bitmap);
 		*++paa = &p->ary[n];
@@ -425,16 +451,19 @@ static void sub_remove(struct idr *idp, int shift, int id)
 	}
 	n = id & IDR_MASK;
 	if (likely(p != NULL && test_bit(n, &p->bitmap))){
+		//一般情况下,这时候p指向了叶子节点
 		__clear_bit(n, &p->bitmap);
 		rcu_assign_pointer(p->ary[n], NULL);
 		to_free = NULL;
 		while(*paa && ! --((**paa)->count)){
+			//当某一节点的count - 1后等于0,该节点才能释放
 			if (to_free)
 				free_layer(to_free);
 			to_free = **paa;
 			**paa-- = NULL;
 		}
 		if (!*paa)
+			//当*paa == NULL时,在idr中id使用的节点全部释放完毕
 			idp->layers = 0;
 		if (to_free)
 			free_layer(to_free);
@@ -455,9 +484,11 @@ void idr_remove(struct idr *idp, int id)
 	/* Mask off upper bits we don't use for the search. */
 	id &= MAX_ID_MASK;
 
+	//减少id对应节点的计数,当计数等于0时才释放对应的slot
 	sub_remove(idp, (idp->layers - 1) * IDR_BITS, id);
 	if (idp->top && idp->top->count == 1 && (idp->layers > 1) &&
 	    idp->top->ary[0]) {
+	    //当top中只有最左边的节点,我们需要释放这个top,将top重新指向top的子节点
 		/*
 		 * Single child at leftmost slot: we can shrink the tree.
 		 * This level is not needed anymore since when layers are
@@ -472,6 +503,7 @@ void idr_remove(struct idr *idp, int id)
 		free_layer(to_free);
 	}
 	while (idp->id_free_cnt >= IDR_FREE_MAX) {
+		//如果预备链表中的成员超过数量,就需要释放一部分成员
 		p = get_from_free_list(idp);
 		/*
 		 * Note: we don't call the rcu callback here, since the only

@@ -383,7 +383,10 @@ int blk_alloc_devt(struct hd_struct *part, dev_t *devt)
 
 	/* in consecutive minor range? */
 	if (part->partno < disk->minors) {
-		//如果partno在disk的分区个数范围之内,比如调用add_disk时.
+		/* 
+		 * 如果partno在disk的分区个数范围之内,比如调用add_disk时.
+		 * 这个设备号由主设备号,first_minor和分区数组成.
+		 */
 		*devt = MKDEV(disk->major, disk->first_minor + part->partno);
 		return 0;
 	}
@@ -394,17 +397,21 @@ int blk_alloc_devt(struct hd_struct *part, dev_t *devt)
 		//预分配idr
 		if (!idr_pre_get(&ext_devt_idr, GFP_KERNEL))
 			return -ENOMEM;
+		//part保存在idr中,idx保存part在idr中的键值
 		rc = idr_get_new(&ext_devt_idr, part, &idx);
+		//如果rc == -EAGAIN,表示预备链表中的idr_layer不够了,需要再分配
 	} while (rc == -EAGAIN);
 
 	if (rc)
 		return rc;
 
 	if (idx > MAX_EXT_DEVT) {
+		//如果idx大于(1 << MINORBITS),这个index就是无效的,如果有可能,释放对应id的slot
 		idr_remove(&ext_devt_idr, idx);
 		return -EBUSY;
 	}
 
+	//设备号就是主设备号和通过idr_get_new获取的idx组成的
 	*devt = MKDEV(BLOCK_EXT_MAJOR, blk_mangle_minor(idx));
 	return 0;
 }
@@ -508,8 +515,9 @@ void add_disk(struct gendisk *disk)
 	disk->flags |= GENHD_FL_UP;
 
 	/* 
-	 * 注册的时候只会使用part0,分配一个主设备号.
-	 * 但是open设备调用rescan_partions时就会遍历所有分区
+	 * 注册的时候只会使用part0,分配一个主设备号.但是open设备调用rescan_partions时就会遍历所有分区.
+	 * 如果没有ext dev_t,这个设备号由主设备号,first_minor和分区数组成.否则,需要在idr tree中找到空
+	 * 闲的id,设备号就由这个id和主设备号组成.
 	 */
 	retval = blk_alloc_devt(&disk->part0, &devt);
 	if (retval) {
