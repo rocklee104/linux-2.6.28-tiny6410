@@ -64,7 +64,7 @@ struct idr_layer {
 	struct idr_layer	*ary[1<<IDR_BITS];
 	//bitmap中有多少位置位
 	int			 count;	 /* When zero, we can release it */
-	//与叶子节点的距离,从0开始
+	//与叶子节点的距离,从0开始(data不是叶子)
 	int			 layer;	 /* distance from leaf */
 	struct rcu_head		 rcu_head;
 };
@@ -74,7 +74,7 @@ struct idr {
 	struct idr_layer *top;
 	//id_free为首的形成一个链表，这个是预备队,并没有参与到top为根的节点中去
 	struct idr_layer *id_free;
-	//当前tree的高度,表示当前tree有多少层idr_layer(包括top,但不包括leaves)
+	//当前tree的高度,表示当前tree有多少层idr_layer(从1开始,包括top,但不包括data)
 	int		  layers; /* only valid without concurrent changes */
 	// 预备队的个数
 	int		  id_free_cnt;

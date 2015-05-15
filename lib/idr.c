@@ -145,6 +145,8 @@ EXPORT_SYMBOL(idr_pre_get);
 /* 
  * 获取空闲的id,并创建id对应的节点.并将这些对应于id的节点保存在pa数组中,
  * pa这个指针数组中下标小的成员保存key值低位表示的节点.
+ *
+ * sub_alloc -- 根据id值在idr tree中分配对应于id的子节点
  */
 static int sub_alloc(struct idr *idp, int *starting_id, struct idr_layer **pa)
 {
@@ -204,11 +206,7 @@ static int sub_alloc(struct idr *idp, int *starting_id, struct idr_layer **pa)
 			else
 				goto restart;
 		}
-		/* 
-		 * 期望的n值被占用,但可找到可用的m值，重新计算id值.
-         * 示例:如果id=0x0A01,则0x0A=10代表第一级的idr_layer的ary数组的索引,
-         * 0x01代表下一级的ary数组索引,最终ptr数据指针就保存在下一级的ary[0x01]处.
-         */
+		// 期望的n值被占用,但可找到可用的m值,重新计算id值.
 		if (m != n) {
 			sh = IDR_BITS*l;
 			id = ((id >> sh) ^ n ^ m) << sh;
@@ -250,6 +248,10 @@ static int sub_alloc(struct idr *idp, int *starting_id, struct idr_layer **pa)
 	return id;
 }
 
+/* 
+ * 在idr tree中找到空闲的id,并且分配对应id的所有节点,并将这些节点保存在pa数组中.
+ * 最后返回这个id值
+ */
 static int idr_get_empty_slot(struct idr *idp, int starting_id,
 			      struct idr_layer **pa)
 {
@@ -304,7 +306,14 @@ build_up:
 			spin_unlock_irqrestore(&idp->lock, flags);
 			return -1;
 		}
-		//增长tree的高度时,首先只增长每一层的ary[0]
+		/* 
+		 * 增长tree的高度时,首先只增长每一层的ary[0],这时因为在idr_get_empty_slot中,
+		 * 树的增长是分配一个新的idr_layer,然后将这个idr_layer作为root,也就是向上增长。
+		 * 这样是没有办法确定id最终的值,所以不能根据id的值来增加相应的节点。
+		 * 
+		 * 而当p->count == 0的时候,整个树都是空的,id的值可以确定,继而调用sub_alloc就可以
+		 * 根据id的值增长树的高度(向下增长)
+		 */ 
 		new->ary[0] = p;
 		new->count = 1;
 		new->layer = layers-1;
