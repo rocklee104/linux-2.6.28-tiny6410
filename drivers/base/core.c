@@ -1,4 +1,4 @@
-/*
+﻿/*
  * drivers/base/core.c - core driver model code (device registration, etc)
  *
  * Copyright (c) 2002-3 Patrick Mochel
@@ -993,6 +993,7 @@ int device_register(struct device *dev)
  * we do take care to provide for the case that we get a NULL
  * pointer passed in.
  */
+//增加device的kobject计数
 struct device *get_device(struct device *dev)
 {
 	return dev ? to_dev(kobject_get(&dev->kobj)) : NULL;

@@ -375,23 +375,25 @@ static int bdev_set(struct inode *inode, void *data)
 //全局链表头,用于记录系统中所有的block device
 static LIST_HEAD(all_bdevs);
 
-//根据设备号获取block device
-/** 此函数首先根据dev_t获取inode: 
+/*
+ * 根据设备号获取block device
+ *
+ * 此函数首先根据dev_t获取inode: 
  * 1.从hash表中找到hash值匹配的inode 
  * 2.从inode获取block device 
  * 3.再从blockdevice中获取dev_t 
  * 4.如果这个dev_t对象和传入的data相等，这个inode就是我们要找的inode.
  * 然后就对这个找到的inode的block device对象赋值。
- * @param dev
- * @return struct block_device* 
  */
 struct block_device *bdget(dev_t dev)
 {
 	struct block_device *bdev;
 	struct inode *inode;
 
-	/*这里先在inode的哈希表中进行查找与dev设备号对应的inode，如果没找到的话， 
-    则通过bdev伪文件系统创建bdev_inode(包含inode和block device的结构体)*/  
+	/*
+	 * 这里先在inode的哈希表中进行查找与dev设备号对应的inode，如果没找到的话， 
+     * 则通过bdev伪文件系统创建bdev_inode(包含inode和block device的结构体)
+     */  
 	inode = iget5_locked(bd_mnt->mnt_sb, hash(dev),
 			bdev_test, bdev_set, &dev);
 
@@ -1237,6 +1239,7 @@ static int __blkdev_put(struct block_device *bdev, fmode_t mode, int for_part)
 		kill_bdev(bdev);
 	}
 	if (bdev->bd_contains == bdev) {
+		//磁盘设备
 		if (disk->fops->release)
 			ret = disk->fops->release(disk, mode);
 	}

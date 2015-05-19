@@ -166,7 +166,7 @@ struct gendisk {
 	 */
 	//磁盘分区表信息,由partno索引的分区指针的数组
 	struct disk_part_tbl *part_tbl;
-	//当前块设备的第一个分区
+	//当前块设备的第一个分区,如果没有分区则指代整个设备
 	struct hd_struct part0;
 
 	struct block_device_operations *fops;

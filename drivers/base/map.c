@@ -55,6 +55,7 @@ int kobj_map(struct kobj_map *domain, dev_t dev, unsigned long range,
 		p->lock = lock;
 		p->dev = dev;
 		p->range = range;
+		//对于块设备p->data实际上就是对应于dev的gendisk指针
 		p->data = data;
 	}
 	mutex_lock(domain->lock);
@@ -115,22 +116,33 @@ retry:
 		struct module *owner;
 		void *data;
 
+		/* 
+		 * 符合条件的p需要是dev >= p->dev && dev <= p->dev + p->range - 1,
+		 * 也就是dev需要落在p->dev和p->dev的range之间
+		 */
 		if (p->dev > dev || p->dev + p->range - 1 < dev)
 			continue;
 		if (p->range - 1 >= best)
+			//链表遍历完成
 			break;
 		if (!try_module_get(p->owner))
 			continue;
+		//找到符合条件的p->dev,这个p->dev也就是之前已经注册到系统中的设备
 		owner = p->owner;
 		data = p->data;
 		probe = p->get;
 		best = p->range - 1;
+		/*
+		 * dev落在p->dev和p->dev的range之间([p->dev, p->dev + p->range -1]),
+		 * 这个*index也就是p->dev的次设备号
+		 */
 		*index = dev - p->dev;
 		if (p->lock && p->lock(dev, data) < 0) {
 			module_put(owner);
 			continue;
 		}
 		mutex_unlock(domain->lock);
+		//对于块设备,data是对应于dev的gendisk指针,通过probe获取到gendisk的device的kobject指针
 		kobj = probe(dev, index, data);
 		/* Currently ->owner protects _only_ ->probe() itself. */
 		module_put(owner);

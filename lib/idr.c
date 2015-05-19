@@ -595,6 +595,7 @@ EXPORT_SYMBOL(idr_destroy);
  * This function can be called under rcu_read_lock(), given that the leaf
  * pointers lifetimes are correctly managed.
  */
+//找到id对应的data
 void *idr_find(struct idr *idp, int id)
 {
 	int n;
@@ -603,6 +604,7 @@ void *idr_find(struct idr *idp, int id)
 	p = rcu_dereference(idp->top);
 	if (!p)
 		return NULL;
+	//p->layer + 1一般就等于idp->layers
 	n = (p->layer+1) * IDR_BITS;
 
 	/* Mask off upper bits we don't use for the search. */

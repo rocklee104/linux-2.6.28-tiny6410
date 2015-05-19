@@ -1,4 +1,4 @@
-/*
+﻿/*
  * fs/sysfs/file.c - sysfs regular (text) file implementation
  *
  * Copyright (c) 2001-3 Patrick Mochel
@@ -331,7 +331,9 @@ static void sysfs_put_open_dirent(struct sysfs_dirent *sd,
 
 static int sysfs_open_file(struct inode *inode, struct file *file)
 {
+	//获取sysfs中的目录项
 	struct sysfs_dirent *attr_sd = file->f_path.dentry->d_fsdata;
+	//获取父目录的kobject
 	struct kobject *kobj = attr_sd->s_parent->s_dir.kobj;
 	struct sysfs_buffer *buffer;
 	struct sysfs_ops *ops;
@@ -532,6 +534,7 @@ int sysfs_add_file(struct sysfs_dirent *dir_sd, const struct attribute *attr,
  *	@attr:	attribute descriptor.
  */
 
+//在kobj下创建文件
 int sysfs_create_file(struct kobject * kobj, const struct attribute * attr)
 {
 	BUG_ON(!kobj || !kobj->sd || !attr);

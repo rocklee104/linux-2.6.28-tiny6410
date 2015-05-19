@@ -1,4 +1,4 @@
-/*
+﻿/*
  * kobject.h - generic kernel object infrastructure.
  *
  * Copyright (c) 2002-2003 Patrick Mochel
@@ -57,14 +57,22 @@ enum kobject_action {
 };
 
 struct kobject {
+	//内核对象的名称,如果该内核对象加入系统,那么它的name将会出现在sysfs中
 	const char		*name;
+	//链表元素,链表头是kset->list
 	struct list_head	entry;
+	//内核对象的上层节点
 	struct kobject		*parent;
+	//该内核对象所属的kset对象的指针
 	struct kset		*kset;
+	//定义了该内核对象的一组sysfs相关的操作函数和属性
 	struct kobj_type	*ktype;
+	//该内核对象在sysfs中对应的目录项
 	struct sysfs_dirent	*sd;
 	struct kref		kref;
+	//kobject所代表的内核对象初始化的状态,1表示已经被初始化,0表示尚未被初始化
 	unsigned int state_initialized:1;
+	//表示该kobject所代表的内核对象有没有在sysfs中创建一个入口点
 	unsigned int state_in_sysfs:1;
 	unsigned int state_add_uevent_sent:1;
 	unsigned int state_remove_uevent_sent:1;
@@ -149,6 +157,7 @@ extern struct sysfs_ops kobj_sysfs_ops;
  * desired.
  */
 struct kset {
+	//链表头,链表成员是kobject->entry
 	struct list_head list;
 	spinlock_t list_lock;
 	struct kobject kobj;

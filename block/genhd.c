@@ -52,6 +52,7 @@ static struct device_type disk_type;
  * RETURNS:
  * Pointer to the found partition on success, NULL if not found.
  */
+//增加分区对应的struct device的引用计数,并返回这个分区的指针
 struct hd_struct *disk_get_part(struct gendisk *disk, int partno)
 {
 	struct hd_struct *part = NULL;
@@ -411,7 +412,7 @@ int blk_alloc_devt(struct hd_struct *part, dev_t *devt)
 		return -EBUSY;
 	}
 
-	//设备号就是主设备号和通过idr_get_new获取的idx组成的
+	//设备号使用idr机制的块设备,主设备号是BLOCK_EXT_MAJOR
 	*devt = MKDEV(BLOCK_EXT_MAJOR, blk_mangle_minor(idx));
 	return 0;
 }
@@ -524,6 +525,7 @@ void add_disk(struct gendisk *disk)
 		WARN_ON(1);
 		return;
 	}
+	//磁盘第一个分区的设备号
 	disk_to_dev(disk)->devt = devt;
 
 	/* ->major and ->first_minor aren't supposed to be
@@ -532,6 +534,7 @@ void add_disk(struct gendisk *disk)
 	disk->major = MAJOR(devt);
 	disk->first_minor = MINOR(devt);
 
+	//将设备号加入bdev_map
 	blk_register_region(disk_devt(disk), disk->minors, NULL,
 			    exact_match, exact_lock, disk);
 	register_disk(disk);
@@ -563,17 +566,21 @@ void unlink_gendisk(struct gendisk *disk)
  * This function gets the structure containing partitioning
  * information for the given device @devt.
  */
+//通过devt获取到磁盘的gendisk指针,并返回分区号
 struct gendisk *get_gendisk(dev_t devt, int *partno)
 {
 	struct gendisk *disk = NULL;
 
 	if (MAJOR(devt) != BLOCK_EXT_MAJOR) {
+		// 一般流程:dev_t->bdev_map->分区的gendisk->part0.__dev->磁盘的gendisk
 		struct kobject *kobj;
 
+		//找到devt对应的device的kobj
 		kobj = kobj_lookup(bdev_map, devt, partno);
 		if (kobj)
 			disk = dev_to_disk(kobj_to_dev(kobj));
 	} else {
+		//分区信息保存在idr中
 		struct hd_struct *part;
 
 		mutex_lock(&ext_devt_mutex);
@@ -606,9 +613,12 @@ struct block_device *bdget_disk(struct gendisk *disk, int partno)
 	struct hd_struct *part;
 	struct block_device *bdev = NULL;
 
+	//增加分区的kobject引用计数
 	part = disk_get_part(disk, partno);
 	if (part)
+		//找到part的bdev
 		bdev = bdget(part_devt(part));
+	//减少分区的kobject引用计数
 	disk_put_part(part);
 
 	return bdev;

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * fs/sysfs/dir.c - sysfs core and dir operation implementation
  *
  * Copyright (c) 2001-3 Patrick Mochel
@@ -684,6 +684,7 @@ int sysfs_create_dir(struct kobject * kobj)
 	if (kobj->parent)
 		parent_sd = kobj->parent->sd;
 	else
+		//没有parent,其parent就是sysfs的/
 		parent_sd = &sysfs_root;
 
 	error = create_dir(kobj, parent_sd, kobject_name(kobj), &sd);

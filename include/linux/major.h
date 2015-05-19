@@ -1,4 +1,4 @@
-#ifndef _LINUX_MAJOR_H
+﻿#ifndef _LINUX_MAJOR_H
 #define _LINUX_MAJOR_H
 
 /*
@@ -170,6 +170,7 @@
 
 #define VIOTAPE_MAJOR		230
 
+//这个设备号的块设备是用ext
 #define BLOCK_EXT_MAJOR		259
 
 #endif

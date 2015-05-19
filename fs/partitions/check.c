@@ -476,12 +476,15 @@ void register_disk(struct gendisk *disk)
 
 	/* No minors to use for partitions */
 	if (!disk_partitionable(disk))
+		//如果disk不可以分区
 		goto exit;
 
 	/* No such device (e.g., media were just removed) */
 	if (!get_capacity(disk))
+		//设备未设置容量,对于内核来说,无此设备
 		goto exit;
 
+	//获取整个磁盘的bdev
 	bdev = bdget_disk(disk, 0);
 	if (!bdev)
 		goto exit;

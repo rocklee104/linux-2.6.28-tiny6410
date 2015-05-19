@@ -1,4 +1,4 @@
-/*
+﻿/*
  * kobject.c - library routines for handling generic kernel objects
  *
  * Copyright (c) 2002-2003 Patrick Mochel <mochel@osdl.org>
@@ -27,6 +27,7 @@
  * object registration that loops through the default attributes of the
  * subsystem and creates attributes files for them in sysfs.
  */
+//填充目录,也就是在sysfs的目录下生成属性相关的文件
 static int populate_dir(struct kobject *kobj)
 {
 	struct kobj_type *t = get_ktype(kobj);
@@ -137,8 +138,10 @@ static void kobj_kset_leave(struct kobject *kobj)
 		return;
 
 	spin_lock(&kobj->kset->list_lock);
+	//将kobject从kset链表中删除
 	list_del_init(&kobj->entry);
 	spin_unlock(&kobj->kset->list_lock);
+	//减少kset的引用计数
 	kset_put(kobj->kset);
 }
 
@@ -174,6 +177,7 @@ static int kobject_add_internal(struct kobject *kobj)
 	/* join kset if set, use it as parent if we do not already have one */
 	if (kobj->kset) {
 		if (!parent)
+			//如果当前kobject存在kset并且不存在parent,那么parent就是其kset
 			parent = kobject_get(&kobj->kset->kobj);
 		kobj_kset_join(kobj);
 		kobj->parent = parent;
@@ -186,6 +190,7 @@ static int kobject_add_internal(struct kobject *kobj)
 
 	error = create_dir(kobj);
 	if (error) {
+		//创建目录失败
 		kobj_kset_leave(kobj);
 		kobject_put(parent);
 		kobj->parent = NULL;
@@ -277,6 +282,7 @@ void kobject_init(struct kobject *kobj, struct kobj_type *ktype)
 		goto error;
 	}
 	if (kobj->state_initialized) {
+		//不能初始化一个已经初始化过了的kobject
 		/* do not error out as sometimes we can recover */
 		printk(KERN_ERR "kobject (%p): tried to init an initialized "
 		       "object, something is seriously wrong.\n", kobj);
