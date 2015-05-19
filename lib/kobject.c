@@ -723,6 +723,7 @@ int kset_register(struct kset *k)
 	err = kobject_add_internal(&k->kobj);
 	if (err)
 		return err;
+	//通知用户空间add事件
 	kobject_uevent(&k->kobj, KOBJ_ADD);
 	return 0;
 }

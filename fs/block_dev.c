@@ -1102,7 +1102,7 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
                 //重新扫描分区 
 				rescan_partitions(disk, bdev);
 		} else {
-			//block device是分区
+			//block device是分区,会__blkdev_get磁盘设备
 			struct block_device *whole;
 			//通过设备号找到磁盘的bdev
 			whole = bdget_disk(disk, 0);
@@ -1123,6 +1123,7 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 				ret = -ENXIO;
 				goto out_clear;
 			}
+			//设置分区大小
 			bd_set_size(bdev, (loff_t)bdev->bd_part->nr_sects << 9);
 		}
 	} else {
@@ -1130,7 +1131,7 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 		put_disk(disk);
 		module_put(disk->fops->owner);
 		disk = NULL;
-		//如果此block device是一个主设备
+		//如果此block device是一个磁盘
 		if (bdev->bd_contains == bdev) {
 			if (bdev->bd_disk->fops->open) {
 				//调用具体设备的open
@@ -1236,6 +1237,7 @@ static int __blkdev_put(struct block_device *bdev, fmode_t mode, int for_part)
 		bdev->bd_part_count--;
 
 	if (!--bdev->bd_openers) {
+		//没有其他地方打开这个bdev了,需要同步
 		sync_blockdev(bdev);
 		kill_bdev(bdev);
 	}
@@ -1254,6 +1256,7 @@ static int __blkdev_put(struct block_device *bdev, fmode_t mode, int for_part)
 		bdev->bd_disk = NULL;
 		bdev->bd_inode->i_data.backing_dev_info = &default_backing_dev_info;
 		if (bdev != bdev->bd_contains)
+			//bdev表示一个分区设备
 			victim = bdev->bd_contains;
 		bdev->bd_contains = NULL;
 	}
@@ -1261,6 +1264,7 @@ static int __blkdev_put(struct block_device *bdev, fmode_t mode, int for_part)
 	mutex_unlock(&bdev->bd_mutex);
 	bdput(bdev);
 	if (victim)
+		//减少磁盘设备的bd_part_count
 		__blkdev_put(victim, mode, 1);
 	return ret;
 }

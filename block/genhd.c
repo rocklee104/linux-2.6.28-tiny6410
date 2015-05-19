@@ -126,6 +126,7 @@ struct hd_struct *disk_part_iter_next(struct disk_part_iter *piter)
 	int inc, end;
 
 	/* put the last partition */
+	//put上一个循环使用过的part
 	disk_put_part(piter->part);
 	piter->part = NULL;
 
@@ -134,6 +135,7 @@ struct hd_struct *disk_part_iter_next(struct disk_part_iter *piter)
 	ptbl = rcu_dereference(piter->disk->part_tbl);
 
 	/* determine iteration parameters */
+	//确定下面for循环中的步长和结束条件
 	if (piter->flags & DISK_PITER_REVERSE) {
 		inc = -1;
 		if (piter->flags & DISK_PITER_INCL_PART0)
@@ -149,15 +151,18 @@ struct hd_struct *disk_part_iter_next(struct disk_part_iter *piter)
 	for (; piter->idx != end; piter->idx += inc) {
 		struct hd_struct *part;
 
+		//获取分区
 		part = rcu_dereference(ptbl->part[piter->idx]);
 		if (!part)
 			continue;
+		//当分区大小为0,DISK_PITER_INCL_EMPTY置位时候,这样一个分区也符合条件
 		if (!(piter->flags & DISK_PITER_INCL_EMPTY) && !part->nr_sects)
 			continue;
 
 		get_device(part_to_dev(part));
 		piter->part = part;
 		piter->idx += inc;
+		//循环一次退出一次
 		break;
 	}
 
@@ -572,7 +577,13 @@ struct gendisk *get_gendisk(dev_t devt, int *partno)
 	struct gendisk *disk = NULL;
 
 	if (MAJOR(devt) != BLOCK_EXT_MAJOR) {
-		// 一般流程:dev_t->bdev_map->分区的gendisk->part0.__dev->磁盘的gendisk
+		/* 
+		 * 一般流程:dev_t->bdev_map->gendisk->通过probe函数得到part0.__dev
+		 * ->从struct device获取kobject->struct device->gendisk.
+		 * 
+		 * 为什么不直接从bdev_map中获取data,也就是gendisk,是因为kmap中没有
+		 * 直接返回data的函数.
+		 */
 		struct kobject *kobj;
 
 		//找到devt对应的device的kobj

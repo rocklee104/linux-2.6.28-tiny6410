@@ -139,7 +139,7 @@ struct blk_scsi_cmd_filter {
 
 struct disk_part_tbl {
 	struct rcu_head rcu_head;
-	//part[]中成员的个数
+	//part[]中成员的个数,也就是分区的个数(包括part0)
 	int len;
 	struct hd_struct *part[];
 };
@@ -245,8 +245,11 @@ static inline void disk_put_part(struct hd_struct *part)
 /*
  * Smarter partition iterator without context limits.
  */
+//从最后一个分区遍历
 #define DISK_PITER_REVERSE	(1 << 0) /* iterate in the reverse direction */
+//遍历的时候包含大小为0的分区
 #define DISK_PITER_INCL_EMPTY	(1 << 1) /* include 0-sized parts */
+//遍历器从part0开始遍历
 #define DISK_PITER_INCL_PART0	(1 << 2) /* include partition 0 */
 
 struct disk_part_iter {

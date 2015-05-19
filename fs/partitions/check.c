@@ -499,12 +499,15 @@ void register_disk(struct gendisk *disk)
 exit:
 	/* announce disk after possible partitions are created */
 	ddev->uevent_suppress = 0;
+	//通知用户层,磁盘已添加
 	kobject_uevent(&ddev->kobj, KOBJ_ADD);
 
 	/* announce possible partitions */
 	disk_part_iter_init(&piter, disk, 0);
 	while ((part = disk_part_iter_next(&piter)))
+		//从part1开始到最后一个分区,为每一个分区触发一个KOBJ_ADD事件
 		kobject_uevent(&part_to_dev(part)->kobj, KOBJ_ADD);
+	//释放最后一次使用过的part
 	disk_part_iter_exit(&piter);
 }
 

@@ -322,7 +322,9 @@ struct blk_queue_tag {
 	atomic_t refcnt;		/* map can be shared */
 };
 
+//scsi最大命令个数
 #define BLK_SCSI_MAX_CMDS	(256)
+//这些命令占用多少个字
 #define BLK_SCSI_CMD_PER_LONG	(BLK_SCSI_MAX_CMDS / (sizeof(long) * 8))
 
 struct blk_cmd_filter {
@@ -449,9 +451,9 @@ struct request_queue
 	//即使队列已满，仍可以由特殊进程"batch"提交的待处理请求队列的最大值(通常为32)
 	unsigned int		nr_batching;
 
-	//单个请求能处理的最大扇区数(可调的)
+	//单个请求能处理的最大扇区数(可调的),最可以达到BLK_DEF_MAX_SECTORS
 	unsigned int		max_sectors;
-	//单个请求能处理的最大扇区数(硬件约束)
+	//单个请求能处理的最大扇区数(硬件约束),可能比max_sectors大
 	unsigned int		max_hw_sectors;
 	//单个请求所能处理的最大物理段数,当次request bio_vec的总数
 	unsigned short		max_phys_segments;
@@ -506,6 +508,7 @@ struct request_queue
 #if defined(CONFIG_BLK_DEV_BSG)
 	struct bsg_class_device bsg_dev;
 #endif
+	//可接收的命令
 	struct blk_cmd_filter cmd_filter;
 };
 

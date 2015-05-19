@@ -144,6 +144,7 @@ void blk_queue_make_request(struct request_queue *q, make_request_fn *mfn)
 	if (q->unplug_delay == 0)
 		q->unplug_delay = 1;
 
+	//定时器处理函数
 	q->unplug_timer.function = blk_unplug_timeout;
 	q->unplug_timer.data = (unsigned long)q;
 
@@ -166,7 +167,7 @@ EXPORT_SYMBOL(blk_queue_make_request);
  *    buffers for doing I/O to pages residing above @dma_addr.
  **/
 /* 
- * 设置快设备执行dma时可以使用的最高物理地址dma_addr,如果一个请求包含超过这个限制,
+ * 设置块设备执行dma时可以使用的最高物理地址dma_addr,如果一个请求包含超过这个限制,
  * 系统将会给这个操作分配一个回弹缓冲区.这种方式的代价昂贵，因此应该尽量避免.
  */
 void blk_queue_bounce_limit(struct request_queue *q, u64 dma_addr)
@@ -204,10 +205,11 @@ EXPORT_SYMBOL(blk_queue_bounce_limit);
  *    Enables a low level driver to set an upper limit on the size of
  *    received requests.
  **/
-//设置任一请求可包含的最大扇区数
+//设置任一请求可包含的最大扇区数,最少为8
 void blk_queue_max_sectors(struct request_queue *q, unsigned int max_sectors)
 {
 	if ((max_sectors << 9) < PAGE_CACHE_SIZE) {
+		//最大扇区数 * 512 < PAGE_SIZE
 		max_sectors = 1 << (PAGE_CACHE_SHIFT - 9);
 		printk(KERN_INFO "%s: set to minimum %d\n",
 		       __func__, max_sectors);
@@ -280,7 +282,7 @@ EXPORT_SYMBOL(blk_queue_max_hw_segments);
  *    Enables a low level driver to set an upper limit on the size of a
  *    coalesced segment
  **/
-//设置请求段的最大字节数
+//设置请求段的最大字节数,最小是一个PAGE_SIZE
 void blk_queue_max_segment_size(struct request_queue *q, unsigned int max_size)
 {
 	if (max_size < PAGE_CACHE_SIZE) {
@@ -424,7 +426,7 @@ EXPORT_SYMBOL_GPL(blk_queue_dma_drain);
  * @q:  the request queue for the device
  * @mask:  the memory boundary mask
  **/
-//通知内核当前驱动的能够处理的segment边界
+//通知内核当前驱动的能够处理的segment边界,最小是一个PAGE_SIZE
 void blk_queue_segment_boundary(struct request_queue *q, unsigned long mask)
 {
 	if (mask < PAGE_CACHE_SIZE - 1) {

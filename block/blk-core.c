@@ -70,6 +70,7 @@ static void drive_stat_acct(struct request *rq, int new_io)
 	part_stat_unlock();
 }
 
+//请求队列中请求的个数小于13/16,表示队列不拥挤,大于14/16表示拥挤
 void blk_queue_congestion_threshold(struct request_queue *q)
 {
 	int nr;
@@ -237,8 +238,10 @@ int blk_remove_plug(struct request_queue *q)
 	WARN_ON(!irqs_disabled());
 
 	if (!queue_flag_test_and_clear(QUEUE_FLAG_PLUGGED, q))
+		//如果QUEUE_FLAG_PLUGGED被置位,清除这个标志
 		return 0;
 
+	//删除unplug定时器
 	del_timer(&q->unplug_timer);
 	return 1;
 }
@@ -250,11 +253,14 @@ EXPORT_SYMBOL(blk_remove_plug);
 void __generic_unplug_device(struct request_queue *q)
 {
 	if (unlikely(blk_queue_stopped(q)))
+		//设备已经停止
 		return;
 
+	//如果设备没有停止,并且队列仍然存在,就需要清除QUEUE_FLAG_PLUGGED
 	if (!blk_remove_plug(q))
 		return;
 
+	//如果设备没有停止,队列已经不存在,调用请求处理函数
 	q->request_fn(q);
 }
 
@@ -511,6 +517,7 @@ struct request_queue *blk_alloc_queue_node(gfp_t gfp_mask, int node_id)
 		return NULL;
 	}
 
+	//unplug定时器初始化
 	init_timer(&q->unplug_timer);
 	setup_timer(&q->timeout, blk_rq_timed_out_timer, (unsigned long) q);
 	INIT_LIST_HEAD(&q->timeout_list);
@@ -567,6 +574,7 @@ EXPORT_SYMBOL(blk_init_queue);
 struct request_queue *
 blk_init_queue_node(request_fn_proc *rfn, spinlock_t *lock, int node_id)
 {
+	//分配一个请求队列
 	struct request_queue *q = blk_alloc_queue_node(GFP_KERNEL, node_id);
 
 	if (!q)
@@ -585,8 +593,10 @@ blk_init_queue_node(request_fn_proc *rfn, spinlock_t *lock, int node_id)
 	if (!lock)
 		lock = &q->__queue_lock;
 
+	//请求处理函数
 	q->request_fn		= rfn;
 	q->prep_rq_fn		= NULL;
+	//拔出设备函数
 	q->unplug_fn		= generic_unplug_device;
 	q->queue_flags		= (1 << QUEUE_FLAG_CLUSTER |
 				   1 << QUEUE_FLAG_STACKABLE);

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Functions related to sysfs handling
  */
 #include <linux/kernel.h>
@@ -341,6 +341,7 @@ int blk_register_queue(struct gendisk *disk)
 	if (!q->request_fn)
 		return 0;
 
+	//在/sys/block/diskname/下生成queue文件
 	ret = kobject_add(&q->kobj, kobject_get(&disk_to_dev(disk)->kobj),
 			  "%s", "queue");
 	if (ret < 0)

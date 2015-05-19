@@ -159,8 +159,10 @@ extern struct sysfs_ops kobj_sysfs_ops;
 struct kset {
 	//链表头,链表成员是kobject->entry
 	struct list_head list;
+	//对kset上的list进行访问操作时用来作为互斥保护使用的自选锁
 	spinlock_t list_lock;
 	struct kobject kobj;
+	//通知用户空间使用的方法
 	struct kset_uevent_ops *uevent_ops;
 };
 
