@@ -489,6 +489,7 @@ void register_disk(struct gendisk *disk)
 	if (!bdev)
 		goto exit;
 
+	//register_disk需要调用blkdev_get重新扫描磁盘
 	bdev->bd_invalidated = 1;
 	err = blkdev_get(bdev, FMODE_READ);
 	if (err < 0)

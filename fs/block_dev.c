@@ -1066,9 +1066,10 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 	//此block device没有被打开过
 	mutex_lock_nested(&bdev->bd_mutex, for_part);
 	if (!bdev->bd_openers) {
+		//在调用当前函数前,bdev->bd_disk是没有指向disk的
 		bdev->bd_disk = disk;
 		bdev->bd_contains = bdev;
-        //没有使用fdisk之前，是不会有分区信息的，即没有sda1,sda2等设备
+        //没有使用fdisk之前,是不会有分区信息的,即没有sda1,sda2等设备
 		if (!partno) {
 			//block device是一个磁盘
 			struct backing_dev_info *bdi;
@@ -1101,10 +1102,9 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
                 //重新扫描分区 
 				rescan_partitions(disk, bdev);
 		} else {
-			//是分区
-            //主block device的对象 
+			//block device是分区
 			struct block_device *whole;
-			//通过设备号找到主设备
+			//通过设备号找到磁盘的bdev
 			whole = bdget_disk(disk, 0);
 			ret = -ENOMEM;
 			if (!whole)
@@ -1155,6 +1155,7 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 	bdev->bd_part = NULL;
 	bdev->bd_inode->i_data.backing_dev_info = &default_backing_dev_info;
 	if (bdev != bdev->bd_contains)
+		//bdev代表一个分区设备,需要减少磁盘的bd_part_count
 		__blkdev_put(bdev->bd_contains, mode, 1);
 	bdev->bd_contains = NULL;
  out_unlock_bdev:

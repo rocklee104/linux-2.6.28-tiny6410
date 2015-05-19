@@ -117,6 +117,7 @@ struct hd_struct {
 #define GENHD_FL_DRIVERFS			2
 #define GENHD_FL_MEDIA_CHANGE_NOTIFY		4
 #define GENHD_FL_CD				8
+//磁盘将被初始化并可以使用
 #define GENHD_FL_UP				16
 #define GENHD_FL_SUPPRESS_PARTITION_INFO	32
 /* 
@@ -124,6 +125,7 @@ struct hd_struct {
  * once the number of minor numbers given to alloc_disk() is exhausted,
  * any additional partitions will be numbered in the extended space
  */
+//使用扩展分区号
 #define GENHD_FL_EXT_DEVT			64 /* allow extended devt */
 
 #define BLK_SCSI_MAX_CMDS	(256)

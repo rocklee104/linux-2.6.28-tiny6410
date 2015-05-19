@@ -580,7 +580,7 @@ struct block_device {
 	dev_t			bd_dev;  /* not a kdev_t - it's a search key */
     //bdevfs中的inode
 	struct inode *		bd_inode;	/* will die */
-	//调用do_open打开该块设备的次数,调用do_open时,bd_openers++,调用完后bd_openers--
+	//当前block_device被打开的次数
 	int			bd_openers;
 	struct mutex		bd_mutex;	/* open/close mutex */
 	struct semaphore	bd_mount_sem;
@@ -609,7 +609,7 @@ struct block_device {
 	//当block_device表示一个完整的块设备时,bd_part指向该块设备的分区结构信息
 	struct hd_struct *	bd_part;
 	/* number of times partitions within this device have been opened. */
-	//内核中引用该设备内分区的次数
+	//当前block_device代表一个磁盘时,这个磁盘中的分区被打开的次数
 	unsigned		bd_part_count;
 	/* 
 	 * 设置为1时,表示该分区在内核中的信息无效,因为磁盘上的分区已经改变,
