@@ -1,4 +1,4 @@
-#include <linux/pagemap.h>
+﻿#include <linux/pagemap.h>
 #include <linux/blkdev.h>
 
 /*
@@ -13,6 +13,7 @@ struct parsed_partitions {
 		int flags;
 	} parts[DISK_MAX_PARTS];
 	int next;
+	//最大分区个数
 	int limit;
 };
 

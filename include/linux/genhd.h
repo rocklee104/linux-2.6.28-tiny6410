@@ -65,16 +65,27 @@ enum {
 #include <linux/fs.h>
 #include <linux/workqueue.h>
 
+//MBR中分区表
 struct partition {
+	//分区状态,0x00非活动,0x80活动
 	unsigned char boot_ind;		/* 0x80 - active */
+	//分区起始磁头号
 	unsigned char head;		/* starting head */
+	//起始扇区号
 	unsigned char sector;		/* starting sector */
+	//起始磁柱号
 	unsigned char cyl;		/* starting cylinder */
+	//文件系统标志位
 	unsigned char sys_ind;		/* What partition type */
+	//分区结束磁头号
 	unsigned char end_head;		/* end head */
+	//分区结束扇区号
 	unsigned char end_sector;	/* end sector */
+	//分区结束磁柱号
 	unsigned char end_cyl;		/* end cylinder */
+	//分区起始位置扇区号
 	__le32 start_sect;	/* starting sector counting from 0 */
+	//分区总扇区数
 	__le32 nr_sects;		/* nr of sectors in partition */
 } __attribute__((packed));
 

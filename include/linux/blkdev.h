@@ -1012,6 +1012,7 @@ static inline int queue_hardsect_size(struct request_queue *q)
 	return retval;
 }
 
+//bdev->gendisk->request_queue->返回请求队列中记录的hardsect_size
 static inline int bdev_hardsect_size(struct block_device *bdev)
 {
 	return queue_hardsect_size(bdev_get_queue(bdev));

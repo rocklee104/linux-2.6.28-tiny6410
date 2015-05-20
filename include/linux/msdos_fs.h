@@ -1,4 +1,4 @@
-#ifndef _LINUX_MSDOS_FS_H
+﻿#ifndef _LINUX_MSDOS_FS_H
 #define _LINUX_MSDOS_FS_H
 
 #include <linux/magic.h>
@@ -100,29 +100,49 @@ struct __fat_dirent {
 #define FAT_IOCTL_GET_ATTRIBUTES	_IOR('r', 0x10, __u32)
 #define FAT_IOCTL_SET_ATTRIBUTES	_IOW('r', 0x11, __u32)
 
+//Dos Boot Sector,引导扇区,用于记录文件系统meta data
 struct fat_boot_sector {
+	//跳转指令
 	__u8	ignored[3];	/* Boot strap short or near jump */
+	//文件系统标志和版本号
 	__u8	system_id[8];	/* Name - can be used to special case
 				   partition manager volumes */
+	//扇区大小
 	__u8	sector_size[2];	/* bytes per logical sector */
+	//每簇扇区数
 	__u8	sec_per_clus;	/* sectors/cluster */
+	//保留扇区数
 	__le16	reserved;	/* reserved sectors */
+	//FAT表个数
 	__u8	fats;		/* number of FATs */
+	//FAT32必须等于0,FAT12/FAT16为根目录中目录的个数
 	__u8	dir_entries[2];	/* root directory entries */
+	//FAT32必须等于0,FAT12/FAT16为扇区总数
 	__u8	sectors[2];	/* number of sectors */
+	//哪种存储介质
 	__u8	media;		/* media code */
+	//FAT32必须为0,FAT12/FAT16为一个FAT 表所占的扇区数
 	__le16	fat_length;	/* sectors/FAT */
+	//每磁道扇区数
 	__le16	secs_track;	/* sectors per track */
+	//磁头数
 	__le16	heads;		/* number of heads */
+	//隐藏扇区数
 	__le32	hidden;		/* hidden sectors (unused) */
+	//磁盘总扇区数
 	__le32	total_sect;	/* number of sectors (if sectors == 0) */
 
 	/* The following fields are only used by FAT32 */
+	//每个FAT表占用扇区数
 	__le32	fat32_length;	/* sectors/FAT */
 	__le16	flags;		/* bit 8: fat mirroring, low 4: active fat */
+	//FAT32版本号
 	__u8	version[2];	/* major, minor filesystem version */
+	//根目录所在第一个簇的簇号
 	__le32	root_cluster;	/* first cluster in root directory */
+	//FSINFO(文件系统信息扇区)
 	__le16	info_sector;	/* filesystem info sector */
+	//备份引导扇区的位置
 	__le16	backup_boot;	/* backup boot sector */
 	__le16	reserved2[6];	/* Unused */
 };

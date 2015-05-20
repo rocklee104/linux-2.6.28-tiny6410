@@ -43,6 +43,7 @@ extern void md_autodetect_dev(dev_t dev);
 
 int warn_no_part = 1; /*This is ugly: should make genhd removable media aware*/
 
+//tiny6410默认只支持msdos_partition
 static int (*check_part[])(struct parsed_partitions *, struct block_device *) = {
 	/*
 	 * Probe partition formats with tables at disk address 0
@@ -125,8 +126,10 @@ char *disk_name(struct gendisk *hd, int partno, char *buf)
 	if (!partno)
 		snprintf(buf, BDEVNAME_SIZE, "%s", hd->disk_name);
 	else if (isdigit(hd->disk_name[strlen(hd->disk_name)-1]))
+		//如果gendisk名称最后一个字符是数字,如mmcblk0,分区名称就是mmcblk0p1,mmcblk0p2...
 		snprintf(buf, BDEVNAME_SIZE, "%sp%d", hd->disk_name, partno);
 	else
+		//如果gendisk名称最后一个字符是数字,如sda,分区名称是sda1,sda2...
 		snprintf(buf, BDEVNAME_SIZE, "%s%d", hd->disk_name, partno);
 
 	return buf;
@@ -163,6 +166,7 @@ check_partition(struct gendisk *hd, struct block_device *bdev)
 	if (!state)
 		return NULL;
 
+	//获取磁盘名称
 	disk_name(hd, 0, state->name);
 	printk(KERN_INFO " %s:", state->name);
 	if (isdigit(state->name[strlen(state->name)-1]))
@@ -172,6 +176,7 @@ check_partition(struct gendisk *hd, struct block_device *bdev)
 	i = res = err = 0;
 	while (!res && check_part[i]) {
 		memset(&state->parts, 0, sizeof(state->parts));
+		//检查磁盘分区
 		res = check_part[i++](state, bdev);
 		if (res < 0) {
 			/* We have hit an I/O error which we don't report now.
@@ -519,6 +524,7 @@ int rescan_partitions(struct gendisk *disk, struct block_device *bdev)
 	int p, highest, res;
 
 	if (bdev->bd_part_count)
+		//磁盘中有分区被打开
 		return -EBUSY;
 	res = invalidate_partition(disk, 0);
 	if (res)

@@ -507,6 +507,7 @@ struct super_block * get_super(struct block_device *bdev)
 
 	spin_lock(&sb_lock);
 rescan:
+	//遍历系统中所有的sb
 	list_for_each_entry(sb, &super_blocks, s_list) {
 		if (sb->s_bdev == bdev) {
 			sb->s_count++;

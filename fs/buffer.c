@@ -180,6 +180,10 @@ EXPORT_SYMBOL(sync_blockdev);
 int fsync_bdev(struct block_device *bdev)
 {
 	struct super_block *sb = get_super(bdev);
+	/* 
+	 * 当插入一个块设备->invalidate_partition->fsync_bdev这个时候
+	 * 当前block device并没有挂载到任何一个fs,sb为NULL
+	 */
 	if (sb) {
 		int res = fsync_super(sb);
 		drop_super(sb);
