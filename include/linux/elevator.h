@@ -1,4 +1,4 @@
-#ifndef _LINUX_ELEVATOR_H
+﻿#ifndef _LINUX_ELEVATOR_H
 #define _LINUX_ELEVATOR_H
 
 #include <linux/percpu.h>
@@ -32,28 +32,40 @@ typedef void (elevator_exit_fn) (elevator_t *);
 
 struct elevator_ops
 {
+	//检查一个新的请求是否可以与现存请求合并
 	elevator_merge_fn *elevator_merge_fn;
+	//在两个请求合并后调用,返回io调度器中因为合并而不再需要的那部分管理数据
 	elevator_merged_fn *elevator_merged_fn;
+	//将两个请求合并为一个请求
 	elevator_merge_req_fn *elevator_merge_req_fn;
 	elevator_allow_merge_fn *elevator_allow_merge_fn;
 
+	//从给定的请求队列中选择下一步应该调度执行的请求
 	elevator_dispatch_fn *elevator_dispatch_fn;
+	//向请求队列添加请求
 	elevator_add_req_fn *elevator_add_req_fn;
 	elevator_activate_req_fn *elevator_activate_req_fn;
 	elevator_deactivate_req_fn *elevator_deactivate_req_fn;
 
+	//检查队列是否包含可供处理的请求
 	elevator_queue_empty_fn *elevator_queue_empty_fn;
 	elevator_completed_req_fn *elevator_completed_req_fn;
 
+	//查找给定请求的前一个请求
 	elevator_request_list_fn *elevator_former_req_fn;
+	//查找给定请求的后一个请求
 	elevator_request_list_fn *elevator_latter_req_fn;
 
+	//创建新请求时调用,用于分配,初始化管理数据
 	elevator_set_req_fn *elevator_set_req_fn;
+	//释放管理数据
 	elevator_put_req_fn *elevator_put_req_fn;
 
 	elevator_may_queue_fn *elevator_may_queue_fn;
 
+	//队列初始化时调用
 	elevator_init_fn *elevator_init_fn;
+	//队列释放时调用
 	elevator_exit_fn *elevator_exit_fn;
 	void (*trim)(struct io_context *);
 };
@@ -71,7 +83,9 @@ struct elv_fs_entry {
  */
 struct elevator_type
 {
+	//链表成员,链表头是elv_list
 	struct list_head list;
+	//调度器操作方法
 	struct elevator_ops ops;
 	struct elv_fs_entry *elevator_attrs;
 	char elevator_name[ELV_NAME_MAX];
@@ -83,9 +97,11 @@ struct elevator_type
  */
 struct elevator_queue
 {
+	//调度器操作方法
 	struct elevator_ops *ops;
 	void *elevator_data;
 	struct kobject kobj;
+	//调度器类型
 	struct elevator_type *elevator_type;
 	struct mutex sysfs_lock;
 	struct hlist_head *hash;

@@ -530,7 +530,7 @@ void add_disk(struct gendisk *disk)
 		WARN_ON(1);
 		return;
 	}
-	//磁盘第一个分区的设备号
+	//磁盘(第一个分区)的设备号
 	disk_to_dev(disk)->devt = devt;
 
 	/* ->major and ->first_minor aren't supposed to be
@@ -543,8 +543,10 @@ void add_disk(struct gendisk *disk)
 	blk_register_region(disk_devt(disk), disk->minors, NULL,
 			    exact_match, exact_lock, disk);
 	register_disk(disk);
+	//主要也就是在sysfs生成一些queue相关的文件
 	blk_register_queue(disk);
 
+	//处理bdi
 	bdi = &disk->queue->backing_dev_info;
 	bdi_register_dev(bdi, disk_devt(disk));
 	retval = sysfs_create_link(&disk_to_dev(disk)->kobj, &bdi->dev->kobj,

@@ -141,6 +141,7 @@ static void elevator_put(struct elevator_type *e)
 	module_put(e->elevator_owner);
 }
 
+//内核空间获取模块,如果失败就会调用modprobe加载相应模块,再次获取
 static struct elevator_type *elevator_get(const char *name)
 {
 	struct elevator_type *e;
@@ -149,17 +150,22 @@ static struct elevator_type *elevator_get(const char *name)
 
 	e = elevator_find(name);
 	if (!e) {
+		//在内核空间中没有找到对应name的算法
 		char elv[ELV_NAME_MAX + strlen("-iosched")];
 
 		spin_unlock(&elv_list_lock);
 
 		if (!strcmp(name, "anticipatory"))
+			//anticipatory算法的模块名是as-iosched.ko
 			sprintf(elv, "as-iosched");
 		else
+			//其它算法的模块名称如cfq-iosched.ko,deadline-iosched.ko
 			sprintf(elv, "%s-iosched", name);
 
+		//调用用户空间的modprobe加载算法模块
 		request_module("%s", elv);
 		spin_lock(&elv_list_lock);
+		//再次在内核空间查找name算法模块
 		e = elevator_find(name);
 	}
 
@@ -184,6 +190,7 @@ static void elevator_attach(struct request_queue *q, struct elevator_queue *eq,
 	eq->elevator_data = data;
 }
 
+//接收命令行参数
 static char chosen_elevator[16];
 
 static int __init elevator_setup(char *str)
@@ -192,6 +199,7 @@ static int __init elevator_setup(char *str)
 	 * Be backwards-compatible with previous kernels, so users
 	 * won't get the wrong elevator.
 	 */
+	//命令行可以使用elevator=as或elevator=anticipatory指定调度算法
 	if (!strcmp(str, "as"))
 		strcpy(chosen_elevator, "anticipatory");
 	else
@@ -218,12 +226,14 @@ static elevator_t *elevator_alloc(struct request_queue *q,
 	kobject_init(&eq->kobj, &elv_ktype);
 	mutex_init(&eq->sysfs_lock);
 
+	//分配hash头数组
 	eq->hash = kmalloc_node(sizeof(struct hlist_head) * ELV_HASH_ENTRIES,
 					GFP_KERNEL, q->node);
 	if (!eq->hash)
 		goto err;
 
 	for (i = 0; i < ELV_HASH_ENTRIES; i++)
+		//初始化hash table中每一个head
 		INIT_HLIST_HEAD(&eq->hash[i]);
 
 	return eq;
@@ -255,12 +265,14 @@ int elevator_init(struct request_queue *q, char *name)
 	q->boundary_rq = NULL;
 
 	if (name) {
+		//指定name的情况
 		e = elevator_get(name);
 		if (!e)
 			return -EINVAL;
 	}
 
 	if (!e && *chosen_elevator) {
+		//未指定name并且命令行参数中指定了算法模块的情况
 		e = elevator_get(chosen_elevator);
 		if (!e)
 			printk(KERN_ERR "I/O scheduler %s not found\n",
@@ -268,6 +280,7 @@ int elevator_init(struct request_queue *q, char *name)
 	}
 
 	if (!e) {
+		//未指定name并且命令行参数中未指定算法模块的情况,使用.config配置的算法
 		e = elevator_get(CONFIG_DEFAULT_IOSCHED);
 		if (!e) {
 			printk(KERN_ERR
@@ -281,6 +294,7 @@ int elevator_init(struct request_queue *q, char *name)
 	if (!eq)
 		return -ENOMEM;
 
+	//调用调度器来初始化一个请求队列,对于noop来说,返回一个noop链表头
 	data = elevator_init_queue(q, eq);
 	if (!data) {
 		kobject_put(&eq->kobj);
@@ -1012,6 +1026,7 @@ int elv_register_queue(struct request_queue *q)
 	elevator_t *e = q->elevator;
 	int error;
 
+	//在/sys/block/diskname/queue下生成iosched目录
 	error = kobject_add(&e->kobj, &q->kobj, "%s", "iosched");
 	if (!error) {
 		struct elv_fs_entry *attr = e->elevator_type->elevator_attrs;
@@ -1045,12 +1060,14 @@ void elv_register(struct elevator_type *e)
 
 	spin_lock(&elv_list_lock);
 	BUG_ON(elevator_find(e->elevator_name));
+	//尾插到elv_list链表
 	list_add_tail(&e->list, &elv_list);
 	spin_unlock(&elv_list_lock);
 
 	if (!strcmp(e->elevator_name, chosen_elevator) ||
 			(!*chosen_elevator &&
 			 !strcmp(e->elevator_name, CONFIG_DEFAULT_IOSCHED)))
+			 //当register的调度算法是命令行传递的或者是.config文件指定的
 				def = " (default)";
 
 	printk(KERN_INFO "io scheduler %s registered%s\n", e->elevator_name,

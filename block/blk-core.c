@@ -593,7 +593,7 @@ blk_init_queue_node(request_fn_proc *rfn, spinlock_t *lock, int node_id)
 	if (!lock)
 		lock = &q->__queue_lock;
 
-	//请求处理函数
+	//使用参数请求处理函数
 	q->request_fn		= rfn;
 	q->prep_rq_fn		= NULL;
 	//拔出设备函数
@@ -618,10 +618,12 @@ blk_init_queue_node(request_fn_proc *rfn, spinlock_t *lock, int node_id)
 	 * all done
 	 */
 	if (!elevator_init(q, NULL)) {
+		//调度器初始化成功
 		blk_queue_congestion_threshold(q);
 		return q;
 	}
 
+	//调度器初始化失败
 	blk_put_queue(q);
 	return NULL;
 }

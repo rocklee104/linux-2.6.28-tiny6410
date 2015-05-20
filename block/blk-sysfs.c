@@ -349,6 +349,7 @@ int blk_register_queue(struct gendisk *disk)
 
 	kobject_uevent(&q->kobj, KOBJ_ADD);
 
+	//在/sys/block/diskname/queue下生成iosched目录
 	ret = elv_register_queue(q);
 	if (ret) {
 		kobject_uevent(&q->kobj, KOBJ_REMOVE);
