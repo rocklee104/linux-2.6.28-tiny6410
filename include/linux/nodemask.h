@@ -361,15 +361,18 @@ static inline void __nodes_fold(nodemask_t *dstp, const nodemask_t *origp,
  * Bitmasks that are kept for all the nodes.
  */
 //N_POSSIBLE, N_ONLINE, N_CPU are used for cpu & memory hot plugin
+//如果系统中结点多于1个,内核会维护一个位图,用以提供各个节点的状态信息
 enum node_states {
 	N_POSSIBLE,		/* The node could become online at some point */
 	N_ONLINE,		/* The node is online */
+	//结点有普通内存域
 	N_NORMAL_MEMORY,	/* The node has regular memory */
 #ifdef CONFIG_HIGHMEM
 	N_HIGH_MEMORY,		/* The node has regular or high memory */
 #else
 	N_HIGH_MEMORY = N_NORMAL_MEMORY,
 #endif
+	//结点有一个或多个cpu
 	N_CPU,		/* The node has one or more cpus */
 	NR_NODE_STATES
 };
@@ -388,6 +391,7 @@ static inline int node_state(int node, enum node_states state)
 	return node_isset(node, node_states[state]);
 }
 
+//设置特定结点的状态
 static inline void node_set_state(int node, enum node_states state)
 {
     //node_states is global variable defined in page_alloc.c
