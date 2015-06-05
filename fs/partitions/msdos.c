@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  fs/partitions/msdos.c
  *
  *  Code extracted from drivers/block/genhd.c
@@ -422,6 +422,7 @@ int msdos_partition(struct parsed_partitions *state, struct block_device *bdev)
 	struct fat_boot_sector *fb;
 	int slot;
 
+	//读取sector 0
 	data = read_dev_sector(bdev, 0, &sect);
 	if (!data)
 		return -1;

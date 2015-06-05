@@ -127,6 +127,7 @@ static struct inode *alloc_inode(struct super_block *sb)
 		inode = (struct inode *) kmem_cache_alloc(inode_cachep, GFP_KERNEL);
 
 	if (inode) {
+		//inode->i_mapping最终会指向&inode->i_data
 		struct address_space * const mapping = &inode->i_data;
 
 		//inode的i_sb指向sb

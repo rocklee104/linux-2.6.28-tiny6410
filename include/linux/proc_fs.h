@@ -1,4 +1,4 @@
-#ifndef _LINUX_PROC_FS_H
+﻿#ifndef _LINUX_PROC_FS_H
 #define _LINUX_PROC_FS_H
 
 #include <linux/slab.h>
@@ -46,6 +46,14 @@ enum {
  * from unloading while proc_dir_entry is in use
  */
 
+/*
+ * page: 指向用来写入数据的缓冲区
+ * start: 返回实际数据写到内存页的哪个位置
+ * eof: 指向一个整形树,当没有数据可以返回时,驱动程序必须设置这个参数
+ * data: 驱动程序的专用数据指针
+ *
+ * return: 放到内存页缓冲区的字节数
+*/
 typedef	int (read_proc_t)(char *page, char **start, off_t off,
 			  int count, int *eof, void *data);
 typedef	int (write_proc_t)(struct file *file, const char __user *buffer,

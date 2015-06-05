@@ -525,6 +525,7 @@ struct request_queue
 #define QUEUE_FLAG_NOMERGES    10	/* disable merge attempts */
 #define QUEUE_FLAG_SAME_COMP   11	/* force complete on same CPU */
 #define QUEUE_FLAG_FAIL_IO     12	/* fake timeout */
+//对request进行排队处理,否则直接分发,在2.6.28中貌似没什么作用
 #define QUEUE_FLAG_STACKABLE   13	/* supports request stacking */
 #define QUEUE_FLAG_NONROT      14	/* non-rotational device (SSD) */
 
@@ -730,6 +731,7 @@ extern unsigned long blk_max_low_pfn, blk_max_pfn;
  */
 
 #if BITS_PER_LONG == 32
+//不使用回弹缓冲区的最高地址
 #define BLK_BOUNCE_HIGH		((u64)blk_max_low_pfn << PAGE_SHIFT)
 #else
 #define BLK_BOUNCE_HIGH		-1ULL
@@ -1033,6 +1035,7 @@ static inline int blk_rq_aligned(struct request_queue *q, void *addr,
 /* assumes size > 256 */
 static inline unsigned int blksize_bits(unsigned int size)
 {
+	//一个字节8位
 	unsigned int bits = 8;
 	do {
 		bits++;

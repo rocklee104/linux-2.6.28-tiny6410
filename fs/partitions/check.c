@@ -600,6 +600,7 @@ int rescan_partitions(struct gendisk *disk, struct block_device *bdev)
 
 unsigned char *read_dev_sector(struct block_device *bdev, sector_t n, Sector *p)
 {
+	//mapping在bdget中给inode赋值的i_mapping(指向i_data)
 	struct address_space *mapping = bdev->bd_inode->i_mapping;
 	struct page *page;
 

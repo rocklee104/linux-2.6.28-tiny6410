@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  bootmem - A boot-time physical memory allocator and configurator
  *
  *  Copyright (C) 1999 Ingo Molnar
@@ -19,6 +19,7 @@
 
 #include "internal.h"
 
+//最大低端内存可以使用的page
 unsigned long max_low_pfn;
 unsigned long min_low_pfn;
 unsigned long max_pfn;

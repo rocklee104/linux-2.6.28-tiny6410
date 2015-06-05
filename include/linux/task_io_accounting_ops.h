@@ -55,6 +55,7 @@ static inline void task_blk_io_accounting_add(struct task_io_accounting *dst,
 
 #else
 
+//tiny6410
 static inline void task_io_account_read(size_t bytes)
 {
 }

@@ -218,6 +218,11 @@ enum zone_type {
 	 * i386, x86_64 and multiple other arches
 	 * 			<16M.
 	 */
+	/*
+	 * 当有些设备不能使用所有的ZONE_NORMAL区域中的内存空间做DMA访问时,就可以
+	 * 使用ZONE_DMA,所表示的内存区域.于是我们把这部分空间划分出来专门用作DMA
+	 * 访问的内存空间.该区域的访问是处理器体系架构相关的.
+	 */
 	ZONE_DMA,
 #endif
 #ifdef CONFIG_ZONE_DMA32
@@ -234,9 +239,10 @@ enum zone_type {
 	 * performed on pages in ZONE_NORMAL if the DMA devices support
 	 * transfers to all addressable memory.
 	 */
+	//常规内存访问.如果DMA设备支持在此区域内存访问,也可以使用本区域
 	ZONE_NORMAL,
 #ifdef CONFIG_HIGHMEM
-//6410 256MB的内存,没有高端内存T-T
+	//6410 256MB的内存,没有高端内存T-T
 	/*
 	 * A memory area that is only addressable by the kernel through
 	 * mapping portions into its own address space. This is for example
@@ -244,6 +250,11 @@ enum zone_type {
 	 * 900MB. The kernel will set up special mappings (page
 	 * table entries on i386) for each page that the kernel needs to
 	 * access.
+	 */
+	/*
+	 * 这个区域的内存只能只能通过内核将其映射到内核地址空间访问.比如在
+	 * i386构架中,内核空间1GB,除去其他一些开销,能对物理地址进行线性映射
+	 * 的空间大约只有896MB,此时高于896MB以上的物理地址空间就叫ZONE_HIGHMEM.
 	 */
 	ZONE_HIGHMEM,
 #endif

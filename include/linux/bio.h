@@ -90,7 +90,7 @@ struct bio {
 	//合并之后bio中物理段的数目
 	unsigned int		bi_phys_segments;
 
-	//需要传送的字节数,通常使用bio_sectors(bio)宏获取每个扇区的大小
+	//需要传送的字节数
 	unsigned int		bi_size;	/* residual I/O count */
 
 	/*
@@ -534,6 +534,7 @@ extern void bio_integrity_init_slab(void);
 
 #else /* CONFIG_BLK_DEV_INTEGRITY */
 
+//tiny6410
 #define bio_integrity(a)		(0)
 #define bioset_integrity_create(a, b)	(0)
 #define bio_integrity_prep(a)		(0)

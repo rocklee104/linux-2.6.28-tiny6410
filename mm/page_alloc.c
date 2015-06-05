@@ -1,4 +1,4 @@
-/*
+ï»¿/*
  *  linux/mm/page_alloc.c
  *
  *  Manages the free list, the system allocates free pages here.
@@ -1458,6 +1458,7 @@ __alloc_pages_internal(gfp_t gfp_mask, unsigned int order,
 			struct zonelist *zonelist, nodemask_t *nodemask)
 {
 	const gfp_t wait = gfp_mask & __GFP_WAIT;
+	//ç¡®å®šåˆ†é…çš„pageåœ¨å“ªä¸ªå†…å­˜åŒº
 	enum zone_type high_zoneidx = gfp_zone(gfp_mask);
 	struct zoneref *z;
 	struct zone *zone;
@@ -1671,6 +1672,7 @@ unsigned long __get_free_pages(gfp_t gfp_mask, unsigned int order)
 	page = alloc_pages(gfp_mask, order);
 	if (!page)
 		return 0;
+	//è¿”å›åˆ†é…çš„ç‰©ç†é¡µé¢çš„è™šæ‹Ÿåœ°å€
 	return (unsigned long) page_address(page);
 }
 
@@ -2485,15 +2487,15 @@ void build_all_zonelists(void)
 #define PAGES_PER_WAITQUEUE	256
 
 #ifndef CONFIG_MEMORY_HOTPLUG
-//Ò»°ã²»»áÓĞÉè±¸Ö§³Ömemory hotplug
+//ä¸€èˆ¬ä¸ä¼šæœ‰è®¾å¤‡æ”¯æŒmemory hotplug
 static inline unsigned long wait_table_hash_nr_entries(unsigned long pages)
 {
 	unsigned long size = 1;
 
-    //Ã¿256¸öpages·ÖÅäÒ»¸öµÈ´ı¶ÓÁĞÍ·
+    //æ¯256ä¸ªpagesåˆ†é…ä¸€ä¸ªç­‰å¾…é˜Ÿåˆ—å¤´
 	pages /= PAGES_PER_WAITQUEUE;
 
-    //µÈ´ı¶ÓÁĞÍ·µÄ¸öÊı±ØĞëÊÇ2µÄn´Î·½
+    //ç­‰å¾…é˜Ÿåˆ—å¤´çš„ä¸ªæ•°å¿…é¡»æ˜¯2çš„næ¬¡æ–¹
 	while (size < pages)
 		size <<= 1;
 
@@ -2502,10 +2504,10 @@ static inline unsigned long wait_table_hash_nr_entries(unsigned long pages)
 	 * on IO we've got bigger problems than wait queue collision.
 	 * Limit the size of the wait table to a reasonable size.
 	 */
-    //µÈ´ı¶ÓÁĞÍ·µÄ¸öÊı²»ÄÜ³¬¹ı4096
+    //ç­‰å¾…é˜Ÿåˆ—å¤´çš„ä¸ªæ•°ä¸èƒ½è¶…è¿‡4096
 	size = min(size, 4096UL);
 
-    //µÈ´ı¶ÓÁĞÍ·µÄ¸öÊı²»ÄÜĞ¡ÓÚ4
+    //ç­‰å¾…é˜Ÿåˆ—å¤´çš„ä¸ªæ•°ä¸èƒ½å°äº4
 	return max(size, 4UL);
 }
 #else
@@ -2873,12 +2875,12 @@ int zone_wait_table_init(struct zone *zone, unsigned long zone_size_pages)
 		 wait_table_hash_nr_entries(zone_size_pages);
 	zone->wait_table_bits =
 		wait_table_bits(zone->wait_table_hash_nr_entries);
-    //µÈ´ı¶ÓÁĞÍ·×Ü¹²Õ¼ÓÃµÄ¿Õ¼ä
+    //ç­‰å¾…é˜Ÿåˆ—å¤´æ€»å…±å ç”¨çš„ç©ºé—´
 	alloc_size = zone->wait_table_hash_nr_entries
 					* sizeof(wait_queue_head_t);
 
 	if (!slab_is_available()) {
-        //slab»¹ÓÃ²»ÁËµÄÊ±ºò¾ÍÓÃalloc_bootmem_node·ÖÅä¿Õ¼ä
+        //slabè¿˜ç”¨ä¸äº†çš„æ—¶å€™å°±ç”¨alloc_bootmem_nodeåˆ†é…ç©ºé—´
 		zone->wait_table = (wait_queue_head_t *)
 			alloc_bootmem_node(pgdat, alloc_size);
 	} else {
@@ -2898,7 +2900,7 @@ int zone_wait_table_init(struct zone *zone, unsigned long zone_size_pages)
 		return -ENOMEM;
 
 	for(i = 0; i < zone->wait_table_hash_nr_entries; ++i)
-        //³õÊ¼»¯ËùÓĞµÄµÈ´ı¶ÓÁĞÍ·
+        //åˆå§‹åŒ–æ‰€æœ‰çš„ç­‰å¾…é˜Ÿåˆ—å¤´
 		init_waitqueue_head(zone->wait_table + i);
 
 	return 0;
