@@ -173,13 +173,19 @@ static inline int is_unevictable_lru(enum lru_list l)
 }
 
 struct per_cpu_pages {
+	//如果count值超过了high,表明链表中的页太多了
 	int count;		/* number of pages in the list */
 	int high;		/* high watermark, emptying needed */
+	/* 
+	 * 如果可能,CPU高速缓存不是用单个页来填充,而是多个页组成的块.
+	 * batch是每次添加页数的一个参考值
+	 */
 	int batch;		/* chunk size for buddy add/remove */
 	struct list_head list;	/* the list of pages */
 };
 
 struct per_cpu_pageset {
+	//冷热页放到同一个链表中
 	struct per_cpu_pages pcp;
 #ifdef CONFIG_NUMA
 	s8 expire;
@@ -320,6 +326,7 @@ struct zone {
 	 */
 	unsigned long		min_unmapped_pages;
 	unsigned long		min_slab_pages;
+	//NR_CPUS指的不是系统中实际的CPU数目,而是内核支持的CPU的最大数目
 	struct per_cpu_pageset	*pageset[NR_CPUS];
 #else
     //用于实现per-CPU的冷热页帧列表.内核使用这些列表来保存可用于满足实现的fresh page.
@@ -479,8 +486,8 @@ struct zone {
 typedef enum {
 	/*
      * 这个状态出现在内核试图重用该内存域的一些页时,但因为所有的页都被钉住了,
-     * 而无法回收,例如用户空间应用程序可以使用mblock系统调用通知内核页不能
-     * 从物理内存移出,比如换出到磁盘,这样的页称为钉住的.如果一个内存域中的所有
+     * 而无法回收,例如用户空间应用程序可以使用mlock系统调用通知内核页不能从
+     * 物理内存移出,比如换出到磁盘,这样的页称为钉住的.如果一个内存域中的所有
      * 页都被钉住,那么该内存域是无法回收的,即设置该标志.为了不浪费时间,交换
      * 守护进程在寻找可供回收的页时,只会简单地扫描一下此类内存域.
  	 */

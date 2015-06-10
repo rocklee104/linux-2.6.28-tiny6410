@@ -325,8 +325,6 @@ static void __init smdk6410_smc911x_set(void)
 
 static void __init smdk6410_machine_init(void)
 {
-	unsigned int tmp;
-
 	s3c_device_nand.dev.platform_data = &s3c_nand_mtd_part_info;
 	s3c_device_onenand.dev.platform_data = &s3c_onenand_data;
 

@@ -119,7 +119,7 @@ static char * const zone_names[MAX_NR_ZONES] = {
 	 "Movable",
 };
 
-//minimum memory space that must remain free for critical allocations
+//用于关键性分配的内存空间最小值
 int min_free_kbytes = 1024;
 
 unsigned long __meminitdata nr_kernel_pages;

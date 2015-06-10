@@ -41,11 +41,13 @@ struct page {
 					 * updated asynchronously */
 	atomic_t _count;		/* Usage count, see below. */
 	union {
+		//页表中有多少页指向该页
 		atomic_t _mapcount;	/* Count of ptes mapped in mms,
 					 * to show when page is mapped
 					 * & limit reverse map searches.
 					 */
 		struct {		/* SLUB */
+			//用于SLUB分配器:对象的数目
 			u16 inuse;
 			u16 objects;
 		};
@@ -59,6 +61,10 @@ struct page {
 						 * indicates order in the buddy
 						 * system if PG_buddy is set.
 						 */
+		/* 
+		 * 如果mapping最低位是1,则该指针并不指向address_space,而是指向
+		 * anon_vma,该结构对实现匿名映射很重要.
+		 */
 		struct address_space *mapping;	/* If low bit clear, points to
 						 * inode address_space, or NULL.
 						 * If page mapped as anonymous
@@ -71,12 +77,21 @@ struct page {
 	    spinlock_t ptl;
 #endif
 	    struct kmem_cache *slab;	/* SLUB: Pointer to slab */
+		/*
+		 * 内核可以将多个毗邻的页合并为较大的复合页。分组的第一个页叫首页,
+		 * 而所有其余各页叫做尾页.所有尾页对应的page实例中,都将first_page
+		 * 指向首页.
+		 */
 	    struct page *first_page;	/* Compound tail pages */
 	};
 	union {
 		pgoff_t index;		/* Our offset within mapping. */
 		void *freelist;		/* SLUB: freelist req. slab lock */
 	};
+	/* 
+	 * 链表成员,用于将page加入各种链表,以便将page按不同类别分类.
+	 * 最重要的类别是活动页和不活动页.
+	 */
 	struct list_head lru;		/* Pageout list, eg. active_list
 					 * protected by zone->lru_lock !
 					 */
@@ -91,6 +106,7 @@ struct page {
 	 * WANT_PAGE_VIRTUAL in asm/page.h
 	 */
 #if defined(WANT_PAGE_VIRTUAL)
+	//无法映射到内核内存中的页(高端内存页)的虚拟地址
 	void *virtual;			/* Kernel virtual address (NULL if
 					   not kmapped, ie. highmem) */
 #endif /* WANT_PAGE_VIRTUAL */

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Macros for manipulating and testing page->flags
  */
 
@@ -72,25 +72,35 @@
 enum pageflags {
 	PG_locked,		/* Page is locked. Don't touch. */
 	PG_error,
+	//控制了系统使用该页的活跃程度.
 	PG_referenced,
 	PG_uptodate,
+	//内存中的数据与外存上的不同步
 	PG_dirty,
+	//内核使用2个lru链表,来区别活动和不活动页,如果页在其中一个链表中,则设置该标志
 	PG_lru,
+	//如果page在活动链表中,设置该标志
 	PG_active,
+	//如果页是slab分配器的一部分
 	PG_slab,
 	PG_owner_priv_1,	/* Owner use. If pagecache, fs may use*/
 	PG_arch_1,
 	PG_reserved,
+	//如果page的private成员非空
 	PG_private,		/* If pagecache, has fs-private data */
+	//如果页的内容处于向块设备会写过程中
 	PG_writeback,		/* Page is under writeback */
 #ifdef CONFIG_PAGEFLAGS_EXTENDED
 	PG_head,		/* A head page */
 	PG_tail,		/* A tail page */
 #else
+	//该页属于一个更大的复合页
 	PG_compound,		/* A compound page */
 #endif
+	//如果页处于交换缓存
 	PG_swapcache,		/* Swap page: swp_entry_t in private */
 	PG_mappedtodisk,	/* Has blocks allocated on-disk */
+	//在内核决定回收某个特定的页后,需要设置PG_reclaim
 	PG_reclaim,		/* To be reclaimed asap */
 	PG_buddy,		/* Page is free, on buddy lists */
 	PG_swapbacked,		/* Page is backed by RAM/swap */
