@@ -113,35 +113,43 @@
 		.align
 start:
 		.type	start,#function
+        //重复8次,空出中断向量表的位置. 
 		.rept	8
+        //就是nop指令
 		mov	r0, r0
+        //.endr结束循环
 		.endr
 
 		b	1f
 		.word	0x016f2818		@ Magic numbers to help the loader
 		.word	start			@ absolute load/run zImage address
 		.word	_edata			@ zImage end address
+        /*
+         * u-boot中调用theKernel(0, machid, bd->bi_boot_params);
+         * 将machid保存在r1.参数链表物理地址保存在r2.
+         */
+        //将machid移动到r7
 1:		mov	r7, r1			@ save architecture ID
+        //将参数链表地址移动到r8
 		mov	r8, r2			@ save atags pointer
 
-#ifndef __ARM_ARCH_2__
 		/*
 		 * Booting from Angel - need to enter SVC mode and disable
 		 * FIQs/IRQs (numeric definitions from angel arm.h source).
 		 * We only do this if we were in user mode on entry.
 		 */
+        //取出cpsr的值
 		mrs	r2, cpsr		@ get current mode
+        //user模式下cpsr最后2位均为0
 		tst	r2, #3			@ not user?
 		bne	not_angel
 		mov	r0, #0x17		@ angel_SWIreason_EnterSVC
 		swi	0x123456		@ angel_SWI_ARM
 not_angel:
+        //取出cpsr的值
 		mrs	r2, cpsr		@ turn off interrupts to
 		orr	r2, r2, #0xc0		@ prevent angel from running
 		msr	cpsr_c, r2
-#else
-		teqp	pc, #0x0c000003		@ turn off interrupts
-#endif
 
 		/*
 		 * Note that some cache flushing and other stuff may
