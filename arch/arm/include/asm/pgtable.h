@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  arch/arm/include/asm/pgtable.h
  *
  *  Copyright (C) 1995-2002 Russell King
@@ -279,15 +279,20 @@ extern struct page *empty_zero_page;
  * The following only work if pte_present() is true.
  * Undefined behaviour if not..
  */
+//如果一个页表项的present标志或page size等于1,pte_present产生的值为1
 #define pte_present(pte)	(pte_val(pte) & L_PTE_PRESENT)
+//读user/supervisor标志
 #define pte_write(pte)		(pte_val(pte) & L_PTE_WRITE)
+//读dirty标志
 #define pte_dirty(pte)		(pte_val(pte) & L_PTE_DIRTY)
+//读access标志
 #define pte_young(pte)		(pte_val(pte) & L_PTE_YOUNG)
 #define pte_special(pte)	(0)
 
 /*
  * The following only works if pte_present() is not true.
  */
+//读dirty标志
 #define pte_file(pte)		(pte_val(pte) & L_PTE_FILE)
 #define pte_to_pgoff(x)		(pte_val(x) >> 2)
 #define pgoff_to_pte(x)		__pte(((x) << 2) | L_PTE_FILE)
@@ -362,19 +367,30 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
 #define set_pgd(pgd,pgdp)	do { } while (0)
 
 /* to find an entry in a page-table-directory */
+//找到线性地址addr对应的目录项在页全局目录中的index
 #define pgd_index(addr)		((addr) >> PGDIR_SHIFT)
 
+/*
+ * 接收内存描述符地址mm和线性地址addr作为参数.这个宏产生地址addr在页全局目录
+ * 中相应表项的线性地址.通过内存描述符mm内的一个指针可以找到这个页全局目录.
+ */
 #define pgd_offset(mm, addr)	((mm)->pgd+pgd_index(addr))
 
 /* to find an entry in a kernel page-table-directory */
+//产生主内核页全局目录中的某个项的线性地址,该项对应于地址addr
 #define pgd_offset_k(addr)	pgd_offset(&init_mm, addr)
 
 /* Find an entry in the second-level page table.. */
+/*
+ * 接收指向页上级目录项的指针dir和线性地址addr作为参数.这个宏产生目录项addr
+ * 在页中间目录中的偏移地址.在两级或三级分页系统中,它产生pud,即页全局目录项的地址.
+ */
 #define pmd_offset(dir, addr)	((pmd_t *)(dir))
 
 /* Find an entry in the third-level page table.. */
 #define __pte_index(addr)	(((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
 
+//把所有页表项pte的访问权限设置为newprot
 static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 {
 	const unsigned long mask = L_PTE_EXEC | L_PTE_WRITE | L_PTE_USER;

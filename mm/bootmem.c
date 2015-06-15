@@ -19,9 +19,11 @@
 
 #include "internal.h"
 
-//最大低端内存可以使用的page
+//被内核直接映射后的最后一个页框的页框号(低地址内存)
 unsigned long max_low_pfn;
+//ram在内核映像后第一个可用页框的页框号
 unsigned long min_low_pfn;
+//最后一个可用的页框号
 unsigned long max_pfn;
 
 #ifdef CONFIG_CRASH_DUMP
