@@ -113,11 +113,11 @@
 		.align
 start:
 		.type	start,#function
-        //重复8次,空出中断向量表的位置. 
+		#重复8次,空出中断向量表的位置. 
 		.rept	8
-        //就是nop指令
+		#就是nop指令
 		mov	r0, r0
-        //.endr结束循环
+		#.endr结束循环
 		.endr
 
 		b	1f
@@ -128,9 +128,9 @@ start:
          * u-boot中调用theKernel(0, machid, bd->bi_boot_params);
          * 将machid保存在r1.参数链表物理地址保存在r2.
          */
-        //将machid移动到r7
+		#将machid移动到r7
 1:		mov	r7, r1			@ save architecture ID
-        //将参数链表地址移动到r8
+		#将参数链表地址移动到r8
 		mov	r8, r2			@ save atags pointer
 
 		/*
@@ -138,17 +138,19 @@ start:
 		 * FIQs/IRQs (numeric definitions from angel arm.h source).
 		 * We only do this if we were in user mode on entry.
 		 */
-        //取出cpsr的值
+		#取出cpsr的值
 		mrs	r2, cpsr		@ get current mode
-        //user模式下cpsr最后2位均为0
+		#user模式下cpsr最后2位均为0
 		tst	r2, #3			@ not user?
 		bne	not_angel
 		mov	r0, #0x17		@ angel_SWIreason_EnterSVC
 		swi	0x123456		@ angel_SWI_ARM
 not_angel:
-        //取出cpsr的值
+		#取出cpsr的值
 		mrs	r2, cpsr		@ turn off interrupts to
+		#orr按位或,禁止irq/fiq 
 		orr	r2, r2, #0xc0		@ prevent angel from running
+		#将r2写入cpsr
 		msr	cpsr_c, r2
 
 		/*
@@ -162,11 +164,27 @@ not_angel:
 		 */
 
 		.text
+		#r0中保存当前正在运行时LC0的地址
 		adr	r0, LC0
+		/*
+		 * ia,每次传送后地址加4,将r0指向的地址中的数据读取到
+		 * r1, r2, r3, r4, r5, r6, ip, sp中.最后结果:
+		 *
+		 * LC0			   -> r1
+		 * __bss_start	   -> r2
+		 * _end			   -> r3
+		 * zreladdr		   -> r4
+		 * _start		   -> r5
+		 * _got_start	   -> r6
+		 * _got_end		   -> ip
+		 * user_stack+4096 -> sp
+		 */
 		ldmia	r0, {r1, r2, r3, r4, r5, r6, ip, sp}
+		#当前运行地址与链接地址的偏移量存入r0中
 		subs	r0, r0, r1		@ calculate the delta offset
 
 						@ if delta is zero, we are
+		#r0中的值和r1中的一致,就跳转到not_relocated
 		beq	not_relocated		@ running at the address we
 						@ were linked at.
 
@@ -177,7 +195,9 @@ not_angel:
 		 *   r6 - GOT start
 		 *   ip - GOT end
 		 */
+		#如果链接地址和运行地址不一致,那么就需要调整其他寄存器中的值
 		add	r5, r5, r0
+		#修正GOT表的起始位置
 		add	r6, r6, r0
 		add	ip, ip, r0
 
@@ -196,13 +216,18 @@ not_angel:
 		/*
 		 * Relocate all entries in the GOT table.
 		 */
+		#取出GOT表中的第一个entry
 1:		ldr	r1, [r6, #0]		@ relocate entries in the GOT
+		#entry指向的地址也需要相对重定向到运行地址上来
 		add	r1, r1, r0		@ table.  This fixes up the
+		#将新的地址写入GOT表的entry中,r6 = r6 + 4,也就是指向下一entry
 		str	r1, [r6], #4		@ C references.
+		#判断是否超过_got_end,cmp指令实际上是进行了一次减法运算,更行条件标志位
 		cmp	r6, ip
+		#当r6小于ip,就跳转到之前的1这个标签中
 		blo	1b
 #else
-
+		#若定义了CONFIG_ZBOOT_ROM,只对GOT表中bss段以外的符号进行重定位
 		/*
 		 * Relocate entries in the GOT table.  We only relocate
 		 * the entries that are outside the (relocated) BSS region.
@@ -217,11 +242,13 @@ not_angel:
 #endif
 
 not_relocated:	mov	r0, #0
+#初始化bss段
 1:		str	r0, [r2], #4		@ clear bss
 		str	r0, [r2], #4
 		str	r0, [r2], #4
 		str	r0, [r2], #4
 		cmp	r2, r3
+		#还在bss段内,就跳转到之前的1标签中
 		blo	1b
 
 		/*
@@ -229,6 +256,7 @@ not_relocated:	mov	r0, #0
 		 * sufficiently.  Turn the cache on, set up some
 		 * pointers, and start decompressing.
 		 */
+		#C runtime环境已经设置完成,下面要打开cache和mmu
 		bl	cache_on
 
 		mov	r1, sp			@ malloc space above stack
@@ -294,6 +322,7 @@ wont_overwrite:	mov	r0, r4
 		b	call_kernel
 
 		.type	LC0, #object
+#r1中保存的是链接时的LC0地址
 LC0:		.word	LC0			@ r1
 		.word	__bss_start		@ r2
 		.word	_end			@ r3
@@ -545,12 +574,16 @@ call_kernel:	bl	cache_clean_flush
 
 call_cache_fn:	adr	r12, proc_types
 #ifdef CONFIG_CPU_CP15
+		#将协处理器cp15的c0寄存器中的CPU ID保存到r6中
 		mrc	p15, 0, r6, c0, c0	@ get processor ID
 #else
 		ldr	r6, =CONFIG_PROCESSOR_ID
 #endif
+		#r1中保存的值为0x41560600
 1:		ldr	r1, [r12, #0]		@ get value
+		#r2中保存的值为0xffffffe0
 		ldr	r2, [r12, #4]		@ get mask
+		#eor:逻辑异或.
 		eor	r1, r1, r6		@ (real ^ match)
 		tst	r1, r2			@       & mask
 		addeq	pc, r12, r3		@ call cache function
