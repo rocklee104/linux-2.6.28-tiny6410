@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  linux/arch/arm/kernel/traps.c
  *
  *  Copyright (C) 1995-2002 Russell King
@@ -730,5 +730,6 @@ void __init early_trap_init(void)
 	       sizeof(sigreturn_codes));
 
 	flush_icache_range(vectors, vectors + PAGE_SIZE);
+	//使用arm的D1,设置类型为DOMAIN_CLIENT
 	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
 }

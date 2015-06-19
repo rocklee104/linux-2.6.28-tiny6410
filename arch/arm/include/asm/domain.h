@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  arch/arm/include/asm/domain.h
  *
  *  Copyright (C) 1999 Russell King.
@@ -28,6 +28,7 @@
  * 36-bit addressing and supersections are only available on
  * CPUs based on ARMv6+ or the Intel XSC3 core.
  */
+//arm11处理器定义了16种不同的域,但是linux只用到了D0-D2这3种
 #ifndef CONFIG_IO_36
 #define DOMAIN_KERNEL	0
 #define DOMAIN_TABLE	0
@@ -44,14 +45,27 @@
  * Domain types
  */
 #define DOMAIN_NOACCESS	0
+/*
+ * 根据CP15的C1控制寄存器中的R和S位以及页表中地址变换条目中的访问权限控制位AP
+ * 来确定是否允许各种系统工作模式的存储访问
+ */
 #define DOMAIN_CLIENT	1
+/*
+ * 不考虑CP15的C1控制寄存器中的R和S位以及页表中地址变换条目中的访问权限控制位AP,
+ * 在这种情况下不管系统工作在特权模式还是用户模式都不会产生访问失效
+ */
 #define DOMAIN_MANAGER	3
 
+/*
+ * 每个域的访问权限分别由CP15的C3寄存器中的两位来设定，c3寄存器的大小为32bits,
+ * 刚好可以设置16个域的访问权限.每个域占2位,故type需要左移2*(dom)位
+ */
 #define domain_val(dom,type)	((type) << (2*(dom)))
 
 #ifndef __ASSEMBLY__
 
 #ifdef CONFIG_MMU
+//通过修改cp15 c3的值来设置访问控制域
 #define set_domain(x)					\
 	do {						\
 	__asm__ __volatile__(				\
@@ -60,6 +74,7 @@
 	isb();						\
 	} while (0)
 
+//设置当前进程的访问控制域
 #define modify_domain(dom,type)					\
 	do {							\
 	struct thread_info *thread = current_thread_info();	\

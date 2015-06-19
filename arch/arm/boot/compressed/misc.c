@@ -1,4 +1,4 @@
-/*
+﻿/*
  * misc.c
  * 
  * This is a collection of several routines from gzip-1.0.3 
@@ -296,6 +296,11 @@ static void error(char *x)
 }
 
 #ifndef STANDALONE_DEBUG
+/*
+ * output_start:解压后内核的起始地址
+ * free_mem_ptr_p:栈的起始地址
+ * free_mem_ptr_end_p:栈的结束地址
+ */
 
 ulg
 decompress_kernel(ulg output_start, ulg free_mem_ptr_p, ulg free_mem_ptr_end_p,
@@ -312,6 +317,7 @@ decompress_kernel(ulg output_start, ulg free_mem_ptr_p, ulg free_mem_ptr_end_p,
 	putstr("Uncompressing Linux...");
 	gunzip();
 	putstr(" done, booting the kernel.\n");
+	//返回解压后内核的大小
 	return output_ptr;
 }
 #else

@@ -1,4 +1,4 @@
-/* the upper-most page table pointer */
+﻿/* the upper-most page table pointer */
 
 #ifdef CONFIG_MMU
 
@@ -17,9 +17,13 @@ static inline pmd_t *pmd_off_k(unsigned long virt)
 }
 
 struct mem_type {
+	//页表项的访问控制权,pte即第二级映射表项(页表项)
 	unsigned int prot_pte;
+	//段表项的访问控制位,l1即第一级映射表项(段表项/主页表项)
 	unsigned int prot_l1;
+	//代表主页表(不是主页表项)的访问控制位和内存域
 	unsigned int prot_sect;
+	//所属的内存域
 	unsigned int domain;
 };
 

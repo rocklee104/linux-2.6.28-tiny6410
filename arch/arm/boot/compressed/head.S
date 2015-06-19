@@ -133,6 +133,7 @@ start:
 		#将参数链表地址移动到r8
 		mov	r8, r2			@ save atags pointer
 
+#ifndef __ARM_ARCH_2__
 		/*
 		 * Booting from Angel - need to enter SVC mode and disable
 		 * FIQs/IRQs (numeric definitions from angel arm.h source).
@@ -152,6 +153,9 @@ not_angel:
 		orr	r2, r2, #0xc0		@ prevent angel from running
 		#将r2写入cpsr
 		msr	cpsr_c, r2
+#else
+		teqp	pc, #0x0c000003		@ turn off interrupts
+#endif
 
 		/*
 		 * Note that some cache flushing and other stuff may
@@ -256,10 +260,12 @@ not_relocated:	mov	r0, #0
 		 * sufficiently.  Turn the cache on, set up some
 		 * pointers, and start decompressing.
 		 */
-		#C runtime环境已经设置完成,下面要打开cache和mmu
+		#C runtime环境已经设置完成,下面要打开cache和mmu,lr中保存当前PC指针
 		bl	cache_on
 
+		#r1中保存栈的起始地址
 		mov	r1, sp			@ malloc space above stack
+		#r2保存栈的结束地址
 		add	r2, sp, #0x10000	@ 64k max
 
 /*
@@ -271,7 +277,9 @@ not_relocated:	mov	r0, #0
  *   r4 >= r2 -> OK
  *   r4 + image length <= r5 -> OK
  */
+		#r4中保存kernel将要解压到的地址
 		cmp	r4, r2
+		#如果kernel要解压到的地址大于等于栈的结束地址
 		bhs	wont_overwrite
 		sub	r3, sp, r5		@ > compressed kernel size
 		add	r0, r4, r3, lsl #2	@ allow for 4x expansion
@@ -316,8 +324,11 @@ not_relocated:	mov	r0, #0
  * r4     = kernel execution address
  * r7     = architecture ID
  */
+#r0中保存解压后的内核起始地址
 wont_overwrite:	mov	r0, r4
+		#r3保存architecture ID 
 		mov	r3, r7
+		#解压内核
 		bl	decompress_kernel
 		b	call_kernel
 
@@ -326,6 +337,7 @@ wont_overwrite:	mov	r0, r4
 LC0:		.word	LC0			@ r1
 		.word	__bss_start		@ r2
 		.word	_end			@ r3
+		#zreladdr指向kernel解压后的物理地址
 		.word	zreladdr		@ r4
 		.word	_start			@ r5
 		.word	_got_start		@ r6
@@ -421,27 +433,59 @@ __armv3_mpu_cache_on:
 		mcr	p15, 0, r0, c7, c0, 0	@ invalidate whole cache v3
 		mov	pc, lr
 
+		/* 
+		 * r4中保存kernel解压后的物理地址,r3保存page dir的起始地址.
+		 * 由于使用段页式映射,寻址空间4GB,每段1MB,需要4096段.页表项
+		 * 需要4096项,每项4byte, 故page dir总共占用16KB.
+		 *
+		 * 6410中,zreladdr的地址为0x50008000,
+		 * 页目录的地址经过下面的计算应该为0x50004000.
+		 */
 __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
+		#bic是逻辑与非指令,一般用于clear bit,对r3按16KB对齐
 		bic	r3, r3, #0xff		@ Align the pointer
 		bic	r3, r3, #0x3f00
 /*
  * Initialise the page tables, turning on the cacheable and bufferable
  * bits for the RAM area only.
  */
+		#r0中保存page dir起始地址
 		mov	r0, r3
+		#page dir起始地址向下256KB对齐后作为ram的起始地址
 		mov	r9, r0, lsr #18
+		#经过位移操作后ram的起始地址是0x50000000,和datasheet中的一致
 		mov	r9, r9, lsl #18		@ start of RAM
+		#r10=页表起始地址+256M,作为RAM结束地址,这里假定RAM大小为256MB
 		add	r10, r9, #0x10000000	@ a reasonable RAM size
+		/*
+		 * 页表项的初始值:最低两位为10,说明是section map,1MB映射.
+		 * CB(cacheable/bufferable)两位为00,默认禁止缓存和缓冲.
+		 */
 		mov	r1, #0x12
+		/*
+		 * r1的值为0xc12, 访问控制位设置为11,完全允许访问.
+		 * 31-20位为0x000,section物理基址为0x000
+		 */
 		orr	r1, r1, #3 << 10
+		#r2=页表起始地址+16k,作为页表结束地址
 		add	r2, r3, #16384
+		#判断section的物理基址是否落在RAM范围内,因为对RAM应该开启缓存和缓冲
 1:		cmp	r1, r9			@ if virt > start of RAM
+		/*
+		 * hs条件码,表示无符号数大于等于,CPSR中条件标志位为C=1
+		 * 如果落在RAM之内,就开启cache和buffer
+		 */
 		orrhs	r1, r1, #0x0c		@ set cacheable, bufferable
 		cmp	r1, r10			@ if virt > end of RAM
+		#如果落在RAM之外,就关闭cache和buffer
 		bichs	r1, r1, #0x0c		@ clear cacheable, bufferable
+		#把页表项写入页表,并跳转页表指针指向下一个页表项
 		str	r1, [r0], #4		@ 1:1 mapping
+		#把页表项指向下一个section的物理基址,1MB
 		add	r1, r1, #1048576
+		#检查是否到了页表结束地址，如果是则说明页表初始化完成了
 		teq	r0, r2
+		#否则写入下一个页表项
 		bne	1b
 /*
  * If ever we are running from Flash, then we surely want the cache
@@ -449,26 +493,49 @@ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
  * so there is no map overlap problem for up to 1 MB compressed kernel.
  * If the execution is in RAM then we would only be duplicating the above.
  */
+		/*
+		 * 如果我们当前在flash运行,
+		 * 把当前PC所在地址１M对齐的地方的2M空间开启cache和write buffer
+		 * 为了加快代码在 nor flash中运行的速度
+		 */
 		mov	r1, #0x1e
+		#开启读写权限
 		orr	r1, r1, #3 << 10
+		#r2中记录pc右移20位的值,也就是pc这个地址在页表项中的index
 		mov	r2, pc, lsr #20
+		#r1保存了页表项的值
 		orr	r1, r1, r2, lsl #20
+		/* 
+		 * 页表的起始地址(r3)加上pc对应的页表项在页表内的偏移(index * 4),
+		 * 也就是r2 << 2, 获取了pc对应的页表项的物理地址(r0).
+		 */
 		add	r0, r3, r2, lsl #2
+		#将值写入页表项
 		str	r1, [r0], #4
+		#写入下一个页表项
 		add	r1, r1, #1048576
 		str	r1, [r0]
+		#返回到__armv4_mmu_cache_on
 		mov	pc, lr
+#ENDPROC用于定义一个函数,在include/asm/linkage.h有定义
 ENDPROC(__setup_mmu)
 
 __armv4_mmu_cache_on:
+		#保存返回地址
 		mov	r12, lr
 		bl	__setup_mmu
 		mov	r0, #0
+		#清空write buffer
 		mcr	p15, 0, r0, c7, c10, 4	@ drain write buffer
+		#使unified TLB无效,即使instruction TLB和data TLB无效
 		mcr	p15, 0, r0, c8, c7, 0	@ flush I,D TLBs
+		#Read Control Register configuration data到r0
 		mrc	p15, 0, r0, c1, c0, 0	@ read control reg
+		#使能icache, 设置icache的替换策略为round-robin
 		orr	r0, r0, #0x5000		@ I-cache enable, RR cache replacement
+		#ARM1176JZF-S手册第3-46页,读取read control reg的时候,这两个位是1
 		orr	r0, r0, #0x0030
+		#开启MMU,icache,dcache
 		bl	__common_mmu_cache_on
 		mov	r0, #0
 		mcr	p15, 0, r0, c8, c7, 0	@ flush I,D TLBs
@@ -508,17 +575,33 @@ __arm6_mmu_cache_on:
 		mcr	p15, 0, r0, c5, c0, 0	@ invalidate whole TLB v3
 		mov	pc, r12
 
+#r0中保存Control Register configuration data,并且使能了icache
 __common_mmu_cache_on:
 #ifndef DEBUG
+		#开启MMU,dcache,dcache,关闭Strict alignment fault checking
 		orr	r0, r0, #0x000d		@ Write buffer, mmu
 #endif
+		#-1的补码是0xffffffff
 		mov	r1, #-1
+		#将页表基址写入cp15的c2寄存器
 		mcr	p15, 0, r3, c2, c0, 0	@ load page table pointer
+		/* 
+		 * 将domain access control寄存器的16个域全部置1,
+		 * 这样所有的域都设置成管理模式,允许任何访问.
+		 */
 		mcr	p15, 0, r1, c3, c0, 0	@ load domain access control
 		b	1f
 		.align	5			@ cache line aligned
+		#将r0中保存的c1值写入c1(开启MMU,icache,dcache)
 1:		mcr	p15, 0, r0, c1, c0, 0	@ load control register
+		#r0中保存Control Register configuration data
 		mrc	p15, 0, r0, c1, c0, 0	@ and read it back to
+		/*
+		 * 下面其实是2条语句.r0, lsr #32这是第一条;sub pc,lr这是第二条;
+		 * 但是第一条语句对lr没有任何作用,它的作用仅仅是一条空语句.因为
+		 * arm是3级流水线执行指令的,插入这条空语句保证pc值的获取在是在
+		 * mmu开启以后获取到的.
+		 */
 		sub	pc, lr, r0, lsr #32	@ properly flush pipeline
 
 /*
@@ -551,6 +634,7 @@ reloc_start:	add	r9, r5, r0
 		add	sp, r1, #128		@ relocate the stack
 		debug_reloc_end
 
+#关闭MMU,dcache/icache,tlb
 call_kernel:	bl	cache_clean_flush
 		bl	cache_off
 		mov	r0, #0			@ must be zero
@@ -579,14 +663,18 @@ call_cache_fn:	adr	r12, proc_types
 #else
 		ldr	r6, =CONFIG_PROCESSOR_ID
 #endif
-		#r1中保存的值为0x41560600
+#通过((real_id ^ match) & mask) == 0,在proc_types中找到对应的条目
 1:		ldr	r1, [r12, #0]		@ get value
-		#r2中保存的值为0xffffffe0
 		ldr	r2, [r12, #4]		@ get mask
 		#eor:逻辑异或.
 		eor	r1, r1, r6		@ (real ^ match)
 		tst	r1, r2			@       & mask
+		/*
+		 * tst结果为0,执行对应条目的cache on function,cache on function
+		 * 执行完成后,将会返回not_relocated
+		 */
 		addeq	pc, r12, r3		@ call cache function
+		#每个条目有5条语句,r12指向下一个条目
 		add	r12, r12, #4*5
 		b	1b
 
@@ -604,6 +692,10 @@ call_cache_fn:	adr	r12, proc_types
  * methods.  Writeback caches _must_ have the flush method
  * defined.
  */
+		/*
+		 * writethrough的cache只需要提供cache on/off的方法,
+		 * writeback的cache还需要flush的方法.
+		 */
 		.type	proc_types,#object
 proc_types:
 		.word	0x41560600		@ ARM6/610
@@ -691,8 +783,10 @@ proc_types:
 		b	__armv4_mmu_cache_off
 		b	__armv5tej_mmu_cache_flush
 
+		#6410属于armv6
 		.word	0x0007b000		@ ARMv6
 		.word	0x000ff000
+		#armv6采用与armv4相同的方法cache on/off/flush
 		b	__armv4_mmu_cache_on
 		b	__armv4_mmu_cache_off
 		b	__armv6_mmu_cache_flush
@@ -721,6 +815,7 @@ proc_types:
  */
 		.align	5
 cache_off:	mov	r3, #12			@ cache_off function
+		#跳转到__armv4_mmu_cache_off
 		b	call_cache_fn
 
 __armv4_mpu_cache_off:
@@ -742,11 +837,16 @@ __armv3_mpu_cache_off:
 		mov	pc, lr
 
 __armv4_mmu_cache_off:
+		#Read Control Register configuration data
 		mrc	p15, 0, r0, c1, c0
+		#关闭MMU,dcache
 		bic	r0, r0, #0x000d
+		#将r0写入read control register
 		mcr	p15, 0, r0, c1, c0	@ turn MMU and cache off
 		mov	r0, #0
+		#使所有的cache无效
 		mcr	p15, 0, r0, c7, c7	@ invalidate whole cache v4
+		#使instruction/data tlb无效
 		mcr	p15, 0, r0, c8, c7	@ invalidate whole TLB v4
 		mov	pc, lr
 
@@ -788,6 +888,7 @@ __armv3_mmu_cache_off:
 		.align	5
 cache_clean_flush:
 		mov	r3, #16
+		# 跳转到__armv4_mmu_cache_flush
 		b	call_cache_fn
 
 __armv4_mpu_cache_flush:

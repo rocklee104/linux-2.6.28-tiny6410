@@ -167,6 +167,10 @@ __enable_mmu:
 #ifdef CONFIG_CPU_ICACHE_DISABLE
 	bic	r0, r0, #CR_I
 #endif
+	/*
+	 * 对DOMAIN_USER,DOMAIN_KERNEL和DOMAIN_TABLE均设置DOMAIN_MANAGER权限;
+	 * 对DOMAIN_IO设置DOMAIN_CLIENT权限.
+	 */
 	mov	r5, #(domain_val(DOMAIN_USER, DOMAIN_MANAGER) | \
 		      domain_val(DOMAIN_KERNEL, DOMAIN_MANAGER) | \
 		      domain_val(DOMAIN_TABLE, DOMAIN_MANAGER) | \
