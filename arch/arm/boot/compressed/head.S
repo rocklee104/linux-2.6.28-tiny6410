@@ -638,7 +638,9 @@ reloc_start:	add	r9, r5, r0
 call_kernel:	bl	cache_clean_flush
 		bl	cache_off
 		mov	r0, #0			@ must be zero
+		#r1中保存了architecture number
 		mov	r1, r7			@ restore architecture number
+		#r2中保存了tags pointer
 		mov	r2, r8			@ restore atags pointer
 		mov	pc, r4			@ call kernel
 
@@ -983,25 +985,35 @@ __armv4_mmu_cache_flush:
 		mrc	p15, 0, r3, c0, c0, 1	@ read cache type
 		teq	r3, r6			@ cache ID register present?
 		beq	no_cache_id
+		#获取Cache Type Register的Size字段,表示dcache大小
 		mov	r1, r3, lsr #18
 		and	r1, r1, #7
 		mov	r2, #1024
+		#r2的大小是dcache的2倍
 		mov	r2, r2, lsl r1		@ base dcache size *2
+		#测试Cache Type Register的M位,arm11 M一直是0
 		tst	r3, #1 << 14		@ test M bit
+		#如果M==1,size需要再加上其1/2
 		addne	r2, r2, r2, lsr #1	@ +1/2 size if M == 1
+		#获取Cache Type Register的Len字段,表示cache line长度
 		mov	r3, r3, lsr #12
 		and	r3, r3, #3
 		mov	r11, #8
 		mov	r11, r11, lsl r3	@ cache line size in bytes
 no_cache_id:
+		#r1中保存pc指针低5位清0后的地址
 		bic	r1, pc, #63		@ align to longest cache line
+		#r2中保存pc以cache对齐后的地址 + cache size后的地址
 		add	r2, r1, r2
 1:		ldr	r3, [r1], r11		@ s/w flush D cache
 		teq	r1, r2
 		bne	1b
 
+		#Invalidate Entire Instruction Cache.
 		mcr	p15, 0, r1, c7, c5, 0	@ flush I cache
+		#Invalidate Entire Data Cache
 		mcr	p15, 0, r1, c7, c6, 0	@ flush D cache
+		#Clean Entire Data Cache.
 		mcr	p15, 0, r1, c7, c10, 4	@ drain WB
 		mov	pc, lr
 
