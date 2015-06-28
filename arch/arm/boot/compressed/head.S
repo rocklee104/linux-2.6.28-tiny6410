@@ -575,18 +575,6 @@ __armv7_mmu_cache_on:
 		mcr	p15, 0, r0, c7, c5, 4	@ ISB
 		mov	pc, r12
 
-__arm6_mmu_cache_on:
-		mov	r12, lr
-		bl	__setup_mmu
-		mov	r0, #0
-		mcr	p15, 0, r0, c7, c0, 0	@ invalidate whole cache v3
-		mcr	p15, 0, r0, c5, c0, 0	@ invalidate whole TLB v3
-		mov	r0, #0x30
-		bl	__common_mmu_cache_on
-		mov	r0, #0
-		mcr	p15, 0, r0, c5, c0, 0	@ invalidate whole TLB v3
-		mov	pc, r12
-
 #r0中保存Control Register configuration data,并且使能了icache
 __common_mmu_cache_on:
 #ifndef DEBUG
@@ -715,12 +703,6 @@ call_cache_fn:	adr	r12, proc_types
 		 */
 		.type	proc_types,#object
 proc_types:
-		.word	0x0007b000		@ ARMv6
-		.word	0x000ff000
-		b	__armv4_mmu_cache_on
-		b	__armv4_mmu_cache_off
-		b	__armv6_mmu_cache_flush
-
 		#6410
 		.word	0x000f0000		@ new CPU Id
 		.word	0x000f0000
@@ -764,12 +746,16 @@ __armv4_mmu_cache_off:
 		mov	pc, lr
 
 __armv7_mmu_cache_off:
+		#Read Control Register configuration data
 		mrc	p15, 0, r0, c1, c0
+		#关闭MMU,dcache
 		bic	r0, r0, #0x000d
+		#将r0写入read control register
 		mcr	p15, 0, r0, c1, c0	@ turn MMU and cache off
 		mov	r12, lr
 		bl	__armv7_mmu_cache_flush
 		mov	r0, #0
+		#使instruction/data tlb无效
 		mcr	p15, 0, r0, c8, c7, 0	@ invalidate whole TLB
 		mov	pc, r12
 
@@ -788,31 +774,6 @@ cache_clean_flush:
 		mov	r3, #16
 		# 跳转到__armv4_mmu_cache_flush
 		b	call_cache_fn
-
-__armv4_mpu_cache_flush:
-		mov	r2, #1
-		mov	r3, #0
-		mcr	p15, 0, ip, c7, c6, 0	@ invalidate D cache
-		mov	r1, #7 << 5		@ 8 segments
-1:		orr	r3, r1, #63 << 26	@ 64 entries
-2:		mcr	p15, 0, r3, c7, c14, 2	@ clean & invalidate D index
-		subs	r3, r3, #1 << 26
-		bcs	2b			@ entries 63 to 0
-		subs 	r1, r1, #1 << 5
-		bcs	1b			@ segments 7 to 0
-
-		teq	r2, #0
-		mcrne	p15, 0, ip, c7, c5, 0	@ invalidate I cache
-		mcr	p15, 0, ip, c7, c10, 4	@ drain WB
-		mov	pc, lr
-
-__armv6_mmu_cache_flush:
-		mov	r1, #0
-		mcr	p15, 0, r1, c7, c14, 0	@ clean+invalidate D
-		mcr	p15, 0, r1, c7, c5, 0	@ invalidate I+BTB
-		mcr	p15, 0, r1, c7, c15, 0	@ clean+invalidate unified
-		mcr	p15, 0, r1, c7, c10, 4	@ drain WB
-		mov	pc, lr
 
 __armv7_mmu_cache_flush:
 		mrc	p15, 0, r10, c0, c1, 5	@ read ID_MMFR1
