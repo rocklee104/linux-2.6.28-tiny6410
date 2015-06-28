@@ -141,8 +141,12 @@ start:
 		 */
 		#取出cpsr的值
 		mrs	r2, cpsr		@ get current mode
-		#user模式下cpsr最后2位均为0
+		/*
+		 * user模式下cpsr最后2位均为0,u-boot进入kernel,系统已经处于svc32模式,
+		 * 而angel进入则是user模式
+		 */
 		tst	r2, #3			@ not user?
+		#不是user模式
 		bne	not_angel
 		mov	r0, #0x17		@ angel_SWIreason_EnterSVC
 		swi	0x123456		@ angel_SWI_ARM
@@ -455,7 +459,7 @@ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
 		mov	r9, r0, lsr #18
 		#经过位移操作后ram的起始地址是0x50000000,和datasheet中的一致
 		mov	r9, r9, lsl #18		@ start of RAM
-		#r10=页表起始地址+256M,作为RAM结束地址,这里假定RAM大小为256MB
+		#r10=ram起始地址+256M,作为RAM结束地址,这里假定RAM大小为256MB
 		add	r10, r9, #0x10000000	@ a reasonable RAM size
 		/*
 		 * 页表项的初始值:最低两位为10,说明是section map,1MB映射.
@@ -505,7 +509,7 @@ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
 		mov	r2, pc, lsr #20
 		#r1保存了页表项的值
 		orr	r1, r1, r2, lsl #20
-		/* 
+		/*
 		 * 页表的起始地址(r3)加上pc对应的页表项在页表内的偏移(index * 4),
 		 * 也就是r2 << 2, 获取了pc对应的页表项的物理地址(r0).
 		 */
@@ -515,7 +519,7 @@ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
 		#写入下一个页表项
 		add	r1, r1, #1048576
 		str	r1, [r0]
-		#返回到__armv4_mmu_cache_on
+		#返回到__armv7_mmu_cache_on
 		mov	pc, lr
 #ENDPROC用于定义一个函数,在include/asm/linkage.h有定义
 ENDPROC(__setup_mmu)
@@ -527,7 +531,7 @@ __armv4_mmu_cache_on:
 		mov	r0, #0
 		#清空write buffer
 		mcr	p15, 0, r0, c7, c10, 4	@ drain write buffer
-		#使unified TLB无效,即使instruction TLB和data TLB无效
+		#使unified TLB无效
 		mcr	p15, 0, r0, c8, c7, 0	@ flush I,D TLBs
 		#Read Control Register configuration data到r0
 		mrc	p15, 0, r0, c1, c0, 0	@ read control reg
@@ -543,23 +547,31 @@ __armv4_mmu_cache_on:
 
 __armv7_mmu_cache_on:
 		mov	r12, lr
+		#读取Memory Model Feature Register 0
 		mrc	p15, 0, r11, c0, c1, 4	@ read ID_MMFR0
+		#是否支持Virtual Memory System Architecture
 		tst	r11, #0xf		@ VMSA
 		blne	__setup_mmu
 		mov	r0, #0
+		#将write buffer中的内存同步到内存中
 		mcr	p15, 0, r0, c7, c10, 4	@ drain write buffer
 		tst	r11, #0xf		@ VMSA
+		#ARM1176JZF-S不区分instruction/data tlb,只有一个unified tlb,使tlb无效
 		mcrne	p15, 0, r0, c8, c7, 0	@ flush I,D TLBs
 		mrc	p15, 0, r0, c1, c0, 0	@ read control reg
 		orr	r0, r0, #0x5000		@ I-cache enable, RR cache replacement
 		orr	r0, r0, #0x003c		@ write buffer
 		orrne	r0, r0, #1		@ MMU enabled
+		#补码是0xffffffff
 		movne	r1, #-1
+		#r3中保存页目录的地址
 		mcrne	p15, 0, r3, c2, c0, 0	@ load page table pointer
+		#r1中保存域访问控制的值
 		mcrne	p15, 0, r1, c3, c0, 0	@ load domain access control
 		mcr	p15, 0, r0, c1, c0, 0	@ load control register
 		mrc	p15, 0, r0, c1, c0, 0	@ and read it back
 		mov	r0, #0
+		#使之前预取的指令无效
 		mcr	p15, 0, r0, c7, c5, 4	@ ISB
 		mov	pc, r12
 
@@ -592,7 +604,10 @@ __common_mmu_cache_on:
 		mcr	p15, 0, r1, c3, c0, 0	@ load domain access control
 		b	1f
 		.align	5			@ cache line aligned
-		#将r0中保存的c1值写入c1(开启MMU,icache,dcache)
+		/* 
+		 * 将r0中保存的c1值(原来的c1按位或0x503d)写入c1
+		 * (开启MMU,icache,dcache,write buffer,round-robin)
+		 */
 1:		mcr	p15, 0, r0, c1, c0, 0	@ load control register
 		#r0中保存Control Register configuration data
 		mrc	p15, 0, r0, c1, c0, 0	@ and read it back to
@@ -660,7 +675,7 @@ call_kernel:	bl	cache_clean_flush
 
 call_cache_fn:	adr	r12, proc_types
 #ifdef CONFIG_CPU_CP15
-		#将协处理器cp15的c0寄存器中的CPU ID保存到r6中
+		#将协处理器cp15的c0寄存器中的CPU ID保存到r6中,6410的id是0x410FB767
 		mrc	p15, 0, r6, c0, c0	@ get processor ID
 #else
 		ldr	r6, =CONFIG_PROCESSOR_ID
@@ -700,99 +715,13 @@ call_cache_fn:	adr	r12, proc_types
 		 */
 		.type	proc_types,#object
 proc_types:
-		.word	0x41560600		@ ARM6/610
-		.word	0xffffffe0
-		b	__arm6_mmu_cache_off	@ works, but slow
-		b	__arm6_mmu_cache_off
-		mov	pc, lr
-@		b	__arm6_mmu_cache_on		@ untested
-@		b	__arm6_mmu_cache_off
-@		b	__armv3_mmu_cache_flush
-
-		.word	0x00000000		@ old ARM ID
-		.word	0x0000f000
-		mov	pc, lr
-		mov	pc, lr
-		mov	pc, lr
-
-		.word	0x41007000		@ ARM7/710
-		.word	0xfff8fe00
-		b	__arm7_mmu_cache_off
-		b	__arm7_mmu_cache_off
-		mov	pc, lr
-
-		.word	0x41807200		@ ARM720T (writethrough)
-		.word	0xffffff00
-		b	__armv4_mmu_cache_on
-		b	__armv4_mmu_cache_off
-		mov	pc, lr
-
-		.word	0x41007400		@ ARM74x
-		.word	0xff00ff00
-		b	__armv3_mpu_cache_on
-		b	__armv3_mpu_cache_off
-		b	__armv3_mpu_cache_flush
-		
-		.word	0x41009400		@ ARM94x
-		.word	0xff00ff00
-		b	__armv4_mpu_cache_on
-		b	__armv4_mpu_cache_off
-		b	__armv4_mpu_cache_flush
-
-		.word	0x00007000		@ ARM7 IDs
-		.word	0x0000f000
-		mov	pc, lr
-		mov	pc, lr
-		mov	pc, lr
-
-		@ Everything from here on will be the new ID system.
-
-		.word	0x4401a100		@ sa110 / sa1100
-		.word	0xffffffe0
-		b	__armv4_mmu_cache_on
-		b	__armv4_mmu_cache_off
-		b	__armv4_mmu_cache_flush
-
-		.word	0x6901b110		@ sa1110
-		.word	0xfffffff0
-		b	__armv4_mmu_cache_on
-		b	__armv4_mmu_cache_off
-		b	__armv4_mmu_cache_flush
-
-		.word	0x56050000		@ Feroceon
-		.word	0xff0f0000
-		b	__armv4_mmu_cache_on
-		b	__armv4_mmu_cache_off
-		b	__armv5tej_mmu_cache_flush
-
-		@ These match on the architecture ID
-
-		.word	0x00020000		@ ARMv4T
-		.word	0x000f0000
-		b	__armv4_mmu_cache_on
-		b	__armv4_mmu_cache_off
-		b	__armv4_mmu_cache_flush
-
-		.word	0x00050000		@ ARMv5TE
-		.word	0x000f0000
-		b	__armv4_mmu_cache_on
-		b	__armv4_mmu_cache_off
-		b	__armv4_mmu_cache_flush
-
-		.word	0x00060000		@ ARMv5TEJ
-		.word	0x000f0000
-		b	__armv4_mmu_cache_on
-		b	__armv4_mmu_cache_off
-		b	__armv5tej_mmu_cache_flush
-
-		#6410属于armv6
 		.word	0x0007b000		@ ARMv6
 		.word	0x000ff000
-		#armv6采用与armv4相同的方法cache on/off/flush
 		b	__armv4_mmu_cache_on
 		b	__armv4_mmu_cache_off
 		b	__armv6_mmu_cache_flush
 
+		#6410
 		.word	0x000f0000		@ new CPU Id
 		.word	0x000f0000
 		b	__armv7_mmu_cache_on
@@ -817,26 +746,8 @@ proc_types:
  */
 		.align	5
 cache_off:	mov	r3, #12			@ cache_off function
-		#跳转到__armv4_mmu_cache_off
+		#跳转到__armv7_mmu_cache_off
 		b	call_cache_fn
-
-__armv4_mpu_cache_off:
-		mrc	p15, 0, r0, c1, c0
-		bic	r0, r0, #0x000d
-		mcr	p15, 0, r0, c1, c0	@ turn MPU and cache off
-		mov	r0, #0
-		mcr	p15, 0, r0, c7, c10, 4	@ drain write buffer
-		mcr	p15, 0, r0, c7, c6, 0	@ flush D-Cache
-		mcr	p15, 0, r0, c7, c5, 0	@ flush I-Cache
-		mov	pc, lr
-
-__armv3_mpu_cache_off:
-		mrc	p15, 0, r0, c1, c0
-		bic	r0, r0, #0x000d
-		mcr	p15, 0, r0, c1, c0, 0	@ turn MPU and cache off
-		mov	r0, #0
-		mcr	p15, 0, r0, c7, c0, 0	@ invalidate whole cache v3
-		mov	pc, lr
 
 __armv4_mmu_cache_off:
 		#Read Control Register configuration data
@@ -861,21 +772,6 @@ __armv7_mmu_cache_off:
 		mov	r0, #0
 		mcr	p15, 0, r0, c8, c7, 0	@ invalidate whole TLB
 		mov	pc, r12
-
-__arm6_mmu_cache_off:
-		mov	r0, #0x00000030		@ ARM6 control reg.
-		b	__armv3_mmu_cache_off
-
-__arm7_mmu_cache_off:
-		mov	r0, #0x00000070		@ ARM7 control reg.
-		b	__armv3_mmu_cache_off
-
-__armv3_mmu_cache_off:
-		mcr	p15, 0, r0, c1, c0, 0	@ turn MMU and cache off
-		mov	r0, #0
-		mcr	p15, 0, r0, c7, c0, 0	@ invalidate whole cache v3
-		mcr	p15, 0, r0, c5, c0, 0	@ invalidate whole TLB v3
-		mov	pc, lr
 
 /*
  * Clean and flush the cache to maintain consistency.
@@ -909,7 +805,6 @@ __armv4_mpu_cache_flush:
 		mcrne	p15, 0, ip, c7, c5, 0	@ invalidate I cache
 		mcr	p15, 0, ip, c7, c10, 4	@ drain WB
 		mov	pc, lr
-		
 
 __armv6_mmu_cache_flush:
 		mov	r1, #0
@@ -972,13 +867,6 @@ iflush:
 		mcr	p15, 0, r10, c7, c10, 4	@ drain WB
 		mov	pc, lr
 
-__armv5tej_mmu_cache_flush:
-1:		mrc	p15, 0, r15, c7, c14, 3	@ test,clean,invalidate D cache
-		bne	1b
-		mcr	p15, 0, r0, c7, c5, 0	@ flush I cache
-		mcr	p15, 0, r0, c7, c10, 4	@ drain WB
-		mov	pc, lr
-
 __armv4_mmu_cache_flush:
 		mov	r2, #64*1024		@ default: 32K dcache size (*2)
 		mov	r11, #32		@ default: 32 byte line size
@@ -1013,14 +901,8 @@ no_cache_id:
 		mcr	p15, 0, r1, c7, c5, 0	@ flush I cache
 		#Invalidate Entire Data Cache
 		mcr	p15, 0, r1, c7, c6, 0	@ flush D cache
-		#Clean Entire Data Cache.
+		#清空write buffer,将write buffer中的数据全部写到主存中去.
 		mcr	p15, 0, r1, c7, c10, 4	@ drain WB
-		mov	pc, lr
-
-__armv3_mmu_cache_flush:
-__armv3_mpu_cache_flush:
-		mov	r1, #0
-		mcr	p15, 0, r0, c7, c0, 0	@ invalidate whole cache v3
 		mov	pc, lr
 
 /*

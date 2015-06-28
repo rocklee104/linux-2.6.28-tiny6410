@@ -76,8 +76,18 @@
  */
 	.section ".text.head", "ax"
 ENTRY(stext)
+	/*
+	 * cpsr共32位,被分为4个域
+	 * [31:24] 条件标志位域,用f表示
+	 * [23:16] 状态位域,用s表示
+	 * [15:8]  扩展位域,用x表示
+	 * [7:0]   控制位域,用c表示
+	 * 位域的表示方法:在cpsr或spsr后面使用一下划线
+	 */	
+	#进入管理模式,并且关闭fiq & irq
 	msr	cpsr_c, #PSR_F_BIT | PSR_I_BIT | SVC_MODE @ ensure svc mode
 						@ and irqs disabled
+	#获取处理器id,保存在r9
 	mrc	p15, 0, r9, c0, c0		@ get processor id
 	bl	__lookup_processor_type		@ r5=procinfo r9=cpuid
 	movs	r10, r5				@ invalid processor (r5=0)?
