@@ -113,7 +113,7 @@
 		.align
 start:
 		.type	start,#function
-		#重复8次,空出中断向量表的位置. 
+		#重复8次,空出中断向量表的位置.
 		.rept	8
 		#就是nop指令
 		mov	r0, r0
@@ -153,7 +153,7 @@ start:
 not_angel:
 		#取出cpsr的值
 		mrs	r2, cpsr		@ turn off interrupts to
-		#orr按位或,禁止irq/fiq 
+		#orr按位或,禁止irq/fiq
 		orr	r2, r2, #0xc0		@ prevent angel from running
 		#将r2写入cpsr
 		msr	cpsr_c, r2
@@ -182,7 +182,7 @@ not_angel:
 		 * __bss_start	   -> r2
 		 * _end			   -> r3
 		 * zreladdr		   -> r4
-		 * _start		   -> r5
+		 * _start		   -> r5 当前zImage的起始地址
 		 * _got_start	   -> r6
 		 * _got_end		   -> ip
 		 * user_stack+4096 -> sp
@@ -283,18 +283,38 @@ not_relocated:	mov	r0, #0
  */
 		#r4中保存kernel将要解压到的地址
 		cmp	r4, r2
-		#如果kernel要解压到的地址大于等于栈的结束地址
+		/*
+		 * 第一种情况:解压地址在zImage之上
+		 *
+		 * 如果kernel要解压到的地址大于等于栈的结束地址,这时候就确保了
+		 * 解压后的内核不会将当前zImage的内存区域覆盖
+		 */
 		bhs	wont_overwrite
+		/*
+		 * 第二种情况:解压地址在zImage之下
+		 *
+		 * 栈的起始地址到zImage的起始地址差, 也就是zImage占用的空间保存在r3中
+		 */
 		sub	r3, sp, r5		@ > compressed kernel size
+		/*
+		 * r0中保存kernel将要解压的地址+4*zImage大小,允许解压后的内核是zImage
+		 * 大小的4倍
+		 */
 		add	r0, r4, r3, lsl #2	@ allow for 4x expansion
 		cmp	r0, r5
+		#解压后的内核不会覆盖zImage
 		bls	wont_overwrite
 
+		#解压后可能会覆盖zImage,就在栈顶的位置解压kernel
 		mov	r5, r2			@ decompress after malloc space
 		mov	r0, r5
 		mov	r3, r7
 		bl	decompress_kernel
 
+		/*
+		 * r0中保存decompress_kernel的返回值,也就是解压后kernel
+		 * 的大小,这个大小进行256字节对齐
+		 */
 		add	r0, r0, #127 + 128	@ alignment + stack
 		bic	r0, r0, #127		@ align the kernel length
 /*
@@ -307,19 +327,25 @@ not_relocated:	mov	r0, #0
  * r8     = atags pointer
  * r9-r14 = corrupted
  */
+		#r1中保存了解压kernel的结束地址
 		add	r1, r5, r0		@ end of decompressed kernel
+		#r2中保存需要重定位的代码的起始位置
 		adr	r2, reloc_start
 		ldr	r3, LC1
+		#r3中保存需要重定位的代码的结束位置
 		add	r3, r2, r3
+		#代码搬移,将reloc_start到reloc_end这块代码搬移到解压kernel的上方
 1:		ldmia	r2!, {r9 - r14}		@ copy relocation code
 		stmia	r1!, {r9 - r14}
 		ldmia	r2!, {r9 - r14}
 		stmia	r1!, {r9 - r14}
 		cmp	r2, r3
 		blo	1b
+		//设置sp到解压kernel上放的reloc_end + 128字节的位置
 		add	sp, r1, #128		@ relocate the stack
 
 		bl	cache_clean_flush
+		//跳转到重定位的代码起始位置
 		add	pc, r5, r0		@ call relocation code
 
 /*
@@ -330,7 +356,7 @@ not_relocated:	mov	r0, #0
  */
 #r0中保存解压后的内核起始地址
 wont_overwrite:	mov	r0, r4
-		#r3保存architecture ID 
+		#r3保存architecture ID
 		mov	r3, r7
 		#解压内核
 		bl	decompress_kernel
@@ -437,7 +463,7 @@ __armv3_mpu_cache_on:
 		mcr	p15, 0, r0, c7, c0, 0	@ invalidate whole cache v3
 		mov	pc, lr
 
-		/* 
+		/*
 		 * r4中保存kernel解压后的物理地址,r3保存page dir的起始地址.
 		 * 由于使用段页式映射,寻址空间4GB,每段1MB,需要4096段.页表项
 		 * 需要4096项,每项4byte, 故page dir总共占用16KB.
@@ -585,14 +611,14 @@ __common_mmu_cache_on:
 		mov	r1, #-1
 		#将页表基址写入cp15的c2寄存器
 		mcr	p15, 0, r3, c2, c0, 0	@ load page table pointer
-		/* 
+		/*
 		 * 将domain access control寄存器的16个域全部置1,
 		 * 这样所有的域都设置成管理模式,允许任何访问.
 		 */
 		mcr	p15, 0, r1, c3, c0, 0	@ load domain access control
 		b	1f
 		.align	5			@ cache line aligned
-		/* 
+		/*
 		 * 将r0中保存的c1值(原来的c1按位或0x503d)写入c1
 		 * (开启MMU,icache,dcache,write buffer,round-robin)
 		 */
@@ -622,17 +648,22 @@ __common_mmu_cache_on:
  * r9-r14 = corrupted
  */
 		.align	5
+		#r9中保存kernel解压的结束位置
 reloc_start:	add	r9, r5, r0
 		sub	r9, r9, #128		@ do not copy the stack
 		debug_reloc_start
 		mov	r1, r4
 1:
+		//每次copy 32字节,共copy 128字节
 		.rept	4
+		#将kernel解压起始位置的32字节数据拷贝到寄存器中
 		ldmia	r5!, {r0, r2, r3, r10 - r14}	@ relocate kernel
+		#将kernel解压起始位置的32字节数据写入kernel执行地址
 		stmia	r1!, {r0, r2, r3, r10 - r14}
 		.endr
 
 		cmp	r5, r9
+		//copy未完成,继copy
 		blo	1b
 		add	sp, r1, #128		@ relocate the stack
 		debug_reloc_end
@@ -772,7 +803,7 @@ __armv7_mmu_cache_off:
 		.align	5
 cache_clean_flush:
 		mov	r3, #16
-		# 跳转到__armv4_mmu_cache_flush
+		# 跳转到__armv7_mmu_cache_flush
 		b	call_cache_fn
 
 __armv7_mmu_cache_flush:
