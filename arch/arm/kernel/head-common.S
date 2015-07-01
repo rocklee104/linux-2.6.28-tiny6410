@@ -154,10 +154,25 @@ ENDPROC(__error)
  *	r9 = cpuid (preserved)
  */
 __lookup_processor_type:
+   /*
+	* adr是相对寻址,它的寻计算结果是将当前PC值加上3f符号与PC的偏移量,
+    * 而PC是物理地址,因此r3的结果也是3f符号的物理地址
+	*/
 	adr	r3, 3f
+	/*
+	 * 编号低的寄存器在store/load数据时对应于存储器的低地址
+	 *
+	 * r5:__proc_info_begin
+	 * r6:__proc_ino_end
+	 * r7:., 也即3f符号的链接地址.请注意,在链接期间,__proc_info_begin和
+	 * __proc_info_end以及.均是链接地址,也即虚执地址.
+	 */
 	ldmda	r3, {r5 - r7}
+	#r3中保存了物理地址和虚拟地址之间的差值
 	sub	r3, r3, r7			@ get offset between virt&phys
+	#r5中保存__proc_info_begin的虚拟地址
 	add	r5, r5, r3			@ convert virt addresses to
+	#r6中__proc_info_end的虚拟地址
 	add	r6, r6, r3			@ physical address space
 1:	ldmia	r5, {r3, r4}			@ value, mask
 	and	r4, r4, r9			@ mask wanted bits

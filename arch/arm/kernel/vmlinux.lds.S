@@ -21,6 +21,12 @@ SECTIONS
 #ifdef CONFIG_XIP_KERNEL
 	. = XIP_VIRT_ADDR(CONFIG_XIP_PHYS_ADDR);
 #else
+	/*
+	 * PAGE_OFFSET在arch/arm/include/asm/memory.h中定义为CONFIG_PAGE_OFFSET
+	 * 继而搜索.config, 其中定义了CONFIG_PAGE_OFFSET为0xC0000000;
+	 * TEXT_OFFSET在arch/arm/Makefile中定义,默认是0x0008000;
+	 * 故vmlinux的代码段起始地址是0xC0008000
+	 */
 	. = PAGE_OFFSET + TEXT_OFFSET;
 #endif
 	.text.head : {

@@ -121,8 +121,10 @@ start:
 		.endr
 
 		b	1f
+		#Uboot中的zImage魔术0x016f2818验证保证9个指令大小的偏移
 		.word	0x016f2818		@ Magic numbers to help the loader
 		.word	start			@ absolute load/run zImage address
+		#_edata实际上就是zImage文件的大小
 		.word	_edata			@ zImage end address
         /*
          * u-boot中调用theKernel(0, machid, bd->bi_boot_params);
@@ -171,14 +173,18 @@ not_angel:
 		 * by the linker here, but it should preserve r7, r8, and r9.
 		 */
 
+		/*
+		 * 链接器可能会把一些处理器相关的代码链接到这个位置,如果需要在这里
+		 * 插入代码,那么需要保证r7,r8和r9寄存器在调用前后保持不变
+		 */
 		.text
-		#r0中保存当前正在运行时LC0的地址
+		#adr计算LC0标签所代表的地址相对于pc的偏移,调节r0的值指向pc偏移后的值
 		adr	r0, LC0
 		/*
 		 * ia,每次传送后地址加4,将r0指向的地址中的数据读取到
 		 * r1, r2, r3, r4, r5, r6, ip, sp中.最后结果:
 		 *
-		 * LC0			   -> r1
+		 * LC0			   -> r1 中记录了LC0的绝对地址
 		 * __bss_start	   -> r2
 		 * _end			   -> r3
 		 * zreladdr		   -> r4
@@ -199,6 +205,7 @@ not_angel:
 		/*
 		 * We're running at a different address.  We need to fix
 		 * up various pointers:
+		 * 下面这些寄存器中的地址是绝对地址
 		 *   r5 - zImage base address
 		 *   r6 - GOT start
 		 *   ip - GOT end
@@ -211,6 +218,9 @@ not_angel:
 
 #ifndef CONFIG_ZBOOT_ROM
 		/*
+		 * 如果没有从rom启动,那么当前运行的是位置无关代码,
+		 * 位置无关代码不能有任何绝对地址.
+		 *
 		 * If we're running fully PIC === CONFIG_ZBOOT_ROM = n,
 		 * we need to fix up pointers into the BSS region.
 		 *   r2 - BSS start
@@ -242,7 +252,12 @@ not_angel:
 		 */
 1:		ldr	r1, [r6, #0]		@ relocate entries in the GOT
 		cmp	r1, r2			@ entry < bss_start ||
+		/*
+		 * 如果GOT表中条目中的地址大于等于bss_start,
+		 * 将这个条目中的地址和bss_end比较
+		 */
 		cmphs	r3, r1			@ _end < entry
+		#如果GOT条目中的地址刚好在bss段,就需要重定位
 		addlo	r1, r1, r0		@ table.  This fixes up the
 		str	r1, [r6], #4		@ C references.
 		cmp	r6, ip
@@ -267,9 +282,9 @@ not_relocated:	mov	r0, #0
 		#C runtime环境已经设置完成,下面要打开cache和mmu,lr中保存当前PC指针
 		bl	cache_on
 
-		#r1中保存栈的起始地址
+		#r1中保存堆的起始地址,也就是栈顶
 		mov	r1, sp			@ malloc space above stack
-		#r2保存栈的结束地址
+		#r2保存堆的结束地址,堆的大小为64k
 		add	r2, sp, #0x10000	@ 64k max
 
 /*
@@ -286,7 +301,7 @@ not_relocated:	mov	r0, #0
 		/*
 		 * 第一种情况:解压地址在zImage之上
 		 *
-		 * 如果kernel要解压到的地址大于等于栈的结束地址,这时候就确保了
+		 * 如果kernel要解压到的地址大于等于堆的结束地址,这时候就确保了
 		 * 解压后的内核不会将当前zImage的内存区域覆盖
 		 */
 		bhs	wont_overwrite
@@ -294,26 +309,27 @@ not_relocated:	mov	r0, #0
 		 * 第二种情况:解压地址在zImage之下
 		 *
 		 * 栈的起始地址到zImage的起始地址差, 也就是zImage占用的空间保存在r3中
+		 * 在vmlinux.lds中定义了zImage之后紧接着栈
 		 */
 		sub	r3, sp, r5		@ > compressed kernel size
 		/*
 		 * r0中保存kernel将要解压的地址+4*zImage大小,允许解压后的内核是zImage
-		 * 大小的4倍
+		 * 大小的4倍,也就是解压后kernel的结束地址
 		 */
 		add	r0, r4, r3, lsl #2	@ allow for 4x expansion
+		#将解压后kernel的地址和zImage的起始地址比较
 		cmp	r0, r5
 		#解压后的内核不会覆盖zImage
 		bls	wont_overwrite
 
-		#解压后可能会覆盖zImage,就在栈顶的位置解压kernel
+		#解压后可能会覆盖zImage,就在堆区结束的位置解压kernel,这片内存未使用
 		mov	r5, r2			@ decompress after malloc space
 		mov	r0, r5
 		mov	r3, r7
 		bl	decompress_kernel
 
 		/*
-		 * r0中保存decompress_kernel的返回值,也就是解压后kernel
-		 * 的大小,这个大小进行256字节对齐
+		 * kernel末尾空出128字节的栈空间，并且使其长度128字节对齐
 		 */
 		add	r0, r0, #127 + 128	@ alignment + stack
 		bic	r0, r0, #127		@ align the kernel length
@@ -327,7 +343,7 @@ not_relocated:	mov	r0, #0
  * r8     = atags pointer
  * r9-r14 = corrupted
  */
-		#r1中保存了解压kernel的结束地址
+		#r1中保存了解压后kernel的sp地址
 		add	r1, r5, r0		@ end of decompressed kernel
 		#r2中保存需要重定位的代码的起始位置
 		adr	r2, reloc_start
@@ -344,6 +360,7 @@ not_relocated:	mov	r0, #0
 		//设置sp到解压kernel上放的reloc_end + 128字节的位置
 		add	sp, r1, #128		@ relocate the stack
 
+		#代码地址变化了不能让cache再命中被内核覆盖的老地址
 		bl	cache_clean_flush
 		//跳转到重定位的代码起始位置
 		add	pc, r5, r0		@ call relocation code
@@ -468,7 +485,7 @@ __armv3_mpu_cache_on:
 		 * 由于使用段页式映射,寻址空间4GB,每段1MB,需要4096段.页表项
 		 * 需要4096项,每项4byte, 故page dir总共占用16KB.
 		 *
-		 * 6410中,zreladdr的地址为0x50008000,
+		 * 6410中,zreladdr的物理地址为0x50008000,
 		 * 页目录的地址经过下面的计算应该为0x50004000.
 		 */
 __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
@@ -648,13 +665,13 @@ __common_mmu_cache_on:
  * r9-r14 = corrupted
  */
 		.align	5
-		#r9中保存kernel解压的结束位置
+		#r9中保存kernel解压的结束位置+128作用栈的空间
 reloc_start:	add	r9, r5, r0
 		sub	r9, r9, #128		@ do not copy the stack
 		debug_reloc_start
 		mov	r1, r4
 1:
-		//每次copy 32字节,共copy 128字节
+		#每次copy 128字节,确保将解压完成的kernel copy到reladdr
 		.rept	4
 		#将kernel解压起始位置的32字节数据拷贝到寄存器中
 		ldmia	r5!, {r0, r2, r3, r10 - r14}	@ relocate kernel
@@ -676,6 +693,7 @@ call_kernel:	bl	cache_clean_flush
 		mov	r1, r7			@ restore architecture number
 		#r2中保存了tags pointer
 		mov	r2, r8			@ restore atags pointer
+		#跳转到解压后的kernel开始执行代码
 		mov	pc, r4			@ call kernel
 
 /*
@@ -974,4 +992,5 @@ reloc_end:
 
 		.align
 		.section ".stack", "w"
+#.space伪指令,分配连续4k字节的存储单元并初始化为0
 user_stack:	.space	4096

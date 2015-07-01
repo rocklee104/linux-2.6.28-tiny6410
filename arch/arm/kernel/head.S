@@ -26,7 +26,9 @@
 #error "PHYS_OFFSET must be at an even 2MiB boundary!"
 #endif
 
+//kernel虚拟地址0xc0008000
 #define KERNEL_RAM_VADDR	(PAGE_OFFSET + TEXT_OFFSET)
+//kernel物理地址0xc0008000
 #define KERNEL_RAM_PADDR	(PHYS_OFFSET + TEXT_OFFSET)
 
 
@@ -83,7 +85,7 @@ ENTRY(stext)
 	 * [15:8]  扩展位域,用x表示
 	 * [7:0]   控制位域,用c表示
 	 * 位域的表示方法:在cpsr或spsr后面使用一下划线
-	 */	
+	 */
 	#进入管理模式,并且关闭fiq & irq
 	msr	cpsr_c, #PSR_F_BIT | PSR_I_BIT | SVC_MODE @ ensure svc mode
 						@ and irqs disabled

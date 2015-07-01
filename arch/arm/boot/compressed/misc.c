@@ -250,7 +250,9 @@ int fill_inbuf(void)
 	if (insize != 0)
 		error("ran out of input data");
 
+	//piggy.gz的起始位置
 	inbuf = input_data;
+	//获取piggy.gz的大小
 	insize = &input_data_end[0] - &input_data[0];
 
 	inptr = 1;
@@ -298,8 +300,8 @@ static void error(char *x)
 #ifndef STANDALONE_DEBUG
 /*
  * output_start:解压后内核的起始地址
- * free_mem_ptr_p:栈的起始地址
- * free_mem_ptr_end_p:栈的结束地址
+ * free_mem_ptr_p:堆的起始地址
+ * free_mem_ptr_end_p:堆的结束地址
  */
 
 ulg
@@ -307,6 +309,7 @@ decompress_kernel(ulg output_start, ulg free_mem_ptr_p, ulg free_mem_ptr_end_p,
 		  int arch_id)
 {
 	output_data		= (uch *)output_start;	/* Points to kernel start */
+	//free_mem_ptr和free_mem_end_ptr将被用来实现简单的malloc
 	free_mem_ptr		= free_mem_ptr_p;
 	free_mem_end_ptr	= free_mem_ptr_end_p;
 	__machine_arch_type	= arch_id;
@@ -315,6 +318,7 @@ decompress_kernel(ulg output_start, ulg free_mem_ptr_p, ulg free_mem_ptr_end_p,
 
 	makecrc();
 	putstr("Uncompressing Linux...");
+	//直接包含inflate.c得到gunzip实现
 	gunzip();
 	putstr(" done, booting the kernel.\n");
 	//返回解压后内核的大小
