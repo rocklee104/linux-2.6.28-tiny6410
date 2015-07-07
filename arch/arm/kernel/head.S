@@ -92,11 +92,14 @@ ENTRY(stext)
 	#获取处理器id,保存在r9
 	mrc	p15, 0, r9, c0, c0		@ get processor id
 	bl	__lookup_processor_type		@ r5=procinfo r9=cpuid
+	#movs影响cpsr,如果r5==0,那么cpsr的z位被置位,eq判断cpsr的z位,z==1,相等.
 	movs	r10, r5				@ invalid processor (r5=0)?
+	#如果r5 == 0,说明无法匹配processor
 	beq	__error_p			@ yes, error 'p'
 	bl	__lookup_machine_type		@ r5=machinfo
 	movs	r8, r5				@ invalid machine (r5=0)?
 	beq	__error_a			@ yes, error 'a'
+	#atags parameter的有效性
 	bl	__vet_atags
 	bl	__create_page_tables
 

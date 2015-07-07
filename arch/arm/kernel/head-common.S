@@ -174,10 +174,12 @@ __lookup_processor_type:
 	add	r5, r5, r3			@ convert virt addresses to
 	#r6中__proc_info_end的虚拟地址
 	add	r6, r6, r3			@ physical address space
+	#r3中保存val = 0x0007b000,r4保存mask = 0x0007f000,arm1176jzf-S的id是410fb766
 1:	ldmia	r5, {r3, r4}			@ value, mask
 	and	r4, r4, r9			@ mask wanted bits
 	teq	r3, r4
 	beq	2f
+	#匹配下个proc_info
 	add	r5, r5, #PROC_INFO_SZ		@ sizeof(proc_info_list)
 	cmp	r5, r6
 	blo	1b
@@ -219,13 +221,31 @@ ENDPROC(lookup_processor_type)
  */
 __lookup_machine_type:
 	adr	r3, 3b
+	/*
+	 * r4:., 也即3f符号的链接地址.请注意,在链接期间,__arch_info_begin和
+	 * __arch_info_end以及.均是链接地址,也即虚执地址.
+	 * r5:__arch_info_begin
+	 * r6:__arch_info_end
+	 *
+	 * 每个board都会调用MACHINE_START/MACHINE_END将struct machine_desc添加到
+	 * .arch.info.init段中
+	 */
 	ldmia	r3, {r4, r5, r6}
+	#r3中保存了物理地址和虚拟地址之间的差值
 	sub	r3, r3, r4			@ get offset between virt&phys
+	#__arch_info_begin物理地址
 	add	r5, r5, r3			@ convert virt addresses to
+	#__arch_info_end物理地址
 	add	r6, r6, r3			@ physical address space
+	/*
+	 * r5记录struct machine_desc的起始位置,MACHINFO_TYPE是nr在
+	 * struct machine_desc中的offset,r3就记录nr的值
+	 */
 1:	ldr	r3, [r5, #MACHINFO_TYPE]	@ get machine type
+	#和u-boot中传来的architecture number相比
 	teq	r3, r1				@ matches loader number?
 	beq	2f				@ found
+	#判断下一个struct machine_desc
 	add	r5, r5, #SIZEOF_MACHINE_DESC	@ next machine_desc
 	cmp	r5, r6
 	blo	1b

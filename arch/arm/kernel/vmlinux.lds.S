@@ -38,6 +38,7 @@ SECTIONS
 	.init : {			/* Init code and data		*/
 			INIT_TEXT
 		_einittext = .;
+		/*proc_v6.S中定义了.proc.info.init这个段中的数据*/
 		__proc_info_begin = .;
 			*(.proc.info.init)
 		__proc_info_end = .;

@@ -127,10 +127,10 @@ start:
 		#_edata实际上就是zImage文件的大小
 		.word	_edata			@ zImage end address
         /*
-         * u-boot中调用theKernel(0, machid, bd->bi_boot_params);
-         * 将machid保存在r1.参数链表物理地址保存在r2.
+		 * u-boot中调用theKernel(0, bd->bi_arch_number, bd->bi_boot_params);
+         * 将bd->bi_arch_number(2520)保存在r1.参数链表物理地址保存在r2.
          */
-		#将machid移动到r7
+		#将architecture id移动到r7
 1:		mov	r7, r1			@ save architecture ID
 		#将参数链表地址移动到r8
 		mov	r8, r2			@ save atags pointer
@@ -712,7 +712,7 @@ call_kernel:	bl	cache_clean_flush
 
 call_cache_fn:	adr	r12, proc_types
 #ifdef CONFIG_CPU_CP15
-		#将协处理器cp15的c0寄存器中的CPU ID保存到r6中,6410的id是0x410FB767
+		#将协处理器cp15的c0寄存器中的CPU ID保存到r6中,arm1176jzf-S的id是0x410FB767
 		mrc	p15, 0, r6, c0, c0	@ get processor ID
 #else
 		ldr	r6, =CONFIG_PROCESSOR_ID
