@@ -130,9 +130,9 @@ start:
 		 * u-boot中调用theKernel(0, bd->bi_arch_number, bd->bi_boot_params);
          * 将bd->bi_arch_number(2520)保存在r1.参数链表物理地址保存在r2.
          */
-		#将architecture id移动到r7
+		#将architecture id, 这个id是board id, 也就是2520移动到r7
 1:		mov	r7, r1			@ save architecture ID
-		#将参数链表地址移动到r8
+		#将tag链表地址移动到r8
 		mov	r8, r2			@ save atags pointer
 
 #ifndef __ARM_ARCH_2__
@@ -373,7 +373,7 @@ not_relocated:	mov	r0, #0
  */
 #r0中保存解压后的内核起始地址
 wont_overwrite:	mov	r0, r4
-		#r3保存architecture ID
+		#r3保存architecture ID, board id:2520
 		mov	r3, r7
 		#解压内核
 		bl	decompress_kernel
@@ -604,6 +604,7 @@ __armv7_mmu_cache_on:
 		mrc	p15, 0, r0, c1, c0, 0	@ read control reg
 		orr	r0, r0, #0x5000		@ I-cache enable, RR cache replacement
 		orr	r0, r0, #0x003c		@ write buffer
+		#如果不支持VMSA
 		orrne	r0, r0, #1		@ MMU enabled
 		#补码是0xffffffff
 		movne	r1, #-1
@@ -689,7 +690,7 @@ reloc_start:	add	r9, r5, r0
 call_kernel:	bl	cache_clean_flush
 		bl	cache_off
 		mov	r0, #0			@ must be zero
-		#r1中保存了architecture number
+		#r1中保存了architecture number, board id
 		mov	r1, r7			@ restore architecture number
 		#r2中保存了tags pointer
 		mov	r2, r8			@ restore atags pointer

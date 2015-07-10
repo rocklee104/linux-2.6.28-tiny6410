@@ -46,6 +46,7 @@
 	.globl	swapper_pg_dir
 	.equ	swapper_pg_dir, KERNEL_RAM_VADDR - 0x4000
 
+	#获取页表的物理地址,0x50004000
 	.macro	pgtbl, rd
 	ldr	\rd, =(KERNEL_RAM_PADDR - 0x4000)
 	.endm
@@ -96,6 +97,7 @@ ENTRY(stext)
 	movs	r10, r5				@ invalid processor (r5=0)?
 	#如果r5 == 0,说明无法匹配processor
 	beq	__error_p			@ yes, error 'p'
+	#匹配board id
 	bl	__lookup_machine_type		@ r5=machinfo
 	movs	r8, r5				@ invalid machine (r5=0)?
 	beq	__error_a			@ yes, error 'a'
@@ -113,6 +115,7 @@ ENTRY(stext)
 	ldr	r13, __switch_data		@ address to jump to after
 						@ mmu has been enabled
 	adr	lr, __enable_mmu		@ return (PIC) address
+	#跳转到__v6_setup
 	add	pc, r10, #PROCINFO_INITFUNC
 ENDPROC(stext)
 
@@ -190,7 +193,9 @@ __enable_mmu:
 		      domain_val(DOMAIN_KERNEL, DOMAIN_MANAGER) | \
 		      domain_val(DOMAIN_TABLE, DOMAIN_MANAGER) | \
 		      domain_val(DOMAIN_IO, DOMAIN_CLIENT))
+	#将r5写入load domain access register
 	mcr	p15, 0, r5, c3, c0, 0		@ load domain access register
+	#将页表基址写入ttb1,ttb1供操作系统和io使用
 	mcr	p15, 0, r4, c2, c0, 0		@ load page table pointer
 	b	__turn_mmu_on
 ENDPROC(__enable_mmu)
@@ -206,13 +211,17 @@ ENDPROC(__enable_mmu)
  *
  * other registers depend on the function called upon completion
  */
+#以32字节对齐
 	.align	5
 __turn_mmu_on:
 	mov	r0, r0
+	#清除Control Register
 	mcr	p15, 0, r0, c1, c0, 0		@ write control reg
+	#读取main id(410fb766)到r3
 	mrc	p15, 0, r3, c0, c0, 0		@ read id reg
 	mov	r3, r3
 	mov	r3, r3
+	#r13中保存了__switch_data的地址
 	mov	pc, r13
 ENDPROC(__turn_mmu_on)
 
@@ -238,7 +247,9 @@ __create_page_tables:
 	 */
 	mov	r0, r4
 	mov	r3, #0
+	#r6中记录页表结束的位置
 	add	r6, r0, #0x4000
+	#这条指令实际上分为两步:1.r3->[r0], r0<-r0+4,将页表清空
 1:	str	r3, [r0], #4
 	str	r3, [r0], #4
 	str	r3, [r0], #4
@@ -246,6 +257,10 @@ __create_page_tables:
 	teq	r0, r6
 	bne	1b
 
+	/*
+	 * 获取struct proc_info_list中的__cpu_mm_mmu_flags值,在proc-v6.S中定义
+	 * mini6410这个值为0xc0d
+	 */
 	ldr	r7, [r10, #PROCINFO_MM_MMUFLAGS] @ mm_mmuflags
 
 	/*
@@ -254,20 +269,30 @@ __create_page_tables:
 	 * will be removed by paging_init().  We use our current program
 	 * counter to determine corresponding section base address.
 	 */
+	#获取当前PC在1M处的基址,当前没有开启mmu,这个值是0x50000000,保存在r6
 	mov	r6, pc, lsr #20			@ start of kernel section
+	#基址和mmu flag的或值保存在r3
 	orr	r3, r7, r6, lsl #20		@ flags + kernel base
+	#页表中索引为0x1400的页表项的值为0x50000c0e
 	str	r3, [r4, r6, lsl #2]		@ identity mapping
 
 	/*
 	 * Now setup the pagetables for our kernel direct
 	 * mapped region.
 	 */
+	/*
+	 * KERNEL_START也就是KERNEL_RAM_VADDR(0xc0008000),右移18位实际上是
+	 * 右移20位,然后再乘以4,以下2条指令获取了KERNEL_START这个虚拟地址的
+	 * 页表项,并将这个页表项地址保存在r0中
+	 */
 	add	r0, r4,  #(KERNEL_START & 0xff000000) >> 18
 	str	r3, [r0, #(KERNEL_START & 0x00f00000) >> 18]!
 	ldr	r6, =(KERNEL_END - 1)
 	add	r0, r0, #4
+	#kernel结束虚拟地址的页表项地址保存在r6中
 	add	r6, r4, r6, lsr #18
 1:	cmp	r0, r6
+	#处理kernel下一个MB的映射关系
 	add	r3, r3, #1 << 20
 	strls	r3, [r0], #4
 	bls	1b
@@ -294,11 +319,14 @@ __create_page_tables:
 	/*
 	 * Then map first 1MB of ram in case it contains our boot params.
 	 */
+	#获取PAGE_OFFSET(0xc0000000)的页表项地址
 	add	r0, r4, #PAGE_OFFSET >> 18
+	#基址和标志组成页表项
 	orr	r6, r7, #(PHYS_OFFSET & 0xff000000)
 	.if	(PHYS_OFFSET & 0x00f00000)
 	orr	r6, r6, #(PHYS_OFFSET & 0x00f00000)
 	.endif
+	#将页表项写入页表相应的位置(将0x50000c0e写入0x50007000)
 	str	r6, [r0]
 
 #ifdef CONFIG_DEBUG_LL
@@ -320,27 +348,6 @@ __create_page_tables:
 	add	r3, r3, #1 << 20
 	teq	r0, r6
 	bne	1b
-#if defined(CONFIG_ARCH_NETWINDER) || defined(CONFIG_ARCH_CATS)
-	/*
-	 * If we're using the NetWinder or CATS, we also need to map
-	 * in the 16550-type serial port for the debug messages
-	 */
-	add	r0, r4, #0xff000000 >> 18
-	orr	r3, r7, #0x7c000000
-	str	r3, [r0]
-#endif
-#ifdef CONFIG_ARCH_RPC
-	/*
-	 * Map in screen at 0x02000000 & SCREEN2_BASE
-	 * Similar reasons here - for debug.  This is
-	 * only for Acorn RiscPC architectures.
-	 */
-	add	r0, r4, #0x02000000 >> 18
-	orr	r3, r7, #0x02000000
-	str	r3, [r0]
-	add	r0, r4, #0xd8000000 >> 18
-	str	r3, [r0]
-#endif
 #endif
 	mov	pc, lr
 ENDPROC(__create_page_tables)

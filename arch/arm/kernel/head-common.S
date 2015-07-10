@@ -12,9 +12,11 @@
  */
 
 #define ATAG_CORE 0x54410001
+#u-boot中定义了type_size(type) ((sizeof(struct tag_header) + sizeof(struct type)) >> 2)
 #define ATAG_CORE_SIZE ((2*4 + 3*4) >> 2)
 
 	.type	__switch_data, %object
+#__switch_data中记录MMU开启后需要执行的操作,由于开启了MMU,所以不是PIC
 __switch_data:
 	.long	__mmap_switched
 	.long	__data_loc			@ r4
@@ -25,6 +27,7 @@ __switch_data:
 	.long	__machine_arch_type		@ r5
 	.long	__atags_pointer			@ r6
 	.long	cr_alignment			@ r7
+	#init_thread_union定义在数据段的开头,大小为8k,THREAD_START_SP为8k-8
 	.long	init_thread_union + THREAD_START_SP @ sp
 
 /*
@@ -37,10 +40,18 @@ __switch_data:
  *  r9  = processor ID
  */
 __mmap_switched:
+	#r3记录__data_loc
 	adr	r3, __switch_data + 4
-
+	/*
+	 * r4:__data_loc
+	 * r5:__data_start
+	 * r6:__bss_start
+	 * r7:_end
+	 */
 	ldmia	r3!, {r4, r5, r6, r7}
+	#比较__data_loc和__data_start,理论上应该是相等的.
 	cmp	r4, r5				@ Copy data segment if needed
+	#如果不相等,就需要将__data_loc搬运到__data_start上去
 1:	cmpne	r5, r6
 	ldrne	fp, [r4], #4
 	strne	fp, [r5], #4
@@ -48,14 +59,28 @@ __mmap_switched:
 
 	mov	fp, #0				@ Clear BSS (and zero fp)
 1:	cmp	r6, r7
+	#cc为无符号小于
 	strcc	fp, [r6],#4
 	bcc	1b
 
+	/*
+	 * r3:processor_id
+	 * r4:processor_id
+	 * r5:__machine_arch_type
+	 * r6:__atags_pointer
+	 * r7:cr_alignment
+	 * sp:init_thread_union + THREAD_START_SP
+	 */
 	ldmia	r3, {r4, r5, r6, r7, sp}
+	#将processor id,machine type,atags pointer写入相应的地址
 	str	r9, [r4]			@ Save processor ID
 	str	r1, [r5]			@ Save machine type
 	str	r2, [r6]			@ Save atags pointer
 	bic	r4, r0, #CR_A			@ Clear 'A' bit
+	/*
+	 * 将A域以外的CP15 c1寄存器值保存到cr_no_alignment变量,
+	 * 设置A域的值,保存到cr_alignment,这两个变量在entry-armv.S中定义
+	 */
 	stmia	r7, {r0, r4}			@ Save control register values
 	b	start_kernel
 ENDPROC(__mmap_switched)
@@ -239,10 +264,10 @@ __lookup_machine_type:
 	add	r6, r6, r3			@ physical address space
 	/*
 	 * r5记录struct machine_desc的起始位置,MACHINFO_TYPE是nr在
-	 * struct machine_desc中的offset,r3就记录nr的值
+	 * struct machine_desc中的offset,这样的话r3就记录了nr的值
 	 */
 1:	ldr	r3, [r5, #MACHINFO_TYPE]	@ get machine type
-	#和u-boot中传来的architecture number相比
+	#和u-boot中传来的architecture id(2520)相比
 	teq	r3, r1				@ matches loader number?
 	beq	2f				@ found
 	#判断下一个struct machine_desc
@@ -281,13 +306,17 @@ __vet_atags:
 	bne	1f
 
 	ldr	r5, [r2, #0]			@ is first tag ATAG_CORE?
+	#struct tag的hdr.size - #ATAG_CORE_SIZE是否为0,subs影响cpsr的nzcv位
 	subs	r5, r5, #ATAG_CORE_SIZE
+	#tag_core的第一个成员size与#ATAG_CORE_SIZE不相等
 	bne	1f
+	#struct tag的hdr.tag与ATAG_CORE这个magic number相比
 	ldr	r5, [r2, #4]
 	ldr	r6, =ATAG_CORE
 	cmp	r5, r6
 	bne	1f
 
+	#校验tag链表头成功
 	mov	pc, lr				@ atag pointer is ok
 
 1:	mov	r2, #0

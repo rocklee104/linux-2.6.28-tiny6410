@@ -22,9 +22,11 @@
 #define D_CACHE_LINE_SIZE	32
 
 #define TTB_C		(1 << 0)
+/*Indicates the page table walk is to Shared memory*/
 #define TTB_S		(1 << 1)
 #define TTB_IMP		(1 << 2)
 #define TTB_RGN_NC	(0 << 3)
+/*Indicates the Outer cacheable attributes for page table walking*/
 #define TTB_RGN_WBWA	(1 << 3)
 #define TTB_RGN_WT	(2 << 3)
 #define TTB_RGN_WB	(3 << 3)
@@ -160,16 +162,23 @@ __v6_setup:
 	mcr	p15, 0, r0, c7, c15, 0		@ clean+invalidate cache
 	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer
 #ifdef CONFIG_MMU
+	#Invalidate unified TLB
 	mcr	p15, 0, r0, c8, c7, 0		@ invalidate I + D TLBs
+	#清除Translation Table Base Control
 	mcr	p15, 0, r0, c2, c0, 2		@ TTB control register
+	#将页表基址或上ttb的标志,写入ttb1,ttb1为普通进程所使用
 	orr	r4, r4, #TTB_FLAGS
 	mcr	p15, 0, r4, c2, c0, 1		@ load TTB1
 #endif /* CONFIG_MMU */
 	adr	r5, v6_crval
+	#将0x01e0fb7f装入r5, 0x00c0387d装入r6
 	ldmia	r5, {r5, r6}
 	mrc	p15, 0, r0, c1, c0, 0		@ read control register
+	#清除read control register中的r5中的那些bit
 	bic	r0, r0, r5			@ clear bits them
+	#开启mmu,icache,dcache
 	orr	r0, r0, r6			@ set them
+	#跳转到__enable_mmu
 	mov	pc, lr				@ return to head.S:__ret
 
 	/*

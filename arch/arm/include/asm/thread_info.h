@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  arch/arm/include/asm/thread_info.h
  *
  *  Copyright (C) 2002 Russell King.
@@ -48,11 +48,14 @@ struct cpu_context_save {
  * __switch_to() assumes cpu_context follows immediately after cpu_domain.
  */
 struct thread_info {
+	//flags保存各种特定于进程的标志,比如TIF_SIGPENDING,TIF_NEED_RESCHED
 	unsigned long		flags;		/* low level flags */
+	//preempt_count是实现内核抢占所需的计数器
 	int			preempt_count;	/* 0 => preemptable, <0 => bug */
 	mm_segment_t		addr_limit;	/* address limit */
 	struct task_struct	*task;		/* main task structure */
 	struct exec_domain	*exec_domain;	/* execution domain */
+	//cpu说明了进程正在其上执行的CPU数目
 	__u32			cpu;		/* cpu */
 	__u32			cpu_domain;	/* cpu domain */
 	struct cpu_context_save	cpu_context;	/* cpu context */
@@ -65,6 +68,7 @@ struct thread_info {
 #ifdef CONFIG_ARM_THUMBEE
 	unsigned long		thumbee_state;	/* ThumbEE Handler Base register */
 #endif
+	//restart_block用于实现信号机制
 	struct restart_block	restart_block;
 };
 

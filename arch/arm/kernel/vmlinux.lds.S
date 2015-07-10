@@ -38,7 +38,7 @@ SECTIONS
 	.init : {			/* Init code and data		*/
 			INIT_TEXT
 		_einittext = .;
-		/*proc_v6.S中定义了.proc.info.init这个段中的数据*/
+		/*arch/arm/mm/proc-v6.S 中定义了.proc.info.init这个段中的数据*/
 		__proc_info_begin = .;
 			*(.proc.info.init)
 		__proc_info_end = .;
@@ -125,6 +125,7 @@ SECTIONS
 	__data_loc = .;
 #endif
 
+	/*数据开始位置*/
 	.data : AT(__data_loc) {
 		__data_start = .;	/* address in memory */
 
@@ -174,10 +175,12 @@ SECTIONS
 	}
 	_edata_loc = __data_loc + SIZEOF(.data);
 
+	/*bss段*/
 	.bss : {
 		__bss_start = .;	/* BSS				*/
 		*(.bss)
 		*(COMMON)
+		/*bss结束位置,也是kernel结束位置*/
 		_end = .;
 	}
 					/* Stabs debugging sections.	*/

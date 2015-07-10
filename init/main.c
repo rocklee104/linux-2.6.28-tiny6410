@@ -582,7 +582,10 @@ asmlinkage void __init start_kernel(void)
      */
 	cgroup_init_early();
 
-    //这个函数主要作用是关闭当前CPU的所有中断响应.在ARM体系里主要就是对CPSR寄存器进行操作.
+    /* 
+     * 这个函数主要作用是关闭当前CPU的所有中断响应.在ARM体系里主要就是对CPSR寄存器进行操作.
+     * 汇编代码 cpsid i
+     */
 	local_irq_disable();
     /*
      * 这个函数主要作用是标记内核还在早期初始化代码阶段,并且中断在关闭状态.

@@ -17,7 +17,13 @@
 	"cpsid	i"						\
 	: "=r" (x) : : "memory", "cc");				\
 	})
-//tiny6410中开启和关闭中断就是调用这组函数
+/* 
+ * tiny6410中开启和关闭中断就是调用这组函数.
+ * cpsid i	primask=1	关中断
+ * cpsie i 	primask=0	开中断
+ * cpsid f	faultmask=1	关异常
+ * cpsie f	faultmask=0	开异常
+ */
 #define raw_local_irq_enable()  __asm__("cpsie i	@ __sti" : : : "memory", "cc")
 #define raw_local_irq_disable() __asm__("cpsid i	@ __cli" : : : "memory", "cc")
 #define local_fiq_enable()  __asm__("cpsie f	@ __stf" : : : "memory", "cc")
