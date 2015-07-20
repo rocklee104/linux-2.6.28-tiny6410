@@ -1,4 +1,4 @@
-/*
+﻿/*
  * linux/lib/cmdline.c
  * Helper functions generally used for parsing kernel command line
  * and module options.
@@ -147,6 +147,7 @@ unsigned long long memparse(const char *ptr, char **retptr)
 		break;
 	}
 
+	//更新字符串结束的指针位置
 	if (retptr)
 		*retptr = endptr;
 

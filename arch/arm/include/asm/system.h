@@ -166,6 +166,7 @@ extern unsigned int user_debug;
 extern unsigned long cr_no_alignment;	/* defined in entry-armv.S */
 extern unsigned long cr_alignment;	/* defined in entry-armv.S */
 
+//获取control register的值
 static inline unsigned int get_cr(void)
 {
 	unsigned int val;

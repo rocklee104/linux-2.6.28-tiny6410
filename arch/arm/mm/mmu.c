@@ -40,10 +40,19 @@ EXPORT_SYMBOL(empty_zero_page);
  */
 pmd_t *top_pmd;
 
+//不使用缓存
 #define CPOLICY_UNCACHED	0
+//向缓存和内存之间使用写缓冲
 #define CPOLICY_BUFFERED	1
+//缓存中发生写事件,直接反映到内存和内存下层.主要用于usb等经常插拔的存储设备
 #define CPOLICY_WRITETHROUGH	2
+//优先使用缓存,在缓存替换策略作用下,当数据需要从缓存区域脱离时反映到内存
 #define CPOLICY_WRITEBACK	3
+/*
+ * 发送缓存失败时,缓存控制器分配cache line的方法有两种:
+ * 1.read-allocate方式:从内存读取数据时分配cache line
+ * 2.write-allocate方式:向内存写入数据时分配cache line
+ */
 #define CPOLICY_WRITEALLOC	4
 
 static unsigned int cachepolicy __initdata = CPOLICY_WRITEBACK;
@@ -179,6 +188,7 @@ void adjust_cr(unsigned long mask, unsigned long set)
 }
 #endif
 
+//对应的page线性地址已经映射到物理内存,可以access也可以write
 #define PROT_PTE_DEVICE		L_PTE_PRESENT|L_PTE_YOUNG|L_PTE_DIRTY|L_PTE_WRITE
 #define PROT_SECT_DEVICE	PMD_TYPE_SECT|PMD_SECT_AP_WRITE
 
@@ -237,7 +247,7 @@ static struct mem_type mem_types[] = {
 		.prot_l1   = PMD_TYPE_TABLE,
 		.domain    = DOMAIN_USER,
 	},
-	//对应ram
+	//对应ram,段式映射,有读写权限,domain属于kernel
 	[MT_MEMORY] = {
 		.prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE,
 		.domain    = DOMAIN_KERNEL,
@@ -256,62 +266,18 @@ const struct mem_type *get_mem_type(unsigned int type)
 /*
  * Adjust the PMD section entries according to the CPU in use.
  */
+//根据不同的arm版本,设置不同mem_type
 static void __init build_mem_type_table(void)
 {
 	struct cachepolicy *cp;
+	//cr = 0xc5387f
 	unsigned int cr = get_cr();
 	unsigned int user_pgprot, kern_pgprot, vecs_pgprot;
 	int cpu_arch = cpu_architecture();
 	int i;
-
-	if (cpu_arch < CPU_ARCH_ARMv6) {
-#if defined(CONFIG_CPU_DCACHE_DISABLE)
-		if (cachepolicy > CPOLICY_BUFFERED)
-			cachepolicy = CPOLICY_BUFFERED;
-#elif defined(CONFIG_CPU_DCACHE_WRITETHROUGH)
-		if (cachepolicy > CPOLICY_WRITETHROUGH)
-			cachepolicy = CPOLICY_WRITETHROUGH;
-#endif
-	}
-	if (cpu_arch < CPU_ARCH_ARMv5) {
-		if (cachepolicy >= CPOLICY_WRITEALLOC)
-			cachepolicy = CPOLICY_WRITEBACK;
-		ecc_mask = 0;
-	}
 #ifdef CONFIG_SMP
 	cachepolicy = CPOLICY_WRITEALLOC;
 #endif
-
-	/*
-	 * Strip out features not present on earlier architectures.
-	 * Pre-ARMv5 CPUs don't have TEX bits.  Pre-ARMv6 CPUs or those
-	 * without extended page tables don't have the 'Shared' bit.
-	 */
-	if (cpu_arch < CPU_ARCH_ARMv5)
-		for (i = 0; i < ARRAY_SIZE(mem_types); i++)
-			mem_types[i].prot_sect &= ~PMD_SECT_TEX(7);
-	if ((cpu_arch < CPU_ARCH_ARMv6 || !(cr & CR_XP)) && !cpu_is_xsc3())
-		for (i = 0; i < ARRAY_SIZE(mem_types); i++)
-			mem_types[i].prot_sect &= ~PMD_SECT_S;
-
-	/*
-	 * ARMv5 and lower, bit 4 must be set for page tables (was: cache
-	 * "update-able on write" bit on ARM610).  However, Xscale and
-	 * Xscale3 require this bit to be cleared.
-	 */
-	if (cpu_is_xscale() || cpu_is_xsc3()) {
-		for (i = 0; i < ARRAY_SIZE(mem_types); i++) {
-			mem_types[i].prot_sect &= ~PMD_BIT4;
-			mem_types[i].prot_l1 &= ~PMD_BIT4;
-		}
-	} else if (cpu_arch < CPU_ARCH_ARMv6) {
-		for (i = 0; i < ARRAY_SIZE(mem_types); i++) {
-			if (mem_types[i].prot_l1)
-				mem_types[i].prot_l1 |= PMD_BIT4;
-			if (mem_types[i].prot_sect)
-				mem_types[i].prot_sect |= PMD_BIT4;
-		}
-	}
 
 	/*
 	 * Mark the device areas according to the CPU/architecture.

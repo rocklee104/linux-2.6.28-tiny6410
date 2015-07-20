@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  linux/arch/arm/kernel/setup.c
  *
  *  Copyright (C) 1995-2001 Russell King
@@ -63,6 +63,7 @@ extern void paging_init(struct meminfo *, struct machine_desc *desc);
 extern void reboot_setup(char *str);
 extern void _text, _etext, __data_start, _edata, _end;
 
+//processor_id,__machine_arch_type,__atags_pointer,在head-common.S中被赋值
 unsigned int processor_id;
 EXPORT_SYMBOL(processor_id);
 unsigned int __machine_arch_type;
@@ -114,9 +115,11 @@ EXPORT_SYMBOL(elf_platform);
 
 static struct meminfo meminfo __initdata = { 0, };
 static const char *cpu_name;
+//"SMDK6410"
 static const char *machine_name;
 static char __initdata command_line[COMMAND_LINE_SIZE];
 
+//default_command_line通过CONFIG_CMDLINE传递进来
 static char default_command_line[COMMAND_LINE_SIZE] __initdata = CONFIG_CMDLINE;
 static union { char c[4]; unsigned long l; } endian_test __initdata = { { 'l', '?', '?', 'b' } };
 #define ENDIANNESS ((char)endian_test.l)
@@ -196,6 +199,7 @@ static const char *proc_arch[] = {
 	"?(17)",
 };
 
+//mini6410的processor id 410fb766
 int cpu_architecture(void)
 {
 	int cpu_arch;
@@ -213,6 +217,7 @@ int cpu_architecture(void)
 
 		/* Revised CPUID format. Read the Memory Model Feature
 		 * Register 0 and check for VMSAv7 or PMSAv7 */
+		//虚拟存储系统架构(VMSA)和保护存储系统架构(PMSA),mmfr0 == 0x1130003
 		asm("mrc	p15, 0, %0, c0, c1, 4"
 		    : "=r" (mmfr0));
 		if ((mmfr0 & 0x0000000f) == 0x00000003 ||
@@ -229,8 +234,10 @@ int cpu_architecture(void)
 	return cpu_arch;
 }
 
+//mini6410的d/i cache均为VIPT nonaliasing类型
 static void __init cacheid_init(void)
 {
+	//通过访问cp15获取cache类型
 	unsigned int cachetype = read_cpuid_cachetype();
 	unsigned int arch = cpu_architecture();
 
@@ -261,6 +268,7 @@ static void __init cacheid_init(void)
  * These functions re-use the assembly code in head.S, which
  * already provide the required functionality.
  */
+//mini6410定义在proc_info_list在proc-v6.S中
 extern struct proc_info_list *lookup_processor_type(unsigned int);
 extern struct machine_desc *lookup_machine_type(unsigned int);
 
@@ -280,6 +288,7 @@ static void __init setup_processor(void)
 		while (1);
 	}
 
+	//"ARMv6-compatible processor"
 	cpu_name = list->cpu_name;
 
 #ifdef MULTI_CPU
@@ -355,6 +364,9 @@ static struct machine_desc * __init setup_machine(unsigned int nr)
 	/*
 	 * locate machine in the list of supported machines.
 	 */
+	/* mach-smdk6410.c中调用MACHINE_START/MACHINE_END将struct machine_desc
+	 * 添加到了.arch.info.init段中
+	 */
 	list = lookup_machine_type(nr);
 	if (!list) {
 		printk("Machine configuration botched (nr %d), unable "
@@ -362,6 +374,7 @@ static struct machine_desc * __init setup_machine(unsigned int nr)
 		while (1);
 	}
 
+	//SMDK6410
 	printk("Machine: %s\n", list->name);
 
 	return list;
@@ -375,6 +388,7 @@ static void __init arm_add_memory(unsigned long start, unsigned long size)
 	 * Ensure that start/size are aligned to a page boundary.
 	 * Size is appropriately rounded down, start is rounded up.
 	 */
+	//size要减去start未对齐的部分
 	size -= start & ~PAGE_MASK;
 
 	bank = &meminfo.bank[meminfo.nr_banks++];
@@ -399,12 +413,14 @@ static void __init early_mem(char **p)
 	 * size.
 	 */
 	if (usermem == 0) {
+		//表示内存大小是由用户指定的
 		usermem = 1;
 		meminfo.nr_banks = 0;
 	}
 
 	start = PHYS_OFFSET;
 	size  = memparse(*p, p);
+	//指定内存的起始位置
 	if (**p == '@')
 		start = memparse(*p + 1, p);
 
@@ -422,12 +438,17 @@ __early_param("mem=", early_mem);
 */
 static void __init parse_cmdline(char **cmdline_p, char *from)
 {
-    //command_line only contains normal parameters
+    //command_line需要将u-boot传过来的cmdline中的early_params过滤掉
 	char c = ' ', *to = command_line;
 	int len = 0;
 
 	for (;;) {
 		if (c == ' ') {
+			/* 
+			 * __early_begin和__early_end中包含的是.early_param.init section.
+			 * 这个section中的成员是通过__early_param这个宏定义的.这些参数有
+		     * "initrd=","cachepolicy=","nocache","nowb","ecc=","vmalloc=","mem="
+			 */
 			extern struct early_params __early_begin, __early_end;
 			struct early_params *p;
 
@@ -441,7 +462,7 @@ static void __init parse_cmdline(char **cmdline_p, char *from)
 						to -= 1;
                     //FROM points to argue value now
 					from += arglen;
-                    //deal with the argue value
+                    //执行early_params处理函数,并且在command_line中过滤掉这些early_params
 					p->fn(&from);
 
 					while (*from != ' ' && *from != '\0')
@@ -538,14 +559,17 @@ request_standard_resources(struct meminfo *mi, struct machine_desc *mdesc)
  */
 static int __init parse_tag_core(const struct tag *tag)
 {
+	//u-boot传递过来的tag->hdr.size == 5
 	if (tag->hdr.size > 2) {
 		if ((tag->u.core.flags & 1) == 0)
 			root_mountflags &= ~MS_RDONLY;
+		//确定root device的设备号
 		ROOT_DEV = old_decode_dev(tag->u.core.rootdev);
 	}
 	return 0;
 }
 
+//定义static struct tagtable __tagtable_parse_tag_core __attribute__((__used__)) __attribute__((__section__(".taglist.init"))) = { 0x54410001, parse_tag_core };
 __tagtable(ATAG_CORE, parse_tag_core);
 
 static int __init parse_tag_mem32(const struct tag *tag)
@@ -560,6 +584,7 @@ static int __init parse_tag_mem32(const struct tag *tag)
 	return 0;
 }
 
+//定义static struct tagtable __tagtable_parse_tag_mem32 __attribute__((__used__)) __attribute__((__section__(".taglist.init"))) = { 0x54410002, parse_tag_mem32 };
 __tagtable(ATAG_MEM, parse_tag_mem32);
 
 #if defined(CONFIG_VGA_CONSOLE) || defined(CONFIG_DUMMY_CONSOLE)
@@ -618,6 +643,7 @@ __tagtable(ATAG_REVISION, parse_tag_revision);
 
 static int __init parse_tag_cmdline(const struct tag *tag)
 {
+	//如果tag->u.cmdline.cmdline中有内容,那么default_command_line之前的内容就会被覆盖
 	strlcpy(default_command_line, tag->u.cmdline.cmdline, COMMAND_LINE_SIZE);
 	return 0;
 }
@@ -635,6 +661,7 @@ static int __init parse_tag(const struct tag *tag)
 	struct tagtable *t;
 
 	for (t = &__tagtable_begin; t < &__tagtable_end; t++)
+		//在.taglist.init段中搜索当前tag的struct tagtable,并调用处理函数
 		if (tag->hdr.tag == t->tag) {
 			t->parse(tag);
 			break;
@@ -697,6 +724,7 @@ void __init setup_arch(char **cmdline_p)
 	if (mdesc->soft_reboot)
 		reboot_setup("s");
 
+	//获取u-boot传递的tags头部,物理地址需要转换成虚拟地址
 	if (__atags_pointer)
 		tags = phys_to_virt(__atags_pointer);
 	else if (mdesc->boot_params)
@@ -711,24 +739,37 @@ void __init setup_arch(char **cmdline_p)
 	if (tags->hdr.tag != ATAG_CORE)
 		tags = (struct tag *)&init_tags;
 
+	//mini6410没有实现fixup函数
 	if (mdesc->fixup)
 		mdesc->fixup(mdesc, tags, &from, &meminfo);
 
 	if (tags->hdr.tag == ATAG_CORE) {
+		/* 
+		 * 将所有ATAG_MEM类型的节点改为ATAG_NONE也即如果meminfo.nr_banks不为0,
+		 * 则认为已经处理过内存参数,直接跳过这些节点.
+		 */
 		if (meminfo.nr_banks != 0)
 			squash_mem_tags(tags);
+		//mini6410,空函数
 		save_atags(tags);
+		/* 
+		 * 调用全部tag的处理函数,mini6410的tag包括ATAG_CORE,ATAG_MEM,ATAG_CMDLINE.
+		 * 需要注意的是,在ATAG_MEM指定的memory大小,可能会被cmdline中指定的大小覆盖.
+		 */
 		parse_tags(tags);
 	}
 
 	init_mm.start_code = (unsigned long) &_text;
 	init_mm.end_code   = (unsigned long) &_etext;
 	init_mm.end_data   = (unsigned long) &_edata;
+	//bss结束的位置
 	init_mm.brk	   = (unsigned long) &_end;
 
+	//获取.config文件配置的cmdline,及u-boot传递的cmdline
 	memcpy(boot_command_line, from, COMMAND_LINE_SIZE);
     //From now on, boot_command_line holds the cmdline
 	boot_command_line[COMMAND_LINE_SIZE-1] = '\0';
+	//解析cmdline, cmdline_p中包含一般的参数,不包含early_param
 	parse_cmdline(cmdline_p, from);
 	paging_init(&meminfo, mdesc);
 	request_standard_resources(&meminfo, mdesc);

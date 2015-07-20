@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  linux/kernel/printk.c
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
@@ -64,6 +64,7 @@ int console_printk[4] = {
  * Low level drivers may need that to know if they can schedule in
  * their unblank() callback or not. So let's export it.
  */
+//oops_in_progress只有在panic(), BUG() 或 die() 调用中才会被置1
 int oops_in_progress;
 EXPORT_SYMBOL(oops_in_progress);
 
@@ -568,6 +569,7 @@ asmlinkage int printk(const char *fmt, ...)
 }
 
 /* cpu currently holding logbuf_lock */
+//printk_cpu记录了当前执行vprintk的CPU的编号
 static volatile unsigned int printk_cpu = UINT_MAX;
 
 /*
@@ -630,11 +632,13 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 	int this_cpu;
 	char *p;
 
+	//在CONFIG_BOOT_PRINTK_DELAY定义后才起作用
 	boot_delay_msec();
 
 	preempt_disable();
 	/* This stops the holder of console_sem just where we want him */
 	raw_local_irq_save(flags);
+	//用来检测是否嵌套
 	this_cpu = smp_processor_id();
 
 	/*
@@ -649,6 +653,7 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 		 * it can be printed at the next appropriate moment:
 		 */
 		if (!oops_in_progress) {
+			//嵌套调用
 			recursion_bug = 1;
 			goto out_restore_irqs;
 		}

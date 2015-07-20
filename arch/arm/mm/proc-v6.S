@@ -174,9 +174,9 @@ __v6_setup:
 	#将0x01e0fb7f装入r5, 0x00c0387d装入r6
 	ldmia	r5, {r5, r6}
 	mrc	p15, 0, r0, c1, c0, 0		@ read control register
-	#清除read control register中的r5中的那些bit
+	#清除control register中的r5中的(M/A/C/W/S/R/Z/I/V/RR/L4/FI/U/XP/VE)bit
 	bic	r0, r0, r5			@ clear bits them
-	#开启mmu,icache,dcache
+	#开启(M/C/W/Z/I/V/U/XP)
 	orr	r0, r0, r6			@ set them
 	#跳转到__enable_mmu
 	mov	pc, lr				@ return to head.S:__ret

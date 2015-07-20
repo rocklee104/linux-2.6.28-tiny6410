@@ -1,4 +1,4 @@
-#ifndef __LINUX_PREEMPT_H
+﻿#ifndef __LINUX_PREEMPT_H
 #define __LINUX_PREEMPT_H
 
 /*
@@ -11,6 +11,7 @@
 #include <linux/list.h>
 
 #if defined(CONFIG_DEBUG_PREEMPT) || defined(CONFIG_PREEMPT_TRACER)
+//debug preempt时候使用
   extern void add_preempt_count(int val);
   extern void sub_preempt_count(int val);
 #else
@@ -18,9 +19,12 @@
 # define sub_preempt_count(val)	do { preempt_count() -= (val); } while (0)
 #endif
 
+//增加当前sp指向的thread_info中的preempt_count成员
 #define inc_preempt_count() add_preempt_count(1)
+//减少当前sp指向的thread_info中的preempt_count成员
 #define dec_preempt_count() sub_preempt_count(1)
 
+//返回当前sp指向的thread_info中的preempt_count成员,当preempt_count==0时,允许抢占
 #define preempt_count()	(current_thread_info()->preempt_count)
 
 #ifdef CONFIG_PREEMPT

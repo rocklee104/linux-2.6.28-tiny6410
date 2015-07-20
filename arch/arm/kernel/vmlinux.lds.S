@@ -45,6 +45,10 @@ SECTIONS
 		__arch_info_begin = .;
 			*(.arch.info.init)
 		__arch_info_end = .;
+		/*
+		 * .taglist.init段中定义了每一种tag的struct tagtable,
+		 * 这个机构中包含的处理这种tag的函数指针
+		 */
 		__tagtable_begin = .;
 			*(.taglist.init)
 		__tagtable_end = .;

@@ -1,4 +1,4 @@
-#ifndef __LINUX_STRINGIFY_H
+﻿#ifndef __LINUX_STRINGIFY_H
 #define __LINUX_STRINGIFY_H
 
 /* Indirect stringification.  Doing two levels allows the parameter to be a
@@ -7,6 +7,7 @@
  */
 
 #define __stringify_1(x)	#x
+//将x转化成字符串
 #define __stringify(x)		__stringify_1(x)
 
 #endif	/* !__LINUX_STRINGIFY_H */

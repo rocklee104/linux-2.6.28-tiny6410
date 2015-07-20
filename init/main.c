@@ -603,6 +603,7 @@ asmlinkage void __init start_kernel(void)
 	lock_kernel();
 	tick_init();
 	boot_cpu_init();
+	//空函数
 	page_address_init();
 	printk(KERN_NOTICE);
 	printk(linux_banner);

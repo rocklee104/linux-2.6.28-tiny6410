@@ -98,6 +98,14 @@
  * until either the TLB entry is evicted under pressure, or a context
  * switch which changes the user space mapping occurs.
  */
+/*
+ * 根据ARM的硬件分页机制,第一级全局页目录(pgd)有4096项,第二级(pte)为256项.
+ *
+ * 在arm linux实现上,针对ARM的硬件分页机制做了些微小的调整.第一级目录保留了2048项.每项
+ * 占用8 bytes(换句话说,是两个硬件指针指向二级页表);第二级则把两个硬件PTE表连续放在一起,
+ * 在这两个PTE表后面则保存相应的Linux状态信息,因此二级表项实际上有512项(每个表256项,
+ * 每项4byte,两个则为512项).这样每个逻辑PTE表刚好占用一个page.
+ */
 #define PTRS_PER_PTE		512
 #define PTRS_PER_PMD		1
 #define PTRS_PER_PGD		2048
@@ -161,11 +169,15 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
  * The PTE table pointer refers to the hardware entries; the "Linux"
  * entries are stored 1024 bytes below.
  */
+//linux模拟的页表,部分bit使用了x86下定义的
+//表示线性地址已经映射到物理内存
 #define L_PTE_PRESENT		(1 << 0)
 #define L_PTE_FILE		(1 << 1)	/* only when !PRESENT */
+//只有设置L_PTE_YOUNG后,对应的page才能被访问
 #define L_PTE_YOUNG		(1 << 1)
 #define L_PTE_BUFFERABLE	(1 << 2)	/* obsolete, matches PTE */
 #define L_PTE_CACHEABLE		(1 << 3)	/* obsolete, matches PTE */
+//当L_PTE_DIRTY和L_PTE_WRITE同时被设置的时候,对应的page才可写
 #define L_PTE_DIRTY		(1 << 6)
 #define L_PTE_WRITE		(1 << 7)
 #define L_PTE_USER		(1 << 8)

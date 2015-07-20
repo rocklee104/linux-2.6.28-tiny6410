@@ -24,6 +24,7 @@ extern unsigned int cacheid;
 #if __LINUX_ARM_ARCH__ >= 7
 #define __CACHEID_ARCH_MIN	(CACHEID_VIPT_NONALIASING | CACHEID_ASID_TAGGED)
 #elif __LINUX_ARM_ARCH__ >= 6
+//mini6410
 #define	__CACHEID_ARCH_MIN	(~CACHEID_VIVT)
 #else
 #define __CACHEID_ARCH_MIN	(~0)
@@ -36,6 +37,7 @@ extern unsigned int cacheid;
 #define __CACHEID_ALWAYS	(CACHEID_VIVT)
 #define __CACHEID_NEVER		(~CACHEID_VIVT)
 #elif !defined(CONFIG_CPU_CACHE_VIVT) && defined(CONFIG_CPU_CACHE_VIPT)
+//mini6410
 #define __CACHEID_ALWAYS	(0)
 #define __CACHEID_NEVER		(CACHEID_VIVT)
 #else

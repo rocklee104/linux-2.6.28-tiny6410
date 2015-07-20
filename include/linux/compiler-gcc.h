@@ -1,4 +1,4 @@
-#ifndef __LINUX_COMPILER_H
+﻿#ifndef __LINUX_COMPILER_H
 #error "Please don't include <linux/compiler-gcc.h> directly, include <linux/compiler.h> instead."
 #endif
 
@@ -9,6 +9,11 @@
 
 /* Optimization barrier */
 /* The "volatile" is due to gcc bugs */
+/*
+ * C语言的编译器在优化生成的代码时能够保证总是使用内存中的值,而不是D Cache缓冲区或者寄存器中的值.
+ * 换句话说,所有在设置内存屏障前发起的内存访问,必须在设置内存屏障之后发起的内存访问之前完成,
+ * 并且之后的访问被保证是从内存而来.
+ */
 #define barrier() __asm__ __volatile__("": : :"memory")
 
 /* This macro obfuscates arithmetic on a variable address so that gcc

@@ -1,14 +1,16 @@
-#ifndef __ASM_ARM_CPUTYPE_H
+﻿#ifndef __ASM_ARM_CPUTYPE_H
 #define __ASM_ARM_CPUTYPE_H
 
 #include <linux/stringify.h>
 
+//mrc p15,0,rx,c0,c0,CPUID_X,下面的参数用于控制操作c0的方式
 #define CPUID_ID	0
 #define CPUID_CACHETYPE	1
 #define CPUID_TCM	2
 #define CPUID_TLBTYPE	3
 
 #ifdef CONFIG_CPU_CP15
+//通过读取CP15获取处理器id
 #define read_cpuid(reg)							\
 	({								\
 		unsigned int __val;					\

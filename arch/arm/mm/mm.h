@@ -16,12 +16,13 @@ static inline pmd_t *pmd_off_k(unsigned long virt)
 	return pmd_off(pgd_offset_k(virt), virt);
 }
 
+//记录页表类型,权限及访问控制域
 struct mem_type {
-	//页表项的访问控制权,pte即第二级映射表项(页表项)
+	//L2页表项的访问控制权,pte即第二级映射表项(页表项)
 	unsigned int prot_pte;
-	//段表项的访问控制位,l1即第一级映射表项(段表项/主页表项)
+	//L1页表项的访问控制位,l1即第一级映射表项(段表项/主页表项)
 	unsigned int prot_l1;
-	//代表主页表(不是主页表项)的访问控制位和内存域
+	//代表主页表(不是主页表项)的访问控制位和内存域,在段映射时使用这个成员
 	unsigned int prot_sect;
 	//所属的内存域
 	unsigned int domain;

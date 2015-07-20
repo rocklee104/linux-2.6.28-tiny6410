@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  arch/arm/include/asm/pgtable-hwdef.h
  *
  *  Copyright (C) 1995-2002 Russell King
@@ -16,6 +16,7 @@
  * + Level 1 descriptor (PMD)
  *   - common
  */
+//一级页表项的类型,根据页表项的bit[0,1]判断
 #define PMD_TYPE_MASK		(3 << 0)
 #define PMD_TYPE_FAULT		(0 << 0)
 #define PMD_TYPE_TABLE		(1 << 0)
@@ -26,20 +27,34 @@
 /*
  *   - section
  */
+//段页表描述符的各个bit
+//写缓冲使能
 #define PMD_SECT_BUFFERABLE	(1 << 2)
+//cache使能
 #define PMD_SECT_CACHEABLE	(1 << 3)
+//禁止执行标志,1:禁止执行 0:可执行
 #define PMD_SECT_XN		(1 << 4)	/* v6 */
+//页表指示的页面可写
 #define PMD_SECT_AP_WRITE	(1 << 10)
+//页表指示的页面可读
 #define PMD_SECT_AP_READ	(1 << 11)
+//扩展类型,与B,C标志协同控制内存访问类型
 #define PMD_SECT_TEX(x)		((x) << 12)	/* v5 */
+//扩展访问权限位与APY协同控制内存访问权限
 #define PMD_SECT_APX		(1 << 15)	/* v6 */
+//共享访问
 #define PMD_SECT_S		(1 << 16)	/* v6 */
+//全局访问
 #define PMD_SECT_nG		(1 << 17)	/* v6 */
+//段页表和超级段页表开关
 #define PMD_SECT_SUPER		(1 << 18)	/* v6 */
 
+//见ARM1176JZF,Table 6-2
 #define PMD_SECT_UNCACHED	(0)
 #define PMD_SECT_BUFFERED	(PMD_SECT_BUFFERABLE)
+//write through
 #define PMD_SECT_WT		(PMD_SECT_CACHEABLE)
+//write back
 #define PMD_SECT_WB		(PMD_SECT_CACHEABLE | PMD_SECT_BUFFERABLE)
 #define PMD_SECT_MINICACHE	(PMD_SECT_TEX(1) | PMD_SECT_CACHEABLE)
 #define PMD_SECT_WBWA		(PMD_SECT_TEX(1) | PMD_SECT_CACHEABLE | PMD_SECT_BUFFERABLE)
@@ -55,16 +70,22 @@
  */
 #define PTE_TYPE_MASK		(3 << 0)
 #define PTE_TYPE_FAULT		(0 << 0)
+//large page
 #define PTE_TYPE_LARGE		(1 << 0)
+//对arm1176来说,不区分PTE_TYPE_SMALL和PTE_TYPE_EXT,它们都属于Extended small page
 #define PTE_TYPE_SMALL		(2 << 0)
 #define PTE_TYPE_EXT		(3 << 0)	/* v5 */
+//指向的页面开启buffer
 #define PTE_BUFFERABLE		(1 << 2)
+//指向的页面开启cache
 #define PTE_CACHEABLE		(1 << 3)
 
 /*
  *   - extended small page/tiny page
  */
+//下面就是extended small page的页表项中的bit
 #define PTE_EXT_XN		(1 << 0)	/* v6 */
+//extended small page的ap
 #define PTE_EXT_AP_MASK		(3 << 4)
 #define PTE_EXT_AP0		(1 << 4)
 #define PTE_EXT_AP1		(2 << 4)

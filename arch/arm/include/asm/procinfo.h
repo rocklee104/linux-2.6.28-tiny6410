@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  arch/arm/include/asm/procinfo.h
  *
  *  Copyright (C) 1996-1999 Russell King
@@ -32,13 +32,19 @@ struct proc_info_list {
 	unsigned long		__cpu_mm_mmu_flags;	/* used by head.S */
 	unsigned long		__cpu_io_mmu_flags;	/* used by head.S */
 	unsigned long		__cpu_flush;		/* used by head.S */
+	//"armv6"
 	const char		*arch_name;
+	//"v6" 
 	const char		*elf_name;
 	unsigned int		elf_hwcap;
+	//"ARMv6-compatible processor"
 	const char		*cpu_name;
 	struct processor	*proc;
+	//arch/arm/mm/tlb-v6.S定义的v6wbi_tlb_fns
 	struct cpu_tlb_fns	*tlb;
+	//copypage-v6.c中定义的v6_user_fns
 	struct cpu_user_fns	*user;
+	//cache-v6.S中定义的v6_cache_fns
 	struct cpu_cache_fns	*cache;
 };
 

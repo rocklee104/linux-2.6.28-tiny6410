@@ -44,62 +44,6 @@
 #undef _USER
 #undef MULTI_USER
 
-#ifdef CONFIG_CPU_COPY_V3
-# ifdef _USER
-#  define MULTI_USER 1
-# else
-#  define _USER v3
-# endif
-#endif
-
-#ifdef CONFIG_CPU_COPY_V4WT
-# ifdef _USER
-#  define MULTI_USER 1
-# else
-#  define _USER v4wt
-# endif
-#endif
-
-#ifdef CONFIG_CPU_COPY_V4WB
-# ifdef _USER
-#  define MULTI_USER 1
-# else
-#  define _USER v4wb
-# endif
-#endif
-
-#ifdef CONFIG_CPU_COPY_FEROCEON
-# ifdef _USER
-#  define MULTI_USER 1
-# else
-#  define _USER feroceon
-# endif
-#endif
-
-#ifdef CONFIG_CPU_SA1100
-# ifdef _USER
-#  define MULTI_USER 1
-# else
-#  define _USER v4_mc
-# endif
-#endif
-
-#ifdef CONFIG_CPU_XSCALE
-# ifdef _USER
-#  define MULTI_USER 1
-# else
-#  define _USER xscale_mc
-# endif
-#endif
-
-#ifdef CONFIG_CPU_XSC3
-# ifdef _USER
-#  define MULTI_USER 1
-# else
-#  define _USER xsc3_mc
-# endif
-#endif
-
 #ifdef CONFIG_CPU_COPY_V6
 # define MULTI_USER 1
 #endif

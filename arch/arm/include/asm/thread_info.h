@@ -50,7 +50,7 @@ struct cpu_context_save {
 struct thread_info {
 	//flags保存各种特定于进程的标志,比如TIF_SIGPENDING,TIF_NEED_RESCHED
 	unsigned long		flags;		/* low level flags */
-	//preempt_count是实现内核抢占所需的计数器
+	//preempt_count是实现内核抢占所需的计数器,当数值为0的时候，内核就可执行抢占
 	int			preempt_count;	/* 0 => preemptable, <0 => bug */
 	mm_segment_t		addr_limit;	/* address limit */
 	struct task_struct	*task;		/* main task structure */
@@ -72,6 +72,7 @@ struct thread_info {
 	struct restart_block	restart_block;
 };
 
+//0号进程preempt_count初始值为1,也即它默认是不可抢占的直到它自身将preempt_count置为0
 #define INIT_THREAD_INFO(tsk)						\
 {									\
 	.task		= &tsk,						\
@@ -95,6 +96,7 @@ struct thread_info {
  */
 static inline struct thread_info *current_thread_info(void) __attribute_const__;
 
+//从栈中获取thread_info指针
 static inline struct thread_info *current_thread_info(void)
 {
 	register unsigned long sp asm ("sp");

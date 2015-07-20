@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  linux/include/asm/setup.h
  *
  *  Copyright (C) 1997-1999 Russell King
@@ -205,6 +205,7 @@ struct membank {
 };
 
 struct meminfo {
+	//NR_BANKS指定了板子上有多少个ddr芯片,mini6410只有1个
 	int nr_banks;
 	struct membank bank[NR_BANKS];
 };
