@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  arch/arm/include/asm/tlbflush.h
  *
  *  Copyright (C) 1999-2003 Russell King
@@ -205,6 +205,7 @@ extern void __cpu_flush_kern_tlb_range(unsigned long, unsigned long);
 
 extern struct cpu_tlb_fns cpu_tlb;
 
+//v6wbi_tlb_flags
 #define __cpu_tlb_flags			cpu_tlb.tlb_flags
 
 /*
@@ -454,10 +455,12 @@ static inline void clean_pmd_entry(pmd_t *pmd)
 {
 	const unsigned int __tlb_flag = __cpu_tlb_flags;
 
+	//Clean Data Cache Line (using MVA)
 	if (tlb_flag(TLB_DCLEAN))
 		asm("mcr	p15, 0, %0, c7, c10, 1	@ flush_pmd"
 			: : "r" (pmd) : "cc");
 
+	//arm1176-s不会执行下面的代码
 	if (tlb_flag(TLB_L2CLEAN_FR))
 		asm("mcr	p15, 1, %0, c15, c9, 1  @ L2 flush_pmd"
 			: : "r" (pmd) : "cc");

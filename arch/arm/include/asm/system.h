@@ -22,14 +22,18 @@
 #define CR_M	(1 << 0)	/* MMU enable				*/
 #define CR_A	(1 << 1)	/* Alignment abort enable		*/
 #define CR_C	(1 << 2)	/* Dcache enable			*/
+//arm1176没有实现CR_W
 #define CR_W	(1 << 3)	/* Write buffer enable			*/
+//CR_P,CR_D,CR_L should be one
 #define CR_P	(1 << 4)	/* 32-bit exception handler		*/
 #define CR_D	(1 << 5)	/* 32-bit data address range		*/
 #define CR_L	(1 << 6)	/* Implementation defined		*/
 #define CR_B	(1 << 7)	/* Big endian				*/
 #define CR_S	(1 << 8)	/* System MMU protection		*/
 #define CR_R	(1 << 9)	/* ROM MMU protection			*/
+//arm1176 should be zero
 #define CR_F	(1 << 10)	/* Implementation defined		*/
+//Enables branch prediction
 #define CR_Z	(1 << 11)	/* Implementation defined		*/
 #define CR_I	(1 << 12)	/* Icache enable			*/
 #define CR_V	(1 << 13)	/* Vectors relocated to 0xffff0000	*/

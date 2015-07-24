@@ -36,7 +36,9 @@
  * which may not overlap IO space.
  */
 #ifndef VMALLOC_START
+//在物理内存后的8M空洞,用于捕捉越界的内存访问
 #define VMALLOC_OFFSET		(8*1024*1024)
+//high_memory在bootmem_init中才被赋值,VMALLOC_START记录堆的起始地址,此时为8M
 #define VMALLOC_START		(((unsigned long)high_memory + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
 #endif
 
@@ -169,7 +171,10 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
  * The PTE table pointer refers to the hardware entries; the "Linux"
  * entries are stored 1024 bytes below.
  */
-//linux模拟的页表,部分bit使用了x86下定义的
+/* 
+ * linux模拟的页表,部分bit使用了x86下定义的,这部分定义的是armv6版本的页表.
+ * 注意下面没有定义bit[4-5]
+ */
 //表示线性地址已经映射到物理内存
 #define L_PTE_PRESENT		(1 << 0)
 #define L_PTE_FILE		(1 << 1)	/* only when !PRESENT */
@@ -188,6 +193,7 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
  * These are the memory types, defined to be compatible with
  * pre-ARMv6 CPUs cacheable and bufferable bits:   XXCB
  */
+//armv6前的页表,比如arm920t
 #define L_PTE_MT_UNCACHED	(0x00 << 2)	/* 0000 */
 #define L_PTE_MT_BUFFERABLE	(0x01 << 2)	/* 0001 */
 #define L_PTE_MT_WRITETHROUGH	(0x02 << 2)	/* 0010 */
@@ -342,6 +348,7 @@ static inline pte_t pte_mkspecial(pte_t pte) { return pte; }
 		flush_pmd_entry(pmdpd);	\
 	} while (0)
 
+//改变段页表后,还需要清除dcache
 #define pmd_clear(pmdp)			\
 	do {				\
 		pmdp[0] = __pmd(0);	\
@@ -385,6 +392,8 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
 /*
  * 接收内存描述符地址mm和线性地址addr作为参数.这个宏产生地址addr在页全局目录
  * 中相应表项的线性地址.通过内存描述符mm内的一个指针可以找到这个页全局目录.
+ * 由于(mm)->pgd是一个unsigned long pgd_t[2]数组指针,每次当index为1时,实际
+ * 指针偏移8个字节.
  */
 #define pgd_offset(mm, addr)	((mm)->pgd+pgd_index(addr))
 

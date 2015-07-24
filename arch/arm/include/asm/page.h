@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  arch/arm/include/asm/page.h
  *
  *  Copyright (C) 1995-2003 Russell King
@@ -101,6 +101,7 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 #define __pgprot(x)     ((pgprot_t) { (x) } )
 
 #else
+//mini6410使用下面的定义
 /*
  * .. while these make it easier on the compiler
  */

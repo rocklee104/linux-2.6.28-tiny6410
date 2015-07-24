@@ -79,7 +79,7 @@ __mmap_switched:
 	bic	r4, r0, #CR_A			@ Clear 'A' bit
 	/*
 	 * 将A域以外的CP15 c1寄存器值保存到cr_no_alignment变量,
-	 * 设置A域的值,保存到cr_alignment,这两个变量在entry-armv.S中定义
+	 * 设置A域的值,保存到cr_alignment(0xc5387f),这两个变量在entry-armv.S中定义
 	 */
 	stmia	r7, {r0, r4}			@ Save control register values
 	b	start_kernel

@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  arch/arm/include/asm/map.h
  *
  *  Copyright (C) 1999-2000 Russell King
@@ -12,9 +12,13 @@
 #include <asm/io.h>
 
 struct map_desc {
+	//起始虚拟地址
 	unsigned long virtual;
+	//起始页帧号
 	unsigned long pfn;
+	//需要映射的长度
 	unsigned long length;
+	//memory type
 	unsigned int type;
 };
 

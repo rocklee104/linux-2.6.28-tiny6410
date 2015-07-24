@@ -32,6 +32,7 @@
  * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area
  */
 #define PAGE_OFFSET		UL(CONFIG_PAGE_OFFSET)
+//0xC0000000 - 16MB
 #define TASK_SIZE		(UL(CONFIG_PAGE_OFFSET) - UL(0x01000000))
 #define TASK_UNMAPPED_BASE	(UL(CONFIG_PAGE_OFFSET) / 3)
 
@@ -45,6 +46,7 @@
  * and PAGE_OFFSET - it must be within 32MB of the kernel text.
  */
 #define MODULES_END		(PAGE_OFFSET)
+/*开启mmu后的MODULES_VADDR,0xBF000000*/
 #define MODULES_VADDR		(MODULES_END - 16*1048576)
 
 #if TASK_SIZE > MODULES_VADDR
@@ -95,6 +97,7 @@
  * The module can be at any place in ram in nommu mode.
  */
 #define MODULES_END		(END_MEM)
+//无mmu
 #define MODULES_VADDR		(PHYS_OFFSET)
 
 #endif /* !CONFIG_MMU */
