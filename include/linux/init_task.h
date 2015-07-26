@@ -1,4 +1,4 @@
-#ifndef _LINUX__INIT_TASK_H
+﻿#ifndef _LINUX__INIT_TASK_H
 #define _LINUX__INIT_TASK_H
 
 #include <linux/rcupdate.h>
@@ -26,6 +26,7 @@ extern struct files_struct init_files;
 	.max_reqs	= ~0U,				\
 }
 
+//swapper_pg_dir在arch/arm/kernel/head.S中定义为KERNEL_RAM_VADDR - 0x4000
 #define INIT_MM(name) \
 {			 					\
 	.mm_rb		= RB_ROOT,				\

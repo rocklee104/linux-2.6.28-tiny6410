@@ -168,6 +168,7 @@ extern unsigned int user_debug;
 #define nop() __asm__ __volatile__("mov\tr0,r0\t@ nop\n\t");
 
 extern unsigned long cr_no_alignment;	/* defined in entry-armv.S */
+//kernel进入c语言环境后,cr_alignment就为0xc5387f
 extern unsigned long cr_alignment;	/* defined in entry-armv.S */
 
 //获取control register的值

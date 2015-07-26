@@ -198,6 +198,7 @@ static struct mem_type mem_types[] = {
 		.prot_pte	= PROT_PTE_DEVICE | L_PTE_MT_DEV_SHARED |
 				  L_PTE_SHARED,
 		.prot_l1	= PMD_TYPE_TABLE,
+		//段页表,表示的页面设置share标志
 		.prot_sect	= PROT_SECT_DEVICE | PMD_SECT_S,
 		.domain		= DOMAIN_IO,
 	},
@@ -323,6 +324,11 @@ static void __init build_mem_type_table(void)
 			 * - write combine device mem is TEXCB=00100
 			 * (Uncached Normal in ARMv6 parlance).
 			 */
+			/*
+ 			 * 对于ARMv6 and ARMv7禁止tex remapping的情况:
+ 			 * shared device TEXCB=00001
+ 			 * nonshared device TEXCB=01000
+			 */
 			mem_types[MT_DEVICE].prot_sect |= PMD_SECT_BUFFERED;
 			mem_types[MT_DEVICE_NONSHARED].prot_sect |= PMD_SECT_TEX(2);
 			mem_types[MT_DEVICE_WC].prot_sect |= PMD_SECT_TEX(1);
@@ -337,6 +343,7 @@ static void __init build_mem_type_table(void)
 	/*
 	 * Now deal with the memory-type mappings
 	 */
+	//cachepolicy是一个全局变量,初始值是CPOLICY_WRITEBACK
 	cp = &cache_policies[cachepolicy];
 	vecs_pgprot = kern_pgprot = user_pgprot = cp->pte;
 
@@ -363,6 +370,7 @@ static void __init build_mem_type_table(void)
 		 * Mark cache clean areas and XIP ROM read only
 		 * from SVC mode and no access from userspace.
 		 */
+		//特权模式下只读,用户模式下禁止访问
 		mem_types[MT_ROM].prot_sect |= PMD_SECT_APX|PMD_SECT_AP_WRITE;
 		mem_types[MT_MINICLEAN].prot_sect |= PMD_SECT_APX|PMD_SECT_AP_WRITE;
 		mem_types[MT_CACHECLEAN].prot_sect |= PMD_SECT_APX|PMD_SECT_AP_WRITE;
@@ -380,6 +388,7 @@ static void __init build_mem_type_table(void)
 
 	for (i = 0; i < 16; i++) {
 		unsigned long v = pgprot_val(protection_map[i]);
+		//为protection_map中的权限加上L_PTE_MT_WRITEBACK位
 		protection_map[i] = __pgprot(v | user_pgprot);
 	}
 
@@ -541,6 +550,7 @@ void __init create_mapping(struct map_desc *md)
 	const struct mem_type *type;
 	pgd_t *pgd;
 
+	//vectors_base()为0xffff0000
 	if (md->virtual != vectors_base() && md->virtual < TASK_SIZE) {
 		printk(KERN_WARNING "BUG: not creating mapping for "
 		       "0x%08llx at 0x%08lx in user region\n",
@@ -621,6 +631,7 @@ __early_param("vmalloc=", early_vmalloc);
 
 #define VMALLOC_MIN	(void *)(VMALLOC_END - vmalloc_reserve)
 
+//mb->start + mb->size这片区域的虚拟地址是不能覆盖vmalloc区域的
 static int __init check_membank_valid(struct membank *mb)
 {
 	/*
@@ -670,12 +681,21 @@ static void __init sanity_check_meminfo(struct meminfo *mi)
 	mi->nr_banks = j;
 }
 
+/* 
+ * 将[0,0xC0000000)及[0xD0000000,0xE0000000)这段内存的段页表清空.
+ * [0xC0000000,0xD0000000)这段虚拟内存对应的是DRAM,不做清除.
+ */
 static inline void prepare_page_table(struct meminfo *mi)
 {
 	unsigned long addr;
+	int i;
 
 	/*
 	 * Clear out all the mappings below the kernel image.
+	 */
+	/*
+	 * 在head.S的__create_page_tables中创建过段页表,其位置在0xc0004000,
+	 * 现在我们要清除[0,0xBF000000)这段内存的段页表.
 	 */
 	for (addr = 0; addr < MODULES_VADDR; addr += PGDIR_SIZE)
 		pmd_clear(pmd_off_k(addr));
@@ -684,6 +704,7 @@ static inline void prepare_page_table(struct meminfo *mi)
 	/* The XIP kernel is mapped in the module area -- skip over it */
 	addr = ((unsigned long)&_etext + PGDIR_SIZE - 1) & PGDIR_MASK;
 #endif
+	//清除[0xBF000000,0xC0000000)这段内存的段页表
 	for ( ; addr < PAGE_OFFSET; addr += PGDIR_SIZE)
 		pmd_clear(pmd_off_k(addr));
 

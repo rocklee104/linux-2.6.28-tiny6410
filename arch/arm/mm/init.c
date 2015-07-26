@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  linux/arch/arm/mm/init.c
  *
  *  Copyright (C) 1995-2005 Russell King
@@ -215,12 +215,14 @@ static unsigned long __init bootmem_init_node(int node, struct meminfo *mi)
 	pg_data_t *pgdat;
 	int i;
 
+	//DRAM起始页帧号
 	start_pfn = -1UL;
 	end_pfn = 0;
 
 	/*
 	 * Calculate the pfn range, and map the memory banks for this node.
 	 */
+	//mini6410循环只执行1次
 	for_each_nodebank(i, mi, node) {
 		struct membank *bank = &mi->bank[i];
 		unsigned long start, end;

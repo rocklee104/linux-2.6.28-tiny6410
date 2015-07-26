@@ -14,7 +14,7 @@
 struct map_desc {
 	//起始虚拟地址
 	unsigned long virtual;
-	//起始页帧号
+	//起始物理地址的页帧号
 	unsigned long pfn;
 	//需要映射的长度
 	unsigned long length;

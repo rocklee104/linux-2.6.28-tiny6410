@@ -1,4 +1,4 @@
-#ifndef _LINUX_MM_TYPES_H
+ï»¿#ifndef _LINUX_MM_TYPES_H
 #define _LINUX_MM_TYPES_H
 
 #include <linux/auxvec.h>
@@ -41,13 +41,13 @@ struct page {
 					 * updated asynchronously */
 	atomic_t _count;		/* Usage count, see below. */
 	union {
-		//Ò³±íÖĞÓĞ¶àÉÙÒ³Ö¸Ïò¸ÃÒ³
+		//é¡µè¡¨ä¸­æœ‰å¤šå°‘é¡µæŒ‡å‘è¯¥é¡µ
 		atomic_t _mapcount;	/* Count of ptes mapped in mms,
 					 * to show when page is mapped
 					 * & limit reverse map searches.
 					 */
 		struct {		/* SLUB */
-			//ÓÃÓÚSLUB·ÖÅäÆ÷:¶ÔÏóµÄÊıÄ¿
+			//ç”¨äºSLUBåˆ†é…å™¨:å¯¹è±¡çš„æ•°ç›®
 			u16 inuse;
 			u16 objects;
 		};
@@ -62,8 +62,8 @@ struct page {
 						 * system if PG_buddy is set.
 						 */
 		/* 
-		 * Èç¹ûmapping×îµÍÎ»ÊÇ1,Ôò¸ÃÖ¸Õë²¢²»Ö¸Ïòaddress_space,¶øÊÇÖ¸Ïò
-		 * anon_vma,¸Ã½á¹¹¶ÔÊµÏÖÄäÃûÓ³ÉäºÜÖØÒª.
+		 * å¦‚æœmappingæœ€ä½ä½æ˜¯1,åˆ™è¯¥æŒ‡é’ˆå¹¶ä¸æŒ‡å‘address_space,è€Œæ˜¯æŒ‡å‘
+		 * anon_vma,è¯¥ç»“æ„å¯¹å®ç°åŒ¿åæ˜ å°„å¾ˆé‡è¦.
 		 */
 		struct address_space *mapping;	/* If low bit clear, points to
 						 * inode address_space, or NULL.
@@ -78,9 +78,9 @@ struct page {
 #endif
 	    struct kmem_cache *slab;	/* SLUB: Pointer to slab */
 		/*
-		 * ÄÚºË¿ÉÒÔ½«¶à¸öÅşÁÚµÄÒ³ºÏ²¢Îª½Ï´óµÄ¸´ºÏÒ³¡£·Ö×éµÄµÚÒ»¸öÒ³½ĞÊ×Ò³,
-		 * ¶øËùÓĞÆäÓà¸÷Ò³½Ğ×öÎ²Ò³.ËùÓĞÎ²Ò³¶ÔÓ¦µÄpageÊµÀıÖĞ,¶¼½«first_page
-		 * Ö¸ÏòÊ×Ò³.
+		 * å†…æ ¸å¯ä»¥å°†å¤šä¸ªæ¯—é‚»çš„é¡µåˆå¹¶ä¸ºè¾ƒå¤§çš„å¤åˆé¡µã€‚åˆ†ç»„çš„ç¬¬ä¸€ä¸ªé¡µå«é¦–é¡µ,
+		 * è€Œæ‰€æœ‰å…¶ä½™å„é¡µå«åšå°¾é¡µ.æ‰€æœ‰å°¾é¡µå¯¹åº”çš„pageå®ä¾‹ä¸­,éƒ½å°†first_page
+		 * æŒ‡å‘é¦–é¡µ.
 		 */
 	    struct page *first_page;	/* Compound tail pages */
 	};
@@ -89,8 +89,8 @@ struct page {
 		void *freelist;		/* SLUB: freelist req. slab lock */
 	};
 	/* 
-	 * Á´±í³ÉÔ±,ÓÃÓÚ½«page¼ÓÈë¸÷ÖÖÁ´±í,ÒÔ±ã½«page°´²»Í¬Àà±ğ·ÖÀà.
-	 * ×îÖØÒªµÄÀà±ğÊÇ»î¶¯Ò³ºÍ²»»î¶¯Ò³.
+	 * é“¾è¡¨æˆå‘˜,ç”¨äºå°†pageåŠ å…¥å„ç§é“¾è¡¨,ä»¥ä¾¿å°†pageæŒ‰ä¸åŒç±»åˆ«åˆ†ç±».
+	 * æœ€é‡è¦çš„ç±»åˆ«æ˜¯æ´»åŠ¨é¡µå’Œä¸æ´»åŠ¨é¡µ.
 	 */
 	struct list_head lru;		/* Pageout list, eg. active_list
 					 * protected by zone->lru_lock !
@@ -106,7 +106,7 @@ struct page {
 	 * WANT_PAGE_VIRTUAL in asm/page.h
 	 */
 #if defined(WANT_PAGE_VIRTUAL)
-	//ÎŞ·¨Ó³Éäµ½ÄÚºËÄÚ´æÖĞµÄÒ³(¸ß¶ËÄÚ´æÒ³)µÄĞéÄâµØÖ·
+	//æ— æ³•æ˜ å°„åˆ°å†…æ ¸å†…å­˜ä¸­çš„é¡µ(é«˜ç«¯å†…å­˜é¡µ)çš„è™šæ‹Ÿåœ°å€
 	void *virtual;			/* Kernel virtual address (NULL if
 					   not kmapped, ie. highmem) */
 #endif /* WANT_PAGE_VIRTUAL */
@@ -198,6 +198,7 @@ struct mm_struct {
 	unsigned long task_size;		/* size of task vm space */
 	unsigned long cached_hole_size; 	/* if non-zero, the largest hole below free_area_cache */
 	unsigned long free_area_cache;		/* first hole of size cached_hole_size or larger */
+	//é¡µç›®å½•ä½ç½®
 	pgd_t * pgd;
 	atomic_t mm_users;			/* How many users with user space? */
 	atomic_t mm_count;			/* How many references to "struct mm_struct" (users count as 1) */
@@ -205,6 +206,7 @@ struct mm_struct {
 	struct rw_semaphore mmap_sem;
 	spinlock_t page_table_lock;		/* Protects page tables and some counters */
 
+	//ç³»ç»Ÿå†…æ‰€æœ‰mm_structè¿æ¥åˆ°åŒå‘é“¾è¡¨,å…¶ç¬¬ä¸€ä¸ªèŠ‚ç‚¹é€šè¿‡INIT_MM()è¿›è¡Œåˆå§‹åŒ–
 	struct list_head mmlist;		/* List of maybe swapped mm's.	These are globally strung
 						 * together off init_mm.mmlist, and are protected
 						 * by mmlist_lock

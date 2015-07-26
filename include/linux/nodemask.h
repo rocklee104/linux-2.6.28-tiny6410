@@ -1,4 +1,4 @@
-#ifndef __LINUX_NODEMASK_H
+ï»¿#ifndef __LINUX_NODEMASK_H
 #define __LINUX_NODEMASK_H
 
 /*
@@ -361,18 +361,18 @@ static inline void __nodes_fold(nodemask_t *dstp, const nodemask_t *origp,
  * Bitmasks that are kept for all the nodes.
  */
 //N_POSSIBLE, N_ONLINE, N_CPU are used for cpu & memory hot plugin
-//Èç¹ûÏµÍ³ÖĞ½áµã¶àÓÚ1¸ö,ÄÚºË»áÎ¬»¤Ò»¸öÎ»Í¼,ÓÃÒÔÌá¹©¸÷¸ö½ÚµãµÄ×´Ì¬ĞÅÏ¢
+//å¦‚æœç³»ç»Ÿä¸­ç»“ç‚¹å¤šäº1ä¸ª,å†…æ ¸ä¼šç»´æŠ¤ä¸€ä¸ªä½å›¾,ç”¨ä»¥æä¾›å„ä¸ªèŠ‚ç‚¹çš„çŠ¶æ€ä¿¡æ¯
 enum node_states {
 	N_POSSIBLE,		/* The node could become online at some point */
 	N_ONLINE,		/* The node is online */
-	//½áµãÓĞÆÕÍ¨ÄÚ´æÓò
+	//ç»“ç‚¹æœ‰æ™®é€šå†…å­˜åŸŸ
 	N_NORMAL_MEMORY,	/* The node has regular memory */
 #ifdef CONFIG_HIGHMEM
 	N_HIGH_MEMORY,		/* The node has regular or high memory */
 #else
 	N_HIGH_MEMORY = N_NORMAL_MEMORY,
 #endif
-	//½áµãÓĞÒ»¸ö»ò¶à¸öcpu
+	//ç»“ç‚¹æœ‰ä¸€ä¸ªæˆ–å¤šä¸ªcpu
 	N_CPU,		/* The node has one or more cpus */
 	NR_NODE_STATES
 };
@@ -391,7 +391,7 @@ static inline int node_state(int node, enum node_states state)
 	return node_isset(node, node_states[state]);
 }
 
-//ÉèÖÃÌØ¶¨½áµãµÄ×´Ì¬
+//è®¾ç½®ç‰¹å®šç»“ç‚¹çš„çŠ¶æ€
 static inline void node_set_state(int node, enum node_states state)
 {
     //node_states is global variable defined in page_alloc.c
@@ -417,6 +417,7 @@ static inline int num_node_state(enum node_states state)
 extern int nr_node_ids;
 #else
 
+//mini6410åªæœ‰ä¸€ä¸ªnode
 static inline int node_state(int node, enum node_states state)
 {
 	return node == 0;
