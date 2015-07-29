@@ -435,6 +435,7 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
 	pte_t *pte;
 
 	if (pmd_none(*pmd)) {
+		//*pmd为0
 		pte = alloc_bootmem_low_pages(2 * PTRS_PER_PTE * sizeof(pte_t));
 		__pmd_populate(pmd, __pa(pte) | type->prot_l1);
 	}
@@ -446,10 +447,12 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
 	} while (pte++, addr += PAGE_SIZE, addr != end);
 }
 
+//分配[addr,end)这段内存的段页表项
 static void __init alloc_init_section(pgd_t *pgd, unsigned long addr,
 				      unsigned long end, unsigned long phys,
 				      const struct mem_type *type)
 {
+	//从pgd中获取pmd
 	pmd_t *pmd = pmd_offset(pgd, addr);
 
 	/*
@@ -459,16 +462,20 @@ static void __init alloc_init_section(pgd_t *pgd, unsigned long addr,
 	 * up one logical pointer to an L2 table.
 	 */
 	if (((addr | end | phys) & ~SECTION_MASK) == 0) {
+		//addr | end | phys以段大小对齐
 		pmd_t *p = pmd;
 
 		if (addr & SECTION_SIZE)
 			pmd++;
 
 		do {
+			//写入段页表项,段页表项的是由段基地址和一些控制位组成
 			*pmd = __pmd(phys | type->prot_sect);
 			phys += SECTION_SIZE;
+			//pmd自加后每次偏移4字节
 		} while (pmd++, addr += SECTION_SIZE, addr != end);
 
+		//确保pmd写入内存中,而不是cache
 		flush_pmd_entry(p);
 	} else {
 		/*
@@ -558,6 +565,7 @@ void __init create_mapping(struct map_desc *md)
 		return;
 	}
 
+	//type为MT_DEVICE或者MT_ROM的memory不能映射到[PAGE_OFFSET,VMALLOC_END)这块区域
 	if ((md->type == MT_DEVICE || md->type == MT_ROM) &&
 	    md->virtual >= PAGE_OFFSET && md->virtual < VMALLOC_END) {
 		printk(KERN_WARNING "BUG: mapping for 0x%08llx at 0x%08lx "
@@ -575,8 +583,10 @@ void __init create_mapping(struct map_desc *md)
 		return;
 	}
 
+	//虚拟起始地址必须以page size对齐
 	addr = md->virtual & PAGE_MASK;
 	phys = (unsigned long)__pfn_to_phys(md->pfn);
+	//长度以page对齐
 	length = PAGE_ALIGN(md->length + (md->virtual & ~PAGE_MASK));
 
 	if (type->prot_l1 == 0 && ((addr | phys | length) & ~SECTION_MASK)) {
@@ -588,9 +598,12 @@ void __init create_mapping(struct map_desc *md)
 
 	pgd = pgd_offset_k(addr);
 	end = addr + length;
+	//length可能跨越了多个pgd,所以要对pgd中的表项进行遍历
 	do {
+		//以2MB为单位进行循环,取下个pgd
 		unsigned long next = pgd_addr_end(addr, end);
 
+		//每个pgd条目中处理2个pmd
 		alloc_init_section(pgd, addr, next, phys, type);
 
 		phys += next - addr;
@@ -683,7 +696,8 @@ static void __init sanity_check_meminfo(struct meminfo *mi)
 
 /* 
  * 将[0,0xC0000000)及[0xD0000000,0xE0000000)这段内存的段页表清空.
- * [0xC0000000,0xD0000000)这段虚拟内存对应的是DRAM,不做清除.
+ * [0xC0000000,0xD0000000)这段虚拟内存对应的是DRAM,不做清除.DRAM
+ * 的段页表在bootmem_init中设置
  */
 static inline void prepare_page_table(struct meminfo *mi)
 {
@@ -720,6 +734,7 @@ static inline void prepare_page_table(struct meminfo *mi)
 /*
  * Reserve the various regions of node 0
  */
+//在bitmap中保留node 0的kernel image所在page和段页表所在的page
 void __init reserve_node_zero(pg_data_t *pgdat)
 {
 	unsigned long res_size = 0;
@@ -732,6 +747,7 @@ void __init reserve_node_zero(pg_data_t *pgdat)
 	reserve_bootmem_node(pgdat, __pa(&__data_start), &_end - &__data_start,
 			BOOTMEM_DEFAULT);
 #else
+	//保留kernel镜像所在的page
 	reserve_bootmem_node(pgdat, __pa(&_stext), &_end - &_stext,
 			BOOTMEM_DEFAULT);
 #endif
@@ -740,6 +756,7 @@ void __init reserve_node_zero(pg_data_t *pgdat)
 	 * Reserve the page tables.  These are already in use,
 	 * and can only be in node 0.
 	 */
+	//保留段页表所在的page
 	reserve_bootmem_node(pgdat, __pa(swapper_pg_dir),
 			     PTRS_PER_PGD * sizeof(pgd_t), BOOTMEM_DEFAULT);
 

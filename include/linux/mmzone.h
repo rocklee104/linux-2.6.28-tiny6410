@@ -732,10 +732,11 @@ typedef struct pglist_data {
     */
     /*
      * 该NUMA结点的第一个页帧的逻辑编号.系统中所有的结点的页帧是依次编号的，
-     * 每个页帧的号码都是全局唯一的(不只是结点内唯一).UMA中,此成员为0
+     * 每个页帧的号码都是全局唯一的(不只是结点内唯一).UMA中,此成员为0.
+     * 在arm架构中,node_start_pfn记录的是DRAM起始地址的页帧号.
 	 */
 	unsigned long node_start_pfn;
-	//结点中页帧的数目
+	//结点中页帧的数目,不包括空洞
 	unsigned long node_present_pages; /* total number of physical pages */
 	/*
 	 * 该结点以页帧为单位计算的长度,该成员和node_present_pages不一定相同,
@@ -784,6 +785,7 @@ extern int init_currently_empty_zone(struct zone *zone, unsigned long start_pfn,
 #ifdef CONFIG_HAVE_MEMORY_PRESENT
 void memory_present(int nid, unsigned long start, unsigned long end);
 #else
+//mini6410
 static inline void memory_present(int nid, unsigned long start, unsigned long end) {}
 #endif
 
@@ -895,8 +897,10 @@ extern char numa_zonelist_order[];
 #endif
 
 #ifndef CONFIG_NEED_MULTIPLE_NODES
+//mini6410
 
 extern struct pglist_data contig_page_data;
+//bootmem_node_data[0]
 #define NODE_DATA(nid)		(&contig_page_data)
 #define NODE_MEM_MAP(nid)	mem_map
 

@@ -26,7 +26,7 @@ extern struct files_struct init_files;
 	.max_reqs	= ~0U,				\
 }
 
-//swapper_pg_dir在arch/arm/kernel/head.S中定义为KERNEL_RAM_VADDR - 0x4000
+//swapper_pg_dir是整个系统的页目录位置,在arch/arm/kernel/head.S中定义为KERNEL_RAM_VADDR - 0x4000
 #define INIT_MM(name) \
 {			 					\
 	.mm_rb		= RB_ROOT,				\

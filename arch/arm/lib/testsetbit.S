@@ -14,6 +14,7 @@
 
 ENTRY(_test_and_set_bit_be)
 		eor	r0, r0, #0x18		@ big endian byte ordering
+#testop是一个宏,在arch/arm/lib/bitops.h中被定义
 ENTRY(_test_and_set_bit_le)
 	testop	orreq, streqb
 ENDPROC(_test_and_set_bit_be)

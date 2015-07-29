@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Discontiguous memory support, Kanoj Sarcar, SGI, Nov 1999
  */
 #ifndef _LINUX_BOOTMEM_H
@@ -28,26 +28,19 @@ extern unsigned long saved_max_pfn;
  * memory pages (including holes) on the node.
  */
 typedef struct bootmem_data {
-	//node_min_pfn holds the number of the first page in the system;this is zero for most architectures.
+	//当前node起始物理地址对应的page number
 	unsigned long node_min_pfn;
-	/*
-	 * node_low_pfn is the number of the last page of the physical address space
-	 * that can be managed directly,in other words,it is the end of ZONE_NORMAL.
-	*/
+ 	//当前node结束物理地址对应的page number
 	unsigned long node_low_pfn;
-	/* 
-	 * node_bootmem_map is a pointer to the memory area in which the allocation 
-	 * bitmap is stored. On IA-32 systems,the memory area immediately following 
-	 * the kernel image is used for this purpose.The corresponding address is 
-	 * held in the _end variable,which is automatically pathed into the kernel 
-	 * image during linking. 
-	*/
+	//当前node的bitmap起始位置的虚拟地址,bitmap只记录物理页面
 	void *node_bootmem_map;
 	/*
 	 * last_end_off is used as an offset of last successful allocation within
 	 * the page
 	*/
+	//上一次分配的结束页框idx对应的地址
 	unsigned long last_end_off;
+	//上一次分配的结束页框idx
 	unsigned long hint_idx;
 	struct list_head list;
 } bootmem_data_t;
@@ -123,6 +116,7 @@ extern void *__alloc_bootmem_low_node(pg_data_t *pgdat,
 	__alloc_bootmem_nopanic(x, PAGE_SIZE, __pa(MAX_DMA_ADDRESS))
 #define alloc_bootmem_low_pages(x) \
 	__alloc_bootmem_low(x, PAGE_SIZE, 0)
+//mini6410的MAX_DMA_ADDRESS是0x40000000
 #define alloc_bootmem_node(pgdat, x) \
 	__alloc_bootmem_node(pgdat, x, SMP_CACHE_BYTES, __pa(MAX_DMA_ADDRESS))
 #define alloc_bootmem_pages_node(pgdat, x) \
@@ -140,6 +134,7 @@ extern void *alloc_bootmem_section(unsigned long size,
 #ifdef CONFIG_HAVE_ARCH_ALLOC_REMAP
 extern void *alloc_remap(int nid, unsigned long size);
 #else
+//mini6410
 static inline void *alloc_remap(int nid, unsigned long size)
 {
 	return NULL;

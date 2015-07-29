@@ -337,6 +337,7 @@ static inline pte_t pte_mkspecial(pte_t pte) { return pte; }
 #define pgprot_writecombine(prot) \
 	__pgprot((pgprot_val(prot) & ~L_PTE_MT_MASK) | L_PTE_MT_BUFFERABLE)
 
+//判断pmd是否为none
 #define pmd_none(pmd)		(!pmd_val(pmd))
 #define pmd_present(pmd)	(pmd_val(pmd))
 #define pmd_bad(pmd)		(pmd_val(pmd) & 2)

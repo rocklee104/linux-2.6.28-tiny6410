@@ -177,6 +177,7 @@ extern int _find_first_bit_be(const unsigned long *p, unsigned size);
 extern int _find_next_bit_be(const unsigned long *p, int size, int offset);
 
 #ifndef CONFIG_SMP
+//mini6410
 /*
  * The __* form of bitops are non-atomic and may be reordered.
  */
@@ -198,6 +199,7 @@ extern int _find_next_bit_be(const unsigned long *p, int size, int offset);
 	(____nonatomic_##name(nr, p))
 
 #ifndef __ARMEB__
+//mini6410
 /*
  * These are the little endian, atomic definitions.
  */

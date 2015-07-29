@@ -83,6 +83,7 @@ unsigned long num_physpages;
  * highstart_pfn must be the same; there must be no gap between ZONE_NORMAL
  * and ZONE_HIGHMEM.
  */
+//记录DRAM结束物理地址的虚拟地址
 void * high_memory;
 
 EXPORT_SYMBOL(num_physpages);

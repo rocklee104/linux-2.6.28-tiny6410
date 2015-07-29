@@ -59,87 +59,6 @@
 #undef _TLB
 #undef MULTI_TLB
 
-#define v3_tlb_flags	(TLB_V3_FULL | TLB_V3_PAGE)
-
-#ifdef CONFIG_CPU_TLB_V3
-# define v3_possible_flags	v3_tlb_flags
-# define v3_always_flags	v3_tlb_flags
-# ifdef _TLB
-#  define MULTI_TLB 1
-# else
-#  define _TLB v3
-# endif
-#else
-# define v3_possible_flags	0
-# define v3_always_flags	(-1UL)
-#endif
-
-#define v4_tlb_flags	(TLB_V4_U_FULL | TLB_V4_U_PAGE)
-
-#ifdef CONFIG_CPU_TLB_V4WT
-# define v4_possible_flags	v4_tlb_flags
-# define v4_always_flags	v4_tlb_flags
-# ifdef _TLB
-#  define MULTI_TLB 1
-# else
-#  define _TLB v4
-# endif
-#else
-# define v4_possible_flags	0
-# define v4_always_flags	(-1UL)
-#endif
-
-#define v4wbi_tlb_flags	(TLB_WB | TLB_DCLEAN | \
-			 TLB_V4_I_FULL | TLB_V4_D_FULL | \
-			 TLB_V4_I_PAGE | TLB_V4_D_PAGE)
-
-#ifdef CONFIG_CPU_TLB_V4WBI
-# define v4wbi_possible_flags	v4wbi_tlb_flags
-# define v4wbi_always_flags	v4wbi_tlb_flags
-# ifdef _TLB
-#  define MULTI_TLB 1
-# else
-#  define _TLB v4wbi
-# endif
-#else
-# define v4wbi_possible_flags	0
-# define v4wbi_always_flags	(-1UL)
-#endif
-
-#define fr_tlb_flags	(TLB_WB | TLB_DCLEAN | TLB_L2CLEAN_FR | \
-			 TLB_V4_I_FULL | TLB_V4_D_FULL | \
-			 TLB_V4_I_PAGE | TLB_V4_D_PAGE)
-
-#ifdef CONFIG_CPU_TLB_FEROCEON
-# define fr_possible_flags	fr_tlb_flags
-# define fr_always_flags	fr_tlb_flags
-# ifdef _TLB
-#  define MULTI_TLB 1
-# else
-#  define _TLB v4wbi
-# endif
-#else
-# define fr_possible_flags	0
-# define fr_always_flags	(-1UL)
-#endif
-
-#define v4wb_tlb_flags	(TLB_WB | TLB_DCLEAN | \
-			 TLB_V4_I_FULL | TLB_V4_D_FULL | \
-			 TLB_V4_D_PAGE)
-
-#ifdef CONFIG_CPU_TLB_V4WB
-# define v4wb_possible_flags	v4wb_tlb_flags
-# define v4wb_always_flags	v4wb_tlb_flags
-# ifdef _TLB
-#  define MULTI_TLB 1
-# else
-#  define _TLB v4wb
-# endif
-#else
-# define v4wb_possible_flags	0
-# define v4wb_always_flags	(-1UL)
-#endif
-
 #define v6wbi_tlb_flags (TLB_WB | TLB_DCLEAN | \
 			 TLB_V6_I_FULL | TLB_V6_D_FULL | \
 			 TLB_V6_I_PAGE | TLB_V6_D_PAGE | \
@@ -263,21 +182,9 @@ extern struct cpu_tlb_fns cpu_tlb;
  * implemented the "%?" method, but this has been discontinued due to too
  * many people getting it wrong.
  */
-#define possible_tlb_flags	(v3_possible_flags | \
-				 v4_possible_flags | \
-				 v4wbi_possible_flags | \
-				 fr_possible_flags | \
-				 v4wb_possible_flags | \
-				 v6wbi_possible_flags | \
-				 v7wbi_possible_flags)
+#define possible_tlb_flags	(v6wbi_possible_flags | v7wbi_possible_flags)
 
-#define always_tlb_flags	(v3_always_flags & \
-				 v4_always_flags & \
-				 v4wbi_always_flags & \
-				 fr_always_flags & \
-				 v4wb_always_flags & \
-				 v6wbi_always_flags & \
-				 v7wbi_always_flags)
+#define always_tlb_flags	(v6wbi_always_flags & v7wbi_always_flags)
 
 #define tlb_flag(f)	((always_tlb_flags & (f)) || (__tlb_flag & possible_tlb_flags & (f)))
 
@@ -440,14 +347,17 @@ static inline void flush_pmd_entry(pmd_t *pmd)
 	const unsigned int __tlb_flag = __cpu_tlb_flags;
 
 	if (tlb_flag(TLB_DCLEAN))
+		//Clean Data Cache Line
 		asm("mcr	p15, 0, %0, c7, c10, 1	@ flush_pmd"
 			: : "r" (pmd) : "cc");
 
+	//arm1176s的tlb flags中没有TLB_L2CLEAN_FR
 	if (tlb_flag(TLB_L2CLEAN_FR))
 		asm("mcr	p15, 1, %0, c15, c9, 1  @ L2 flush_pmd"
 			: : "r" (pmd) : "cc");
 
 	if (tlb_flag(TLB_WB))
+		//确保Clean Data Cache Line执行完成之后才退出本函数
 		dsb();
 }
 

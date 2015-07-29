@@ -124,11 +124,13 @@ void show_mem(void)
  * the start of a bank, so if we allocate the bootmap bitmap at
  * the end, we won't clash.
  */
+//获取bitmap的起始page号,bitmap放在_end以page向上对齐的位置
 static unsigned int __init
 find_bootmap_pfn(int node, struct meminfo *mi, unsigned int bootmap_pages)
 {
 	unsigned int start_pfn, i, bootmap_pfn;
 
+	//_end在arch/arm/kernel/vmlinux.lds中定义,表示内核的结束位置
 	start_pfn   = PAGE_ALIGN(__pa(&_end)) >> PAGE_SHIFT;
 	bootmap_pfn = 0;
 
@@ -204,10 +206,15 @@ static inline void map_memory_bank(struct membank *bank)
 	map.length = bank_phys_size(bank);
 	map.type = MT_MEMORY;
 
+	//为每一个bank建立段页表
 	create_mapping(&map);
 #endif
 }
 
+/* 
+ * 建立段页表,建立bitmap,并且在bitmap中保留bitmap本身占用的page.
+ * 这个bitmap只用于管理物理内存的page
+ */
 static unsigned long __init bootmem_init_node(int node, struct meminfo *mi)
 {
 	unsigned long start_pfn, end_pfn, boot_pfn;
@@ -217,12 +224,13 @@ static unsigned long __init bootmem_init_node(int node, struct meminfo *mi)
 
 	//DRAM起始页帧号
 	start_pfn = -1UL;
+	//DRAM的结束page number
 	end_pfn = 0;
 
 	/*
 	 * Calculate the pfn range, and map the memory banks for this node.
 	 */
-	//mini6410循环只执行1次
+	//为每一个bank建立段页表,mini6410只有一个bank,故循环只执行1次
 	for_each_nodebank(i, mi, node) {
 		struct membank *bank = &mi->bank[i];
 		unsigned long start, end;
@@ -247,7 +255,9 @@ static unsigned long __init bootmem_init_node(int node, struct meminfo *mi)
 	/*
 	 * Allocate the bootmem bitmap page.
 	 */
+	//获取bitmap占用的page个数
 	boot_pages = bootmem_bootmap_pages(end_pfn - start_pfn);
+	//bitmap的起始page number
 	boot_pfn = find_bootmap_pfn(node, mi, boot_pages);
 
 	/*
@@ -260,13 +270,16 @@ static unsigned long __init bootmem_init_node(int node, struct meminfo *mi)
 
 	for_each_nodebank(i, mi, node) {
 		struct membank *bank = &mi->bank[i];
+		//标记相关bank中所有的物理内存可用
 		free_bootmem_node(pgdat, bank_phys_start(bank), bank_phys_size(bank));
+		//对mini6410来说,空函数
 		memory_present(node, bank_pfn_start(bank), bank_pfn_end(bank));
 	}
 
 	/*
 	 * Reserve the bootmem bitmap for this node.
 	 */
+	//在bitmap中保留bitmap本身所占用的page
 	reserve_bootmem_node(pgdat, boot_pfn << PAGE_SHIFT,
 			     boot_pages << PAGE_SHIFT, BOOTMEM_DEFAULT);
 
@@ -296,11 +309,14 @@ static void __init bootmem_reserve_initrd(int node)
 
 static void __init bootmem_free_node(int node, struct meminfo *mi)
 {
+	//zhole_size用来存储该NODE中孔洞的大小
 	unsigned long zone_size[MAX_NR_ZONES], zhole_size[MAX_NR_ZONES];
 	unsigned long start_pfn, end_pfn;
+	//node 0的bdata
 	pg_data_t *pgdat = NODE_DATA(node);
 	int i;
 
+	//当前节点的起始物理页框
 	start_pfn = pgdat->bdata->node_min_pfn;
 	end_pfn = pgdat->bdata->node_low_pfn;
 
@@ -323,12 +339,14 @@ static void __init bootmem_free_node(int node, struct meminfo *mi)
 	 */
 	zhole_size[0] = zone_size[0];
 	for_each_nodebank(i, mi, node)
+		//mini6410只有一个bank,所以不存在孔洞,也即zhole_size[0]为0
 		zhole_size[0] -= bank_pfn_size(&mi->bank[i]);
 
 	/*
 	 * Adjust the sizes according to any special requirements for
 	 * this machine type.
 	 */
+	//arch_adjust_zones用来处理特定机器架构的特殊需求,这里为空
 	arch_adjust_zones(node, zone_size, zhole_size);
 
 	free_area_init_node(node, zone_size, start_pfn, zhole_size);
@@ -374,6 +392,7 @@ void __init bootmem_init(struct meminfo *mi)
 	/*
 	 * sparse_init() needs the bootmem allocator up and running.
 	 */
+	//mini6410,空函数
 	sparse_init();
 
 	/*
