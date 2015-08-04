@@ -456,6 +456,7 @@ static inline void set_compound_order(struct page *page, unsigned long order)
 #define NODE_NOT_IN_PAGE_FLAGS
 #endif
 
+//mini6410
 #ifndef PFN_SECTION_SHIFT
 #define PFN_SECTION_SHIFT 0
 #endif
@@ -466,7 +467,9 @@ static inline void set_compound_order(struct page *page, unsigned long order)
  * the compiler will optimise away reference to them.
  */
 #define SECTIONS_PGSHIFT	(SECTIONS_PGOFF * (SECTIONS_WIDTH != 0))
+//0
 #define NODES_PGSHIFT		(NODES_PGOFF * (NODES_WIDTH != 0))
+//0x1e
 #define ZONES_PGSHIFT		(ZONES_PGOFF * (ZONES_WIDTH != 0))
 
 /* NODE:ZONE or SECTION:ZONE is used to ID a zone for the buddy allcator */
@@ -486,7 +489,9 @@ static inline void set_compound_order(struct page *page, unsigned long order)
 #error SECTIONS_WIDTH+NODES_WIDTH+ZONES_WIDTH > BITS_PER_LONG - NR_PAGEFLAGS
 #endif
 
+//0x3
 #define ZONES_MASK		((1UL << ZONES_WIDTH) - 1)
+//0
 #define NODES_MASK		((1UL << NODES_WIDTH) - 1)
 #define SECTIONS_MASK		((1UL << SECTIONS_WIDTH) - 1)
 #define ZONEID_MASK		((1UL << ZONEID_SHIFT) - 1)

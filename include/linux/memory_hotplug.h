@@ -162,6 +162,7 @@ extern void put_page_bootmem(struct page *page);
 /*
  * Stub functions for when hotplug is off
  */
+ //mini6410
 static inline void pgdat_resize_lock(struct pglist_data *p, unsigned long *f) {}
 static inline void pgdat_resize_unlock(struct pglist_data *p, unsigned long *f) {}
 static inline void pgdat_resize_init(struct pglist_data *pgdat) {}

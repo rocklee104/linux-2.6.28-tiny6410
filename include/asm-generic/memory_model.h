@@ -27,6 +27,7 @@
  */
 #if defined(CONFIG_FLATMEM)
 
+//mini6410
 #define __pfn_to_page(pfn)	(mem_map + ((pfn) - ARCH_PFN_OFFSET))
 #define __page_to_pfn(page)	((unsigned long)((page) - mem_map) + \
 				 ARCH_PFN_OFFSET)
@@ -75,6 +76,7 @@ struct page;
 extern struct page *pfn_to_page(unsigned long pfn);
 extern unsigned long page_to_pfn(struct page *page);
 #else
+//mini6410
 #define page_to_pfn __page_to_pfn
 #define pfn_to_page __pfn_to_page
 #endif /* CONFIG_OUT_OF_LINE_PFN_TO_PAGE */

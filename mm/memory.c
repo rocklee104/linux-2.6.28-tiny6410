@@ -67,7 +67,7 @@
 #ifndef CONFIG_NEED_MULTIPLE_NODES
 /* use the per-pgdat data instead for discontigmem - mbligh */
 unsigned long max_mapnr;
-//记录了所有的page(物理页面)
+//记录了系统中所有的page指针
 struct page *mem_map;
 
 EXPORT_SYMBOL(max_mapnr);

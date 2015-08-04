@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright 1995, Russell King.
  * Various bits and pieces copyrights include:
  *  Linus Torvalds (test_bit).
@@ -280,6 +280,7 @@ static inline int constant_fls(int x)
  * the clz instruction for much better code efficiency.
  */
 
+//找到x中置位的最高位是第几位(从1开始),比如fls(32) == 6, fls(16) == 5, fls(7) == 3
 static inline int fls(int x)
 {
 	int ret;
@@ -287,14 +288,23 @@ static inline int fls(int x)
 	if (__builtin_constant_p(x))
 	       return constant_fls(x);
 
+	//获取x最高置位的bit之前有多少个0
 	asm("clz\t%0, %1" : "=r" (ret) : "r" (x) : "cc");
+	//获取x最高置位的bit属于第几位(从1开始)
        	ret = 32 - ret;
 	return ret;
 }
 
 #define __fls(x) (fls(x) - 1)
+/* 
+ * ffs, find first bit set.找到最低位置位的bit的bit number.从1开始.
+ * 因为__t + -__t以unsigned类型计算,刚好产生溢出,除了__t最低位和-__t对应的bit相同外,
+ * 其他所有的bit都不相同.所以__t & -__t获取的是__t中置位的最低bit.
+*/
 #define ffs(x) ({ unsigned long __t = (x); fls(__t & -__t); })
+//find first bit set.找到最低位置位的bit的bit number.从0开始.
 #define __ffs(x) (ffs(x) - 1)
+//find first zero.找到最低位为0的bit的bit number,从0开始
 #define ffz(x) __ffs( ~(x) )
 
 #endif

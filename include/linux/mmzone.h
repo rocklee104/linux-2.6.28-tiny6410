@@ -57,7 +57,9 @@ static inline int get_pageblock_migratetype(struct page *page)
 }
 
 struct free_area {
+	//根据不同的migrate_type分为不同的链表
 	struct list_head	free_list[MIGRATE_TYPES];
+	//可用页数
 	unsigned long		nr_free;
 };
 
@@ -173,14 +175,16 @@ static inline int is_unevictable_lru(enum lru_list l)
 }
 
 struct per_cpu_pages {
-	//如果count值超过了high,表明链表中的页太多了
+	//高速缓存中页框的个数,如果count值超过了high,表明链表中的页太多了
 	int count;		/* number of pages in the list */
+	//上界,表示高速缓存用尽
 	int high;		/* high watermark, emptying needed */
 	/* 
 	 * 如果可能,CPU高速缓存不是用单个页来填充,而是多个页组成的块.
 	 * batch是每次添加页数的一个参考值
 	 */
 	int batch;		/* chunk size for buddy add/remove */
+	//高速缓存中包含的页框描述符链表
 	struct list_head list;	/* the list of pages */
 };
 
@@ -279,6 +283,7 @@ enum zone_type {
  * match the requested limits. See gfp_zone() in include/linux/gfp.h
  */
 
+//ZONES_SHIFT == 2
 #if MAX_NR_ZONES < 2
 #define ZONES_SHIFT 0
 #elif MAX_NR_ZONES <= 2
@@ -340,7 +345,7 @@ struct zone {
 	/* see spanned/present_pages for more description */
 	seqlock_t		span_seqlock;
 #endif
-    //用于实现伙伴系统
+    //用于实现伙伴系统,free_area[0],链表每个成员1个page.free_area[1],链表每个成员2个page.
 	struct free_area	free_area[MAX_ORDER];
 
 #ifndef CONFIG_SPARSEMEM
@@ -348,6 +353,7 @@ struct zone {
 	 * Flags for a pageblock_nr_pages block. See pageblock-flags.h.
 	 * In SPARSEMEM, this map is stored in struct mem_section
 	 */
+	//zone中的所有page block都有一个migratetype放在zone->pageblock_flags,每个migratetype占3个bit
 	unsigned long		*pageblock_flags;
 #endif /* CONFIG_SPARSEMEM */
 
@@ -440,6 +446,8 @@ struct zone {
 	 * free_area_init_core() performs the initialization of them.
 	 */
 	/*
+	 * 等待队列头数组,每256个page公用一个等待队列头.
+	 *
 	 * 当对一个page做I/O操作的时候,page需要被锁住,以防止不正确的数据被访问.
 	 * 1. 进程在访问page前，调用wait_on_page*函数,使进程加入一个等待队列
 	 *    (如果没有其它进程正在访问该页，就直接获得访问权限，否则加入等待队列).
@@ -456,6 +464,7 @@ struct zone {
 	/*
 	 * Discontig memory support fields.
 	 */
+	//指向这个zone所属的节点
 	struct pglist_data	*zone_pgdat;
 	/* zone_start_pfn == zone_start_paddr >> PAGE_SHIFT */
 	//内存域第一个页帧的索引
@@ -1201,9 +1210,11 @@ void sparse_init(void);
 #ifdef CONFIG_NODES_SPAN_OTHER_NODES
 #define early_pfn_in_nid(pfn, nid)	(early_pfn_to_nid(pfn) == (nid))
 #else
+//mini6410
 #define early_pfn_in_nid(pfn, nid)	(1)
 #endif
 
+//mini6410
 #ifndef early_pfn_valid
 #define early_pfn_valid(pfn)	(1)
 #endif

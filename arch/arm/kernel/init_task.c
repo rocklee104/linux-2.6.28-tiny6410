@@ -31,6 +31,7 @@ EXPORT_SYMBOL(init_mm);
  */
 union thread_union init_thread_union
 	__attribute__((__section__(".data.init_task"))) =
+		//初始化联合的第一个成员,也就是thread_info
 		{ INIT_THREAD_INFO(init_task) };
 
 /*

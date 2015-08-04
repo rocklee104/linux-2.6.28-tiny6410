@@ -20,7 +20,6 @@ static unsigned long total_usage;
 
 #if !defined(CONFIG_SPARSEMEM)
 
-
 void __meminit pgdat_page_cgroup_init(struct pglist_data *pgdat)
 {
 	pgdat->node_page_cgroup = NULL;
@@ -266,7 +265,6 @@ void __init page_cgroup_init(void)
 	printk(KERN_INFO "please try cgroup_disable=memory option if you don't"
 	" want\n");
 }
-
 void __meminit pgdat_page_cgroup_init(struct pglist_data *pgdat)
 {
 	return;

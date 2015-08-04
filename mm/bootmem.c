@@ -542,6 +542,7 @@ find_block:
 		else
 			start_off = PFN_PHYS(sidx);
 
+		//merge ==1, 表示sidx上个页框还有空间可以容纳部分数据
 		merge = PFN_DOWN(start_off) < sidx;
 		end_off = start_off + size;
 
@@ -553,7 +554,10 @@ find_block:
 		/*
 		 * Reserve the area now:
 		 */
-		//保留[start_off,end_off]这片区域的页框
+		/* 
+		 * 保留[start_off + merge,end_off)这片区域的页框.当merge == 1是表示
+		 * PFN_DOWN(start_off)已经被申请过了,本次申请需要从下一个page开始
+		 */
 		if (__reserve(bdata, PFN_DOWN(start_off) + merge,
 				PFN_UP(end_off), BOOTMEM_EXCLUSIVE))
 			BUG();
@@ -574,6 +578,7 @@ find_block:
 	return NULL;
 }
 
+//遍历系统中所有的bdata,分配连续的物理空间
 static void * __init ___alloc_bootmem_nopanic(unsigned long size,
 					unsigned long align,
 					unsigned long goal,
@@ -582,9 +587,11 @@ static void * __init ___alloc_bootmem_nopanic(unsigned long size,
 	bootmem_data_t *bdata;
 
 restart:
+	//遍历系统中所有的bdata
 	list_for_each_entry(bdata, &bdata_list, list) {
 		void *region;
 
+		//如果目标物理地址的页帧号超过了当前bdata的DRAM的结束页帧号,这个bdata不符合条件
 		if (goal && bdata->node_low_pfn <= PFN_DOWN(goal))
 			continue;
 		if (limit && bdata->node_min_pfn >= PFN_DOWN(limit))
@@ -662,10 +669,12 @@ static void * __init ___alloc_bootmem_node(bootmem_data_t *bdata,
 {
 	void *ptr;
 
+	//ptr是当前bdata的bootmem中连续size的物理内存的虚拟地址
 	ptr = alloc_bootmem_core(bdata, size, align, goal, limit);
 	if (ptr)
 		return ptr;
 
+	//如果alloc_bootmem_core分配失败
 	return ___alloc_bootmem(size, align, goal, limit);
 }
 

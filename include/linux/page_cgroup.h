@@ -91,6 +91,7 @@ static inline void unlock_page_cgroup(struct page_cgroup *pc)
 #else /* CONFIG_CGROUP_MEM_RES_CTLR */
 struct page_cgroup;
 
+//mini6410
 static inline void __meminit pgdat_page_cgroup_init(struct pglist_data *pgdat)
 {
 }

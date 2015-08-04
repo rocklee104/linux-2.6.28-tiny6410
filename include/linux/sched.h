@@ -1,4 +1,4 @@
-#ifndef _LINUX_SCHED_H
+﻿#ifndef _LINUX_SCHED_H
 #define _LINUX_SCHED_H
 
 /*
@@ -1073,6 +1073,7 @@ struct sched_rt_entity {
 
 struct task_struct {
 	volatile long state;	/* -1 unrunnable, 0 runnable, >0 stopped */
+	//一般指向thread_info
 	void *stack;
 	atomic_t usage;
 	unsigned int flags;	/* per process flags, defined below */
@@ -1721,6 +1722,7 @@ void yield(void);
  */
 extern struct exec_domain	default_exec_domain;
 
+//即用于保存swapper的进程信息,也用作栈
 union thread_union {
 	struct thread_info thread_info;
 	unsigned long stack[THREAD_SIZE/sizeof(long)];
