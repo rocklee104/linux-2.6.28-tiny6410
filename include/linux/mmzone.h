@@ -35,13 +35,23 @@
  */
 #define PAGE_ALLOC_COSTLY_ORDER 3
 
+//不可移动页
 #define MIGRATE_UNMOVABLE     0
+//可回收页
 #define MIGRATE_RECLAIMABLE   1
+//可移动页
 #define MIGRATE_MOVABLE       2
+//如果向特定可移动性的列表请求分配内存失败,这种紧急情况下可以从MIGRATE_RESERVE分配内存
 #define MIGRATE_RESERVE       3
+/*
+ * MIGRATE_ISOLATE是一个特殊的虚拟区,用于跨越NUMA节点移动物理内存页.在大型系统上,
+ * 它有益于将物理内存移动到接近于使用该页最频繁的CPU.
+ */
 #define MIGRATE_ISOLATE       4 /* can't allocate from here */
+/*迁移类型的数目*/
 #define MIGRATE_TYPES         5
 
+//遍历所有migrata types的所有分配阶
 #define for_each_migratetype_order(order, type) \
 	for (order = 0; order < MAX_ORDER; order++) \
 		for (type = 0; type < MIGRATE_TYPES; type++)
@@ -59,7 +69,7 @@ static inline int get_pageblock_migratetype(struct page *page)
 struct free_area {
 	//根据不同的migrate_type分为不同的链表
 	struct list_head	free_list[MIGRATE_TYPES];
-	//可用页数
+	//统计所有list的可用页数
 	unsigned long		nr_free;
 };
 

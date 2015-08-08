@@ -306,6 +306,7 @@ static inline struct page *virt_to_head_page(const void *x)
  * Setup the page count before being freed into the page allocator for
  * the first time (boot or memory hotplug)
  */
+//page的引用计数初始化为1
 static inline void init_page_count(struct page *page)
 {
 	atomic_set(&page->_count, 1);
@@ -426,14 +427,17 @@ static inline void set_compound_order(struct page *page, unsigned long order)
  * classic sparse with space for node:| SECTION | NODE | ZONE | ... | FLAGS |
  * classic sparse no space for node:  | SECTION |     ZONE    | ... | FLAGS |
  */
+//SECTIONS_WIDTH == 0
 #if defined(CONFIG_SPARSEMEM) && !defined(CONFIG_SPARSEMEM_VMEMMAP)
 #define SECTIONS_WIDTH		SECTIONS_SHIFT
 #else
 #define SECTIONS_WIDTH		0
 #endif
 
+//ZONES_WIDTH == 2
 #define ZONES_WIDTH		ZONES_SHIFT
 
+//NODES_WIDTH == 0
 #if SECTIONS_WIDTH+ZONES_WIDTH+NODES_SHIFT <= BITS_PER_LONG - NR_PAGEFLAGS
 #define NODES_WIDTH		NODES_SHIFT
 #else
@@ -444,8 +448,11 @@ static inline void set_compound_order(struct page *page, unsigned long order)
 #endif
 
 /* Page flags: | [SECTION] | [NODE] | ZONE | ... | FLAGS | */
+//SECTIONS_PGOFF == 32
 #define SECTIONS_PGOFF		((sizeof(unsigned long)*8) - SECTIONS_WIDTH)
+//NODES_PGOFF == 32
 #define NODES_PGOFF		(SECTIONS_PGOFF - NODES_WIDTH)
+//ZONES_PGOFF == 30
 #define ZONES_PGOFF		(NODES_PGOFF - ZONES_WIDTH)
 
 /*
@@ -466,6 +473,7 @@ static inline void set_compound_order(struct page *page, unsigned long order)
  * sections we define the shift as 0; that plus a 0 mask ensures
  * the compiler will optimise away reference to them.
  */
+//0
 #define SECTIONS_PGSHIFT	(SECTIONS_PGOFF * (SECTIONS_WIDTH != 0))
 //0
 #define NODES_PGSHIFT		(NODES_PGOFF * (NODES_WIDTH != 0))
@@ -478,11 +486,14 @@ static inline void set_compound_order(struct page *page, unsigned long order)
 #define ZONEID_PGOFF		((SECTIONS_PGOFF < ZONES_PGOFF)? \
 						SECTIONS_PGOFF : ZONES_PGOFF)
 #else
+//ZONEID_SHIFT == 2
 #define ZONEID_SHIFT		(NODES_SHIFT + ZONES_SHIFT)
+//ZONEID_PGOFF == 30
 #define ZONEID_PGOFF		((NODES_PGOFF < ZONES_PGOFF)? \
 						NODES_PGOFF : ZONES_PGOFF)
 #endif
 
+//30
 #define ZONEID_PGSHIFT		(ZONEID_PGOFF * (ZONEID_SHIFT != 0))
 
 #if SECTIONS_WIDTH+NODES_WIDTH+ZONES_WIDTH > BITS_PER_LONG - NR_PAGEFLAGS
@@ -493,7 +504,9 @@ static inline void set_compound_order(struct page *page, unsigned long order)
 #define ZONES_MASK		((1UL << ZONES_WIDTH) - 1)
 //0
 #define NODES_MASK		((1UL << NODES_WIDTH) - 1)
+//0
 #define SECTIONS_MASK		((1UL << SECTIONS_WIDTH) - 1)
+//0x3
 #define ZONEID_MASK		((1UL << ZONEID_SHIFT) - 1)
 
 static inline enum zone_type page_zonenum(struct page *page)
@@ -562,6 +575,7 @@ static inline void set_page_section(struct page *page, unsigned long section)
 	page->flags |= (section & SECTIONS_MASK) << SECTIONS_PGSHIFT;
 }
 
+//设置page->flags中的关于zone,node,section的bits
 static inline void set_page_links(struct page *page, enum zone_type zone,
 	unsigned long node, unsigned long pfn)
 {

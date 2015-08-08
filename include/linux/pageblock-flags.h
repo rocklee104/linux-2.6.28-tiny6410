@@ -30,6 +30,7 @@ enum pageblock_bits {
 	PB_migrate,
 	PB_migrate_end = PB_migrate + 3 - 1,
 			/* 3 bits required for migrate types */
+	/* 一个连续内存区的migrate type需要3个bit */
 	NR_PAGEBLOCK_BITS
 };
 
@@ -63,6 +64,7 @@ struct page;
 /* Declarations for getting and setting flags. See mm/page_alloc.c */
 unsigned long get_pageblock_flags_group(struct page *page,
 					int start_bitidx, int end_bitidx);
+/* 设置以page为首的一个zone的migrate type */
 void set_pageblock_flags_group(struct page *page, unsigned long flags,
 					int start_bitidx, int end_bitidx);
 
