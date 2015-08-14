@@ -454,6 +454,11 @@ void generic_sync_sb_inodes(struct super_block *sb,
         //不是周期性的回写或者s_io是空,就将s_dirty中的元素移动到s_io中,重新初始化s_dirty
 		queue_io(sb, wbc->older_than_this);
 
+	/* 
+	 * 退出循环的条件:
+	 * 1.所有的sb的dirty的inode已经被回写.
+	 * 2.达到了最大页同步数量(由writeback_control->nr_to_write指定).
+	 */
 	while (!list_empty(&sb->s_io)) {
 		struct inode *inode = list_entry(sb->s_io.prev,
 						struct inode, i_list);
@@ -621,6 +626,11 @@ writeback_inodes(struct writeback_control *wbc)
 	might_sleep();
 	spin_lock(&sb_lock);
 restart:
+	/* 
+	 * 退出循环的条件:
+	 * 1.所有的sb被扫描完成.
+	 * 2.达到了writeback_control指定的回写页的最大数目.
+	 */
 	list_for_each_entry_reverse(sb, &super_blocks, s_list) {
 		if (sb_has_dirty_inodes(sb)) {
 			/* we're making our own get_super here */
