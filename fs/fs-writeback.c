@@ -627,6 +627,7 @@ writeback_inodes(struct writeback_control *wbc)
 	spin_lock(&sb_lock);
 restart:
 	/* 
+	 * 反向遍历super_blocks链表
 	 * 退出循环的条件:
 	 * 1.所有的sb被扫描完成.
 	 * 2.达到了writeback_control指定的回写页的最大数目.
