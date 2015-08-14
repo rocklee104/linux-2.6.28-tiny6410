@@ -1,4 +1,4 @@
-/*
+﻿/*
  * include/linux/writeback.h
  */
 #ifndef WRITEBACK_H
@@ -41,10 +41,19 @@ struct writeback_control {
 	struct backing_dev_info *bdi;	/* If !NULL, only write back this
 					   queue */
 	enum writeback_sync_modes sync_mode;
+	/*
+	 * 如果older_than_this == NULL,不进行变脏时间的检查,所有对象,不论何时变脏,都进行同步
+	 * 如果older_than_this != NULL,如果变脏时间超过older_than_this指定的值,将回写.
+	 */
 	unsigned long *older_than_this;	/* If !NULL, only write back inodes
 					   older than this */
+	/*
+	 * 限制回写页数目的上限,一般为MAX_WRITEBACK_PAGES
+	 * 若nr_to_write == 0,禁用回写数目上限
+	 */
 	long nr_to_write;		/* Write this many pages, and decrement
 					   this for each page written */
+	/* 回写过程中跳过的页数(如果一个page被kernel其他部分锁定,回写过程中,这个page就必须跳过) */
 	long pages_skipped;		/* Pages which were not written */
 
 	/*
@@ -55,11 +64,18 @@ struct writeback_control {
 	loff_t range_start;
 	loff_t range_end;
 
+	/* 指定回写队列在遇到拥塞时是否阻塞 */
 	unsigned nonblocking:1;		/* Don't get stuck on request queues */
+	/* 通知高层在数据回写期间发生了拥塞 */
 	unsigned encountered_congestion:1; /* An output: a queue is full */
+	/* 如果回写操作由周期性机制发出,for_kupdate == 1,否则为0 */
 	unsigned for_kupdate:1;		/* A kupdate writeback */
 	unsigned for_reclaim:1;		/* Invoked from the page allocator */
 	unsigned for_writepages:1;	/* This is a writepages() call */
+	/* 
+	 * range_cyclic == 0,回写机制限于range_start和range_end指定的范围进行操作.
+	 * range_cyclic == 1,内核可能多次遍历与映射相关的页.
+	 */
 	unsigned range_cyclic:1;	/* range_start is cyclic */
 	unsigned more_io:1;		/* more io to be dispatched */
 	/*

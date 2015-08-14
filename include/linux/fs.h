@@ -1204,6 +1204,7 @@ struct super_block {
 	dev_t			s_dev;		/* search index; _not_ kdev_t */
 	unsigned long		s_blocksize;
 	unsigned char		s_blocksize_bits;
+	/* 用于判断sb是否为dirty */
 	unsigned char		s_dirt;
 	unsigned long long	s_maxbytes;	/* Max file size */
 	struct file_system_type	*s_type;
@@ -1459,6 +1460,7 @@ struct super_operations {
 	void (*drop_inode) (struct inode *);
 	void (*delete_inode) (struct inode *);
 	void (*put_super) (struct super_block *);
+	/* 回写super block的方法,如果为NULL,表示当前fs不需要将内存中的sb和磁盘同步(如ram fs) */
 	void (*write_super) (struct super_block *);
 	int (*sync_fs)(struct super_block *sb, int wait);
 	void (*write_super_lockfs) (struct super_block *);

@@ -138,11 +138,16 @@ static int __put_super(struct super_block *sb)
  * making a loop through super blocks then we need to restart.
  * The caller must hold sb_lock.
  */
+/* 减少sb的引用计数 */
 int __put_super_and_need_restart(struct super_block *sb)
 {
 	/* check for race with generic_shutdown_super() */
 	if (list_empty(&sb->s_list)) {
 		/* super block is removed, need to restart... */
+		/*
+		 * 如果sb被从super_blocks链表中取下来了(表示sb正在被销毁,比如generic_shutdown_super()),
+		 * 那么需要调用__put_super_and_need_restart的地方需要重新遍历super_blocks链表.
+		 */
 		__put_super(sb);
 		return 1;
 	}
@@ -413,12 +418,14 @@ static inline void write_super(struct super_block *sb)
  * hold up the sync while mounting a device. (The newly
  * mounted device won't need syncing.)
  */
+/* 将系统中所有的脏的super block刷入磁盘 */
 void sync_supers(void)
 {
 	struct super_block *sb;
 
 	spin_lock(&sb_lock);
 restart:
+	/* 遍历系统中所有的sb */
 	list_for_each_entry(sb, &super_blocks, s_list) {
 		if (sb->s_dirt) {
 			sb->s_count++;

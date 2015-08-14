@@ -1,4 +1,4 @@
-/*
+﻿/*
  * mm/page-writeback.c
  *
  * Copyright (C) 2002, Linus Torvalds.
@@ -66,6 +66,7 @@ static inline long sync_writeback_pages(void)
 /*
  * Start background writeback (via pdflush) at this percentage
  */
+/* 指定脏页的百分比,当脏页超过该阈值时,pdflush在后台开始周期性刷出 */
 int dirty_background_ratio = 5;
 
 /*
@@ -77,16 +78,19 @@ int vm_highmem_is_dirtyable;
 /*
  * The generator of dirty data starts writeback at this percentage
  */
+/* 指定了脏页(相对于非高端内存)的百分比,脏页超过该阈值时,开始刷出数据 */
 int vm_dirty_ratio = 10;
 
 /*
  * The interval between `kupdate'-style writebacks, in jiffies
  */
+/* 周期性刷出两次调用之间的间隔,单位是1/100s */
 int dirty_writeback_interval = 5 * HZ;
 
 /*
  * The longest number of jiffies for which data is allowed to remain dirty
  */
+/* 一个page可以保持脏页的最长时间,单位是1/100s */
 int dirty_expire_interval = 30 * HZ;
 
 /*
@@ -664,6 +668,7 @@ int wakeup_pdflush(long nr_pages)
 static void wb_timer_fn(unsigned long unused);
 static void laptop_timer_fn(unsigned long unused);
 
+/* 用于控制触发回写的时间 */
 static DEFINE_TIMER(wb_timer, wb_timer_fn, 0, 0);
 static DEFINE_TIMER(laptop_mode_wb_timer, laptop_timer_fn, 0, 0);
 
@@ -679,7 +684,7 @@ static DEFINE_TIMER(laptop_mode_wb_timer, laptop_timer_fn, 0, 0);
  * takes longer than a dirty_writeback_interval interval, then leave a
  * one-second gap.
  *
- * older_than_this takes precedence over nr_to_write.  So we'll only write back
+ * older_than_this takes precedence(n.优先,居先) over nr_to_write.  So we'll only write back
  * all dirty pages if they are all attached to "old" mappings.
  */
 static void wb_kupdate(unsigned long arg)

@@ -110,9 +110,11 @@ enum zone_stat_item {
 			   only modified from process context */
 	NR_FILE_PAGES,
 	NR_FILE_DIRTY,
+	/* 正在回写的页的数目 */
 	NR_WRITEBACK,
 	NR_SLAB_RECLAIMABLE,
 	NR_SLAB_UNRECLAIMABLE,
+	/* 用于存放页表的页的数目 */
 	NR_PAGETABLE,		/* used for pagetables */
 	NR_UNSTABLE_NFS,	/* NFS unstable pages */
 	NR_BOUNCE,
