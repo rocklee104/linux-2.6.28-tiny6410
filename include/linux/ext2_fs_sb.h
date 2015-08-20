@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  linux/include/linux/ext2_fs_sb.h
  *
  * Copyright (C) 1992, 1993, 1994, 1995
@@ -30,14 +30,19 @@ typedef unsigned long ext2_fsblk_t;
 
 #define E2FSBLK "%lu"
 
+/* ext2预留窗口,该结构定义了一个预留区间[_rsv_start,_rsv_end] */
 struct ext2_reserve_window {
 	ext2_fsblk_t		_rsv_start;	/* First byte reserved */
 	ext2_fsblk_t		_rsv_end;	/* Last byte reserved or 0 */
 };
 
+/* 预留窗口节点,该结构体将用于组织红黑树的数据结构rsv_node和预留窗口封装在一起 */
 struct ext2_reserve_window_node {
+	/* 预留块信息管理在一个红黑树中，通过rsv_node组织 */
 	struct rb_node	 	rsv_node;
+	/* 预留窗口的预期长度 */
 	__u32			rsv_goal_size;
+	/* 跟踪预分配的命中数,即多少次分配是在预留窗口中进行的 */
 	__u32			rsv_alloc_hit;
 	struct ext2_reserve_window	rsv_window;
 };
@@ -104,6 +109,7 @@ struct ext2_sb_info {
 	struct blockgroup_lock s_blockgroup_lock;
 	/* root of the per fs reservation window tree */
 	spinlock_t s_rsv_window_lock;
+	/* 红黑树的根节点 */
 	struct rb_root s_rsv_window_root;
 	struct ext2_reserve_window_node s_rsv_window_head;
 };

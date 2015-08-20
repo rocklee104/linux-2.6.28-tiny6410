@@ -1125,7 +1125,9 @@ ext2_try_to_allocate_with_rsv(struct super_block *sb, unsigned int group,
 	 * first block is a filesystem wide block number
 	 * first block is the block number of the first block in this group
 	 */
+	/* 指定group第一个block */
 	group_first_block = ext2_group_first_block_no(sb, group);
+	/* 指定group最后一个block */
 	group_last_block = group_first_block + (EXT2_BLOCKS_PER_GROUP(sb) - 1);
 
 	/*
@@ -1266,6 +1268,7 @@ ext2_fsblk_t ext2_new_blocks(struct inode *inode, ext2_fsblk_t goal,
 	 * command EXT2_IOC_SETRSVSZ to set the window size to 0 to turn off
 	 * reservation on that particular file)
 	 */
+	/* 通过inode获取ext2_block_alloc_info */
 	block_i = EXT2_I(inode)->i_block_alloc_info;
 	if (block_i) {
 		windowsz = block_i->rsv_window_node.rsv_goal_size;
@@ -1284,14 +1287,17 @@ ext2_fsblk_t ext2_new_blocks(struct inode *inode, ext2_fsblk_t goal,
 	if (goal < le32_to_cpu(es->s_first_data_block) ||
 	    goal >= le32_to_cpu(es->s_blocks_count))
 		goal = le32_to_cpu(es->s_first_data_block);
+	/* 获取goal这个block属于哪个group */
 	group_no = (goal - le32_to_cpu(es->s_first_data_block)) /
 			EXT2_BLOCKS_PER_GROUP(sb);
 	goal_group = group_no;
 retry_alloc:
+	/* 获取对应group的gdp */
 	gdp = ext2_get_group_desc(sb, group_no, &gdp_bh);
 	if (!gdp)
 		goto io_error;
 
+	/* 这个group有多少空闲的blocks */
 	free_blocks = le16_to_cpu(gdp->bg_free_blocks_count);
 	/*
 	 * if there is not enough free blocks to make a new resevation
@@ -1303,6 +1309,7 @@ retry_alloc:
 		my_rsv = NULL;
 
 	if (free_blocks > 0) {
+		/* goal组内group number */
 		grp_target_blk = ((goal - le32_to_cpu(es->s_first_data_block)) %
 				EXT2_BLOCKS_PER_GROUP(sb));
 		bitmap_bh = read_block_bitmap(sb, group_no);

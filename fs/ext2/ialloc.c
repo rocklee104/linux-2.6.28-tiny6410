@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  linux/fs/ext2/ialloc.c
  *
  * Copyright (C) 1992, 1993, 1994, 1995
@@ -633,6 +633,7 @@ unsigned long ext2_count_free_inodes (struct super_block * sb)
 	struct buffer_head *bitmap_bh = NULL;
 
 	es = EXT2_SB(sb)->s_es;
+	/* 遍历每个group统计所有group的空闲inode总和 */
 	for (i = 0; i < EXT2_SB(sb)->s_groups_count; i++) {
 		unsigned x;
 

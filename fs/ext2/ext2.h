@@ -1,4 +1,4 @@
-#include <linux/fs.h>
+﻿#include <linux/fs.h>
 #include <linux/ext2_fs.h>
 
 /*
@@ -60,6 +60,7 @@ struct ext2_inode_info {
 	 * ext2_reserve_window_node.
 	 */
 	struct mutex truncate_mutex;
+	/* vfs的inode, 通过这个成员可以获取整个ext2_inode_info */
 	struct inode	vfs_inode;
 	struct list_head i_orphan;	/* unlinked but open inodes */
 };
@@ -179,6 +180,7 @@ extern const struct inode_operations ext2_special_inode_operations;
 extern const struct inode_operations ext2_fast_symlink_inode_operations;
 extern const struct inode_operations ext2_symlink_inode_operations;
 
+/* 获取指定group的第一个block */
 static inline ext2_fsblk_t
 ext2_group_first_block_no(struct super_block *sb, unsigned long group_no)
 {
