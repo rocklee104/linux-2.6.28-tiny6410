@@ -428,6 +428,7 @@ restart:
 	/* 遍历系统中所有的sb */
 	list_for_each_entry(sb, &super_blocks, s_list) {
 		if (sb->s_dirt) {
+			/* 如果sb脏的话,才会去更新sb */
 			sb->s_count++;
 			spin_unlock(&sb_lock);
 			down_read(&sb->s_umount);

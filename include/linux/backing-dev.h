@@ -1,4 +1,4 @@
-/*
+﻿/*
  * include/linux/backing-dev.h
  *
  * low-level device information and state which is propagated up through
@@ -23,7 +23,9 @@ struct dentry;
  * Bits in backing_dev_info.state
  */
 enum bdi_state {
+	/* 一个pdflush正在回写当前正在处理的队列 */
 	BDI_pdflush,		/* A pdflush thread is working this device */
+	/* 表示队列发生拥塞 */
 	BDI_write_congested,	/* The write queue is getting full */
 	BDI_read_congested,	/* The read queue is getting full */
 	BDI_unused,		/* Available bits start here */
@@ -179,6 +181,7 @@ int bdi_set_max_ratio(struct backing_dev_info *bdi, unsigned int max_ratio);
  * BDI_CAP_SWAP_BACKED:    Count shmem/tmpfs objects as swap-backed.
  */
 #define BDI_CAP_NO_ACCT_DIRTY	0x00000001
+/* 不需要write back,比如基于内存的文件系统 */
 #define BDI_CAP_NO_WRITEBACK	0x00000002
 #define BDI_CAP_MAP_COPY	0x00000004
 #define BDI_CAP_MAP_DIRECT	0x00000008
