@@ -1548,6 +1548,7 @@ extern cputime_t task_gtime(struct task_struct *p);
 #define PF_DUMPCORE	0x00000200	/* dumped core */
 #define PF_SIGNALED	0x00000400	/* killed by a signal */
 #define PF_MEMALLOC	0x00000800	/* Allocating memory */
+/* 当前进程是一个pdflush进程 */
 #define PF_FLUSHER	0x00001000	/* responsible for disk writeback */
 #define PF_USED_MATH	0x00002000	/* if unset the fpu must be initialized before use */
 #define PF_NOFREEZE	0x00008000	/* this thread should not be frozen */

@@ -39,9 +39,11 @@
  * The maximum number of pages to writeout in a single bdflush/kupdate
  * operation.  We do this so we don't hold I_SYNC against an inode for
  * enormous amounts of time, which would block a userspace task which has
- * been forced to throttle against that inode.  Also, the code reevaluates
+ * been forced to throttle (['θrɑtl] vt.压制,扼杀 vi.节流,减速,窒息)
+ * against that inode.  Also, the code reevaluates
  * the dirty each time it has written this many pages.
  */
+/* 单次回写操作最大写入的页面数量 */
 #define MAX_WRITEBACK_PAGES	1024
 
 /*
@@ -695,16 +697,22 @@ static void wb_kupdate(unsigned long arg)
 	long nr_to_write;
 	struct writeback_control wbc = {
 		.bdi		= NULL,
+		/* 直接回写,不等待 */
 		.sync_mode	= WB_SYNC_NONE,
 		.older_than_this = &oldest_jif,
+		/* 不设回写数目上限 */
 		.nr_to_write	= 0,
+		/* 遇到拥塞时,不阻塞 */
 		.nonblocking	= 1,
+		/* 回写操作由周期性机制发出 */
 		.for_kupdate	= 1,
+		/* 内核可能多次遍历与映射相关的页 */
 		.range_cyclic	= 1,
 	};
 
 	sync_supers();
 
+	/* 当前时间30s前 */
 	oldest_jif = jiffies - dirty_expire_interval;
 	start_jif = jiffies;
 	next_jif = start_jif + dirty_writeback_interval;
@@ -747,6 +755,7 @@ int dirty_writeback_centisecs_handler(ctl_table *table, int write,
 static void wb_timer_fn(unsigned long unused)
 {
 	if (pdflush_operation(wb_kupdate, 0) < 0)
+		/* 没有空闲的pdflush可以使用,推迟下次的wb_timer_fn 1s */
 		mod_timer(&wb_timer, jiffies + HZ); /* delay 1 second */
 }
 

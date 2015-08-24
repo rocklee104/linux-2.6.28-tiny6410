@@ -255,12 +255,12 @@ void __iget(struct inode * inode)
 		return;
 	}
 	atomic_inc(&inode->i_count);
-	//如果i_count为0,并且inode没有标记为dirty或没有标记为locked(干净,没有锁)
-	//此inode肯定在inode_unused队列中,将其从inode_used中移动到inode_in_use队列中 
+	/* 
+	 * 如果i_count为0,并且inode没有标记为dirty或没有标记为I_SYNC,将其移动到inode_in_use队列中.
+	 */
 	if (!(inode->i_state & (I_DIRTY|I_SYNC)))
 		list_move(&inode->i_list, &inode_in_use);
-	//如果没有别的地方使用inode,才能将inode从inode_unused移动到inode_in_use中
-    //这时候inodes_stat.nr_unused必须要减一
+	/* 更新inode的统计计数 */
 	inodes_stat.nr_unused--;
 }
 

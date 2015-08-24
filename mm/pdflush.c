@@ -163,9 +163,10 @@ static int __pdflush(struct pdflush_work *my_work)
 		 * Thread destruction: For how long has the sleepiest
 		 * thread slept?
 		 */
+		/* 如果pdflush_list为空,就没有必要在pdflush_list中获取成员,然后判断时间了 */
 		if (list_empty(&pdflush_list))
 			continue;
-		/* 系统中pdflush的数量没有超过最低界限 */
+		/* 确保系统中至少有MIN_PDFLUSH_THREADS个pdflush */
 		if (nr_pdflush_threads <= MIN_PDFLUSH_THREADS)
 			continue;
 		//取pdflush_list睡眠时间最长的pdflush_work
@@ -228,12 +229,12 @@ int pdflush_operation(void (*fn)(unsigned long), unsigned long arg0)
 
 	spin_lock_irqsave(&pdflush_lock, flags);
 	if (list_empty(&pdflush_list)) {
-		//没有空闲的pdflush
+		/* 没有空闲的pdflush */
 		ret = -1;
 	} else {
 		struct pdflush_work *pdf;
 
-		//获取最近加入的pdflush_work,将其从空闲链表中移除
+		/* 获取最近加入的pdflush_work,将其从空闲链表中移除 */
 		pdf = list_entry(pdflush_list.next, struct pdflush_work, list);
 		list_del_init(&pdf->list);
 		if (list_empty(&pdflush_list))

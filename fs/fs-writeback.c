@@ -194,6 +194,7 @@ static int write_inode(struct inode *inode, int sync)
  * the case then the inode must have been redirtied while it was being written
  * out and we don't reset its dirtied_when.
  */
+/* 重新dirty一个inode,需要更新inode的dirtied_when为当前的jiffies*/
 static void redirty_tail(struct inode *inode)
 {
 	struct super_block *sb = inode->i_sb;
@@ -236,6 +237,7 @@ static void move_expired_inodes(struct list_head *delaying_queue,
 	while (!list_empty(delaying_queue)) {
 		struct inode *inode = list_entry(delaying_queue->prev,
 						struct inode, i_list);
+		/* 当*older_than_this在inode->dirtied_when之后,需要将这个inode移动到dispatch_queue */
 		if (older_than_this &&
 			time_after(inode->dirtied_when, *older_than_this))
 			break;
@@ -246,9 +248,11 @@ static void move_expired_inodes(struct list_head *delaying_queue,
 /*
  * Queue all expired dirty inodes for io, eldest first.
  */
+/* 将所有超时的dirty inode从s_dirty链表移动到s_io链表上 */
 static void queue_io(struct super_block *sb,
 				unsigned long *older_than_this)
 {
+	/* 将上次回写没有操作完的inode移动到s_io,准备回写 */
 	list_splice_init(&sb->s_more_io, sb->s_io.prev);
 	move_expired_inodes(&sb->s_dirty, &sb->s_io, older_than_this);
 }
@@ -276,9 +280,11 @@ __sync_single_inode(struct inode *inode, struct writeback_control *wbc)
 {
 	unsigned dirty;
 	struct address_space *mapping = inode->i_mapping;
+	/* 是否需要等待 */
 	int wait = wbc->sync_mode == WB_SYNC_ALL;
 	int ret;
 
+	/* __writeback_single_inode已经清除I_SYNC bit了 */
 	BUG_ON(inode->i_state & I_SYNC);
 
 	/* Set I_SYNC, reset I_DIRTY */
@@ -292,6 +298,7 @@ __sync_single_inode(struct inode *inode, struct writeback_control *wbc)
 
 	/* Don't write the inode if only I_DIRTY_PAGES was set */
 	if (dirty & (I_DIRTY_SYNC | I_DIRTY_DATASYNC)) {
+		/* 调用sb write_inode方法写入inode */
 		int err = write_inode(inode, wait);
 		if (ret == 0)
 			ret = err;
@@ -388,6 +395,7 @@ __writeback_single_inode(struct inode *inode, struct writeback_control *wbc)
 	else
 		WARN_ON(inode->i_state & I_WILL_FREE);
 
+	/* 回写机制不需要等待,并且inode需要同步 */
 	if ((wbc->sync_mode != WB_SYNC_ALL) && (inode->i_state & I_SYNC)) {
 		/*
 		 * We're skipping this inode because it's locked, and we're not
@@ -404,6 +412,7 @@ __writeback_single_inode(struct inode *inode, struct writeback_control *wbc)
 	 * It's a data-integrity sync.  We must wait.
 	 */
 	if (inode->i_state & I_SYNC) {
+		/* wbc->sync_mode == WB_SYNC_ALL */
 		DEFINE_WAIT_BIT(wq, &inode->i_state, __I_SYNC);
 
 		wqh = bit_waitqueue(&inode->i_state, __I_SYNC);
@@ -414,6 +423,7 @@ __writeback_single_inode(struct inode *inode, struct writeback_control *wbc)
 			spin_lock(&inode_lock);
 		} while (inode->i_state & I_SYNC);
 	}
+	/* inode->i_state中I_SYNC这个bit为0*/
 	return __sync_single_inode(inode, wbc);
 }
 
@@ -447,11 +457,12 @@ void generic_sync_sb_inodes(struct super_block *sb,
 				struct writeback_control *wbc)
 {
 	const unsigned long start = jiffies;	/* livelock avoidance */
+	/* sync用来判断回写操作是否需要等待 */
 	int sync = wbc->sync_mode == WB_SYNC_ALL;
 
 	spin_lock(&inode_lock);
 	if (!wbc->for_kupdate || list_empty(&sb->s_io))
-        //不是周期性的回写或者s_io是空,就将s_dirty中的元素移动到s_io中,重新初始化s_dirty
+        //不是周期性的回写或者s_io是空,就将s_dirty中的元素移动到s_io中
 		queue_io(sb, wbc->older_than_this);
 
 	/* 
@@ -460,9 +471,9 @@ void generic_sync_sb_inodes(struct super_block *sb,
 	 * 2.达到了最大页同步数量(由writeback_control->nr_to_write指定).
 	 */
 	while (!list_empty(&sb->s_io)) {
+		/* 从最早dirty的inode开始遍历 */
 		struct inode *inode = list_entry(sb->s_io.prev,
 						struct inode, i_list);
-        //从最早dirty的inode开始遍历
 		struct address_space *mapping = inode->i_mapping;
 		struct backing_dev_info *bdi = mapping->backing_dev_info;
 		long pages_skipped;
@@ -473,8 +484,8 @@ void generic_sync_sb_inodes(struct super_block *sb,
              *纯粹基于内存的文件系统如ramdisk,或者伪文件系统(bdev除外)或者纯粹的虚拟文件系统 
              *都不需要与底层块设备同步,这些文件系统会在backing_dev_info中设置 
              *BDI_CAP_NO_WRITEBACK 
-            */
-            //将inode从原先的链表中取出来,加入s_dirty
+             */
+            /* 将inode从原先的链表中取出来,加入到s_dirty头部 */
 			redirty_tail(inode);
 			if (sb_is_blkdev_sb(sb)) {
                 //bdev文件系统,跳过
@@ -496,13 +507,18 @@ void generic_sync_sb_inodes(struct super_block *sb,
 		if (wbc->nonblocking && bdi_write_congested(bdi)) {
             //wbc中设置了回写队列在遇到拥塞时是不阻塞,并且bdi在回写过程中遇到了拥塞
 			wbc->encountered_congestion = 1;
+			/* 遇到拥塞时不阻塞,就应该退出循环(blkdev fs除外) */
 			if (!sb_is_blkdev_sb(sb))
 				break;		/* Skip a congested fs */
+			/* 对于blkdev fs来说,当前inode表示的就是一个blkdev,跳过当前的blkdev */
 			requeue_io(inode);
 			continue;		/* Skip a congested blockdev */
 		}
 
-        //要操作的块设备不是这个设备
+        /* 
+         * fs中当前回写的块设备和inode对应的块设备不匹配,
+         * 除blkdev fs,这种情况不应该存在
+         */
 		if (wbc->bdi && bdi != wbc->bdi) {
 			if (!sb_is_blkdev_sb(sb))
 				break;		/* fs has the wrong queue */
@@ -511,12 +527,12 @@ void generic_sync_sb_inodes(struct super_block *sb,
 		}
 
 		/* Was this inode dirtied after sync_sb_inodes was called? */
-        //如果是sync_sb_inode执行后,结点变为了脏结点,就略过个结点
+        /* 如果是sync_sb_inode执行后,结点变为了脏结点,就略过个结点 */
 		if (time_after(inode->dirtied_when, start))
 			break;
 
 		/* Is another pdflush already flushing this queue? */
-        //已经有另外的pdflush在处理这个super_block中的结点了
+        /* 已经有另外的pdflush在处理这个bdi了 */
 		if (current_is_pdflush() && !writeback_acquire(bdi))
 			break;
 
@@ -633,6 +649,7 @@ restart:
 	 * 2.达到了writeback_control指定的回写页的最大数目.
 	 */
 	list_for_each_entry_reverse(sb, &super_blocks, s_list) {
+		/* 通过判断sb的s_dirty,s_io,s_more_io链表确定sb上是否存在dirty的inode */
 		if (sb_has_dirty_inodes(sb)) {
 			/* we're making our own get_super here */
 			sb->s_count++;

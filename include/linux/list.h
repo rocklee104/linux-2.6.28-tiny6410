@@ -162,7 +162,9 @@ static inline void list_move(struct list_head *list, struct list_head *head)
 static inline void list_move_tail(struct list_head *list,
 				  struct list_head *head)
 {
+	/* 从链表中移除list这个节点 */
 	__list_del(list->prev, list->next);
+	/* 将list节点尾插到head链表中 */
 	list_add_tail(list, head);
 }
 
@@ -273,7 +275,10 @@ static inline void __list_splice(const struct list_head *list,
  * @list: the new list to add.
  * @head: the place to add it in the first list.
  */
-//将list链表除其链表头外的元素头插入head和head->next之间
+/*
+ * 将list链表除其链表头外的元素头插入head和head->next之间,
+ * list->next离head最近,list->prev离head最远
+ */
 static inline void list_splice(const struct list_head *list,
 				struct list_head *head)
 {
@@ -300,6 +305,7 @@ static inline void list_splice_tail(struct list_head *list,
  *
  * The list at @list is reinitialised
  */
+/* 将list链表中所有节点(除list这个节点)加入head链表中 */
 static inline void list_splice_init(struct list_head *list,
 				    struct list_head *head)
 {
