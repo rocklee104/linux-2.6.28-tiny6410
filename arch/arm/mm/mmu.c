@@ -193,7 +193,7 @@ void adjust_cr(unsigned long mask, unsigned long set)
 #define PROT_SECT_DEVICE	PMD_TYPE_SECT|PMD_SECT_AP_WRITE
 
 static struct mem_type mem_types[] = {
-	//对应其他io设备,应用于ioremap
+	//设备空间,对应其他io设备,应用于ioremap
 	[MT_DEVICE] = {		  /* Strongly ordered / ARMv6 shared device */
 		.prot_pte	= PROT_PTE_DEVICE | L_PTE_MT_DEV_SHARED |
 				  L_PTE_SHARED,
@@ -226,33 +226,36 @@ static struct mem_type mem_types[] = {
 		.prot_sect	= PMD_TYPE_SECT | PMD_SECT_XN,
 		.domain		= DOMAIN_IO,
 	},
+	/* 内部高速SRAM空间 */
 	[MT_CACHECLEAN] = {
 		.prot_sect = PMD_TYPE_SECT | PMD_SECT_XN,
 		.domain    = DOMAIN_KERNEL,
 	},
+	/* 内部mini cache空间 */
 	[MT_MINICLEAN] = {
 		.prot_sect = PMD_TYPE_SECT | PMD_SECT_XN | PMD_SECT_MINICACHE,
 		.domain    = DOMAIN_KERNEL,
 	},
-	//对应0地址开始的向量
+	//低端中断向量,对应0地址开始的向量
 	[MT_LOW_VECTORS] = {
 		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
 				L_PTE_EXEC,
 		.prot_l1   = PMD_TYPE_TABLE,
 		.domain    = DOMAIN_USER,
 	},
-	//高地址开始的向量，它有vector_base宏决定
+	//高端中断向量，它有vector_base宏决定
 	[MT_HIGH_VECTORS] = {
 		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
 				L_PTE_USER | L_PTE_EXEC,
 		.prot_l1   = PMD_TYPE_TABLE,
 		.domain    = DOMAIN_USER,
 	},
-	//对应ram,段式映射,有读写权限,domain属于kernel
+	//RAM内存空间,段式映射,有读写权限,domain属于kernel
 	[MT_MEMORY] = {
 		.prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE,
 		.domain    = DOMAIN_KERNEL,
 	},
+	/* ROM(flash)空间 */
 	[MT_ROM] = {
 		.prot_sect = PMD_TYPE_SECT,
 		.domain    = DOMAIN_KERNEL,
@@ -274,6 +277,7 @@ static void __init build_mem_type_table(void)
 	//cr = 0xc5387f
 	unsigned int cr = get_cr();
 	unsigned int user_pgprot, kern_pgprot, vecs_pgprot;
+	/* cpu_arch ==9 */
 	int cpu_arch = cpu_architecture();
 	int i;
 #ifdef CONFIG_SMP
@@ -283,6 +287,7 @@ static void __init build_mem_type_table(void)
 	/*
 	 * Mark the device areas according to the CPU/architecture.
 	 */
+	/* mem_types已经静态初始化,但是根据不同的cpu/architecture需要微调 */
 	if (cpu_is_xsc3() || (cpu_arch >= CPU_ARCH_ARMv6 && (cr & CR_XP))) {
 		if (!cpu_is_xsc3()) {
 			/*
@@ -417,6 +422,7 @@ static void __init build_mem_type_table(void)
 	printk("Memory policy: ECC %sabled, Data cache %s\n",
 		ecc_mask ? "en" : "dis", cp->policy);
 
+	/* 为各种类型的内存构成l1/pte表项 */
 	for (i = 0; i < ARRAY_SIZE(mem_types); i++) {
 		struct mem_type *t = &mem_types[i];
 		if (t->prot_l1)
@@ -435,8 +441,9 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
 	pte_t *pte;
 
 	if (pmd_none(*pmd)) {
-		//*pmd为0
+		/* *pmd为0,分配1024个pte指针,刚好占用一个page */
 		pte = alloc_bootmem_low_pages(2 * PTRS_PER_PTE * sizeof(pte_t));
+		/* 根据pte生成pmd */
 		__pmd_populate(pmd, __pa(pte) | type->prot_l1);
 	}
 
@@ -447,12 +454,12 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
 	} while (pte++, addr += PAGE_SIZE, addr != end);
 }
 
-//分配[addr,end)这段内存的段页表项
+/* 分配[addr,end)这段内存的段页表项 */
 static void __init alloc_init_section(pgd_t *pgd, unsigned long addr,
 				      unsigned long end, unsigned long phys,
 				      const struct mem_type *type)
 {
-	//从pgd中获取pmd
+	/* 从pgd中获取pmd,pgd是逻辑的,实际工作由pmd完成 */
 	pmd_t *pmd = pmd_offset(pgd, addr);
 
 	/*
@@ -462,26 +469,28 @@ static void __init alloc_init_section(pgd_t *pgd, unsigned long addr,
 	 * up one logical pointer to an L2 table.
 	 */
 	if (((addr | end | phys) & ~SECTION_MASK) == 0) {
-		//addr | end | phys以段大小对齐
+		/* addr | end | phys以段大小对齐,属于段式映射 */
 		pmd_t *p = pmd;
 
+		/* addr是一个pgd的起始地址,必须以一个pgd的大小(2MB)对齐 */
 		if (addr & SECTION_SIZE)
 			pmd++;
 
 		do {
-			//写入段页表项,段页表项的是由段基地址和一些控制位组成
+			/* 写入段页表项,段页表项的是由段基地址和一些控制位组成 */
 			*pmd = __pmd(phys | type->prot_sect);
 			phys += SECTION_SIZE;
-			//pmd自加后每次偏移4字节
+			/* pmd自加后每次偏移4字节 */
 		} while (pmd++, addr += SECTION_SIZE, addr != end);
 
-		//确保pmd写入内存中,而不是cache
+		/* 确保pmd写入内存中,而不是cache */
 		flush_pmd_entry(p);
 	} else {
 		/*
 		 * No need to loop; pte's aren't interested in the
 		 * individual L1 entries.
 		 */
+		/* 页式映射 */
 		alloc_init_pte(pmd, addr, end, __phys_to_pfn(phys), type);
 	}
 }
@@ -557,15 +566,16 @@ void __init create_mapping(struct map_desc *md)
 	const struct mem_type *type;
 	pgd_t *pgd;
 
-	//vectors_base()为0xffff0000
+	/* vectors_base()为0xffff0000 */
 	if (md->virtual != vectors_base() && md->virtual < TASK_SIZE) {
+		/* 不能为用户空间建立映射 */
 		printk(KERN_WARNING "BUG: not creating mapping for "
 		       "0x%08llx at 0x%08lx in user region\n",
 		       __pfn_to_phys((u64)md->pfn), md->virtual);
 		return;
 	}
 
-	//type为MT_DEVICE或者MT_ROM的memory不能映射到[PAGE_OFFSET,VMALLOC_END)这块区域
+	/* type为MT_DEVICE或者MT_ROM的memory不能映射到[PAGE_OFFSET,VMALLOC_END)这块区域 */
 	if ((md->type == MT_DEVICE || md->type == MT_ROM) &&
 	    md->virtual >= PAGE_OFFSET && md->virtual < VMALLOC_END) {
 		printk(KERN_WARNING "BUG: mapping for 0x%08llx at 0x%08lx "
@@ -583,13 +593,14 @@ void __init create_mapping(struct map_desc *md)
 		return;
 	}
 
-	//虚拟起始地址必须以page size对齐
+	/* 虚拟起始地址必须以page size对齐 */
 	addr = md->virtual & PAGE_MASK;
 	phys = (unsigned long)__pfn_to_phys(md->pfn);
-	//长度以page对齐
+	/* 长度以page对齐 */
 	length = PAGE_ALIGN(md->length + (md->virtual & ~PAGE_MASK));
 
 	if (type->prot_l1 == 0 && ((addr | phys | length) & ~SECTION_MASK)) {
+		/* type->prot_l1 == 0表示段式映射,addr/phys/length都必须以段大小对齐 */
 		printk(KERN_WARNING "BUG: map for 0x%08lx at 0x%08lx can not "
 		       "be mapped using pages, ignoring.\n",
 		       __pfn_to_phys(md->pfn), addr);
@@ -598,12 +609,12 @@ void __init create_mapping(struct map_desc *md)
 
 	pgd = pgd_offset_k(addr);
 	end = addr + length;
-	//length可能跨越了多个pgd,所以要对pgd中的表项进行遍历
+	/* length可能跨越了多个pgd,所以要对pgd中的表项进行遍历 */
 	do {
-		//以2MB为单位进行循环,取下个pgd
+		/* 以2MB为单位进行循环,取下个pgd指向的虚拟地址 */
 		unsigned long next = pgd_addr_end(addr, end);
 
-		//每个pgd条目中处理2个pmd
+		/* 每个pgd条目中处理2个pmd */
 		alloc_init_section(pgd, addr, next, phys, type);
 
 		phys += next - addr;
@@ -683,6 +694,7 @@ static int __init check_membank_valid(struct membank *mb)
 	return 1;
 }
 
+/* 获取有效的bank数量 */
 static void __init sanity_check_meminfo(struct meminfo *mi)
 {
 	int i, j;
@@ -709,19 +721,10 @@ static inline void prepare_page_table(struct meminfo *mi)
 	 */
 	/*
 	 * 在head.S的__create_page_tables中创建过段页表,其位置在0xc0004000,
-	 * 现在我们要清除[0,0xBF000000)这段内存的段页表.
+	 * 现在我们要清除[0,0xC0000000)这段内存的段页表.
 	 */
-	for (addr = 0; addr < MODULES_VADDR; addr += PGDIR_SIZE)
+	for (addr = 0; addr < PAGE_OFFSET; addr += PGDIR_SIZE)
 		pmd_clear(pmd_off_k(addr));
-
-#ifdef CONFIG_XIP_KERNEL
-	/* The XIP kernel is mapped in the module area -- skip over it */
-	addr = ((unsigned long)&_etext + PGDIR_SIZE - 1) & PGDIR_MASK;
-#endif
-	//清除[0xBF000000,0xC0000000)这段内存的段页表
-	for ( ; addr < PAGE_OFFSET; addr += PGDIR_SIZE)
-		pmd_clear(pmd_off_k(addr));
-
 	/*
 	 * Clear out all the kernel space mappings, except for the first
 	 * memory bank, up to the end of the vmalloc region.
@@ -734,7 +737,7 @@ static inline void prepare_page_table(struct meminfo *mi)
 /*
  * Reserve the various regions of node 0
  */
-//在bitmap中保留node 0的kernel image所在page和段页表所在的page
+/* 在bitmap中保留node 0的kernel image所在page和段页表所在的page */
 void __init reserve_node_zero(pg_data_t *pgdat)
 {
 	unsigned long res_size = 0;
@@ -743,14 +746,9 @@ void __init reserve_node_zero(pg_data_t *pgdat)
 	 * Register the kernel text and data with bootmem.
 	 * Note that this can only be in node 0.
 	 */
-#ifdef CONFIG_XIP_KERNEL
-	reserve_bootmem_node(pgdat, __pa(&__data_start), &_end - &__data_start,
-			BOOTMEM_DEFAULT);
-#else
-	//保留kernel镜像所在的page
+	/* 保留kernel镜像所在的page */
 	reserve_bootmem_node(pgdat, __pa(&_stext), &_end - &_stext,
 			BOOTMEM_DEFAULT);
-#endif
 
 	/*
 	 * Reserve the page tables.  These are already in use,
@@ -759,44 +757,6 @@ void __init reserve_node_zero(pg_data_t *pgdat)
 	//保留段页表所在的page
 	reserve_bootmem_node(pgdat, __pa(swapper_pg_dir),
 			     PTRS_PER_PGD * sizeof(pgd_t), BOOTMEM_DEFAULT);
-
-	/*
-	 * Hmm... This should go elsewhere, but we really really need to
-	 * stop things allocating the low memory; ideally we need a better
-	 * implementation of GFP_DMA which does not assume that DMA-able
-	 * memory starts at zero.
-	 */
-	if (machine_is_integrator() || machine_is_cintegrator())
-		res_size = __pa(swapper_pg_dir) - PHYS_OFFSET;
-
-	/*
-	 * These should likewise go elsewhere.  They pre-reserve the
-	 * screen memory region at the start of main system memory.
-	 */
-	if (machine_is_edb7211())
-		res_size = 0x00020000;
-	if (machine_is_p720t())
-		res_size = 0x00014000;
-
-	/* H1940 and RX3715 need to reserve this for suspend */
-
-	if (machine_is_h1940() || machine_is_rx3715()) {
-		reserve_bootmem_node(pgdat, 0x30003000, 0x1000,
-				BOOTMEM_DEFAULT);
-		reserve_bootmem_node(pgdat, 0x30081000, 0x1000,
-				BOOTMEM_DEFAULT);
-	}
-
-#ifdef CONFIG_SA1111
-	/*
-	 * Because of the SA1111 DMA bug, we want to preserve our
-	 * precious DMA-able memory...
-	 */
-	res_size = __pa(swapper_pg_dir) - PHYS_OFFSET;
-#endif
-	if (res_size)
-		reserve_bootmem_node(pgdat, PHYS_OFFSET, res_size,
-				BOOTMEM_DEFAULT);
 }
 
 /*

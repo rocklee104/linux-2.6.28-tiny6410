@@ -36,9 +36,9 @@
  * which may not overlap IO space.
  */
 #ifndef VMALLOC_START
-//在物理内存后的8M空洞,用于捕捉越界的内存访问
+/* 在物理内存后的8M空洞,用于捕捉越界的内存访问 */
 #define VMALLOC_OFFSET		(8*1024*1024)
-//high_memory在bootmem_init中才被赋值,VMALLOC_START记录堆的起始地址,此时为8M
+/* high_memory在bootmem_init中才被赋值,VMALLOC_START记录堆的起始地址,此时为8M */
 #define VMALLOC_START		(((unsigned long)high_memory + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
 #endif
 
@@ -117,6 +117,7 @@
  * PGDIR_SHIFT determines what a third-level page table entry can map
  */
 #define PMD_SHIFT		21
+/* 逻辑上,一个全局页表项表示2M.底层实现是一个段页表表示1M,一个全局页表由两个段页表组成. */
 #define PGDIR_SHIFT		21
 
 #define LIBRARY_TEXT_START	0x0c000000
@@ -175,14 +176,14 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
  * linux模拟的页表,部分bit使用了x86下定义的,这部分定义的是armv6版本的页表.
  * 注意下面没有定义bit[4-5]
  */
-//表示线性地址已经映射到物理内存
+/* 表示线性地址已经映射到物理内存 */
 #define L_PTE_PRESENT		(1 << 0)
 #define L_PTE_FILE		(1 << 1)	/* only when !PRESENT */
-//只有设置L_PTE_YOUNG后,对应的page才能被访问
+/* 只有设置L_PTE_YOUNG后,对应的page才能被访问 */
 #define L_PTE_YOUNG		(1 << 1)
 #define L_PTE_BUFFERABLE	(1 << 2)	/* obsolete, matches PTE */
 #define L_PTE_CACHEABLE		(1 << 3)	/* obsolete, matches PTE */
-//当L_PTE_DIRTY和L_PTE_WRITE同时被设置的时候,对应的page才可写
+/* 当L_PTE_DIRTY和L_PTE_WRITE同时被设置的时候,对应的page才可写 */
 #define L_PTE_DIRTY		(1 << 6)
 #define L_PTE_WRITE		(1 << 7)
 #define L_PTE_USER		(1 << 8)
@@ -193,7 +194,7 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
  * These are the memory types, defined to be compatible with
  * pre-ARMv6 CPUs cacheable and bufferable bits:   XXCB
  */
-//armv6前的页表,比如arm920t
+/* armv6前的页表,比如arm920t */
 #define L_PTE_MT_UNCACHED	(0x00 << 2)	/* 0000 */
 #define L_PTE_MT_BUFFERABLE	(0x01 << 2)	/* 0001 */
 #define L_PTE_MT_WRITETHROUGH	(0x02 << 2)	/* 0010 */
@@ -297,20 +298,20 @@ extern struct page *empty_zero_page;
  * The following only work if pte_present() is true.
  * Undefined behaviour if not..
  */
-//如果一个页表项的present标志或page size等于1,pte_present产生的值为1
+/* 如果一个页表项的present标志或page size等于1,pte_present产生的值为1 */
 #define pte_present(pte)	(pte_val(pte) & L_PTE_PRESENT)
-//读user/supervisor标志
+/* 读user/supervisor标志 */
 #define pte_write(pte)		(pte_val(pte) & L_PTE_WRITE)
-//读dirty标志
+/* 读dirty标志 */
 #define pte_dirty(pte)		(pte_val(pte) & L_PTE_DIRTY)
-//读access标志
+/* 读access标志 */
 #define pte_young(pte)		(pte_val(pte) & L_PTE_YOUNG)
 #define pte_special(pte)	(0)
 
 /*
  * The following only works if pte_present() is not true.
  */
-//读dirty标志
+/* 读dirty标志 */
 #define pte_file(pte)		(pte_val(pte) & L_PTE_FILE)
 #define pte_to_pgoff(x)		(pte_val(x) >> 2)
 #define pgoff_to_pte(x)		__pte(((x) << 2) | L_PTE_FILE)
@@ -337,7 +338,7 @@ static inline pte_t pte_mkspecial(pte_t pte) { return pte; }
 #define pgprot_writecombine(prot) \
 	__pgprot((pgprot_val(prot) & ~L_PTE_MT_MASK) | L_PTE_MT_BUFFERABLE)
 
-//判断pmd是否为none
+/* 判断pmd是否为none */
 #define pmd_none(pmd)		(!pmd_val(pmd))
 #define pmd_present(pmd)	(pmd_val(pmd))
 #define pmd_bad(pmd)		(pmd_val(pmd) & 2)
@@ -349,7 +350,7 @@ static inline pte_t pte_mkspecial(pte_t pte) { return pte; }
 		flush_pmd_entry(pmdpd);	\
 	} while (0)
 
-//改变段页表后,还需要清除dcache
+/* 改变段页表后,还需要清除dcache */
 #define pmd_clear(pmdp)			\
 	do {				\
 		pmdp[0] = __pmd(0);	\
@@ -387,7 +388,7 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
 #define set_pgd(pgd,pgdp)	do { } while (0)
 
 /* to find an entry in a page-table-directory */
-//找到线性地址addr对应的目录项在页全局目录中的index
+/* 找到线性地址addr对应的目录项在页全局目录中的index */
 #define pgd_index(addr)		((addr) >> PGDIR_SHIFT)
 
 /*
@@ -399,7 +400,7 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
 #define pgd_offset(mm, addr)	((mm)->pgd+pgd_index(addr))
 
 /* to find an entry in a kernel page-table-directory */
-//产生主内核页全局目录中的某个项的线性地址,该项对应于地址addr
+/* 产生主内核页全局目录中的某个项的线性地址,该项对应于地址addr */
 #define pgd_offset_k(addr)	pgd_offset(&init_mm, addr)
 
 /* Find an entry in the second-level page table.. */
@@ -412,7 +413,7 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
 /* Find an entry in the third-level page table.. */
 #define __pte_index(addr)	(((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
 
-//把所有页表项pte的访问权限设置为newprot
+/* 把所有页表项pte的访问权限设置为newprot */
 static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 {
 	const unsigned long mask = L_PTE_EXEC | L_PTE_WRITE | L_PTE_USER;

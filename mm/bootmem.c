@@ -19,11 +19,11 @@
 
 #include "internal.h"
 
-//被内核直接映射后的最后一个页框的页框号(低地址内存)
+/* 被内核直接映射后的最后一个页框的页框号(低地址内存) */
 unsigned long max_low_pfn;
-//ram在内核映像后第一个可用页框的页框号
+/* ram在内核映像后第一个可用页框的页框号 */
 unsigned long min_low_pfn;
-//最后一个可用的页框号
+/* 最后一个可用的页框号 */
 unsigned long max_pfn;
 
 #ifdef CONFIG_CRASH_DUMP
@@ -36,7 +36,7 @@ unsigned long saved_max_pfn;
 
 bootmem_data_t bootmem_node_data[MAX_NUMNODES] __initdata;
 
-//所有的bdata类型都被link_bootmem放入bdata_list链表中统一管理,根据node_min_pfn从小到大排列
+/* 所有的bdata类型都被link_bootmem放入bdata_list链表中统一管理,根据node_min_pfn从小到大排列 */
 static struct list_head bdata_list __initdata = LIST_HEAD_INIT(bdata_list);
 
 static int bootmem_debug;
@@ -57,10 +57,10 @@ early_param("bootmem_debug", bootmem_debug_setup);
 
 static unsigned long __init bootmap_bytes(unsigned long pages)
 {
-	//位图需要的字节数
+	/* 位图需要的字节数 */
 	unsigned long bytes = (pages + 7) / 8;
 
-	//字节数必须以一个字的长度对齐
+	/* 字节数必须以一个字的长度对齐 */
 	return ALIGN(bytes, sizeof(long));
 }
 
@@ -68,7 +68,7 @@ static unsigned long __init bootmap_bytes(unsigned long pages)
  * bootmem_bootmap_pages - calculate bitmap size in pages
  * @pages: number of pages the bitmap has to represent
  */
-//获取保存page的bitmap占用的page个数
+/* 获取保存page的bitmap占用的page个数 */
 unsigned long __init bootmem_bootmap_pages(unsigned long pages)
 {
 	unsigned long bytes = bootmap_bytes(pages);
@@ -79,7 +79,7 @@ unsigned long __init bootmem_bootmap_pages(unsigned long pages)
 /*
  * link bdata in order
  */
-//将bdata插入bdata_list,bdata_list中成员根据node_min_pfn从小到大排列
+/* 将bdata插入bdata_list,bdata_list中成员根据node_min_pfn从小到大排列 */
 static void __init link_bootmem(bootmem_data_t *bdata)
 {
 	struct list_head *iter;
@@ -102,20 +102,20 @@ static unsigned long __init init_bootmem_core(bootmem_data_t *bdata,
 {
 	unsigned long mapsize;
 
-	//mini6410,空函数
+	/* mini6410,空函数 */
 	mminit_validate_memmodel_limits(&start, &end);
-	//获取bootmem bitmap起始位置的虚拟地址
+	/* 获取bootmem bitmap起始位置的虚拟地址 */
 	bdata->node_bootmem_map = phys_to_virt(PFN_PHYS(mapstart));
 	bdata->node_min_pfn = start;
 	bdata->node_low_pfn = end;
-	//将bdata插入bdata_list
+	/* 将bdata插入bdata_list */
 	link_bootmem(bdata);
 
 	/*
 	 * Initially all pages are reserved - setup_arch() has to
 	 * register free RAM areas explicitly.
 	 */
-	//在bitmap中保留[start,end]这部分page
+	/* 在bitmap中保留[start,end]这部分page */
 	mapsize = bootmap_bytes(end - start);
 	memset(bdata->node_bootmem_map, 0xff, mapsize);
 
@@ -237,7 +237,7 @@ unsigned long __init free_all_bootmem(void)
 	return free_all_bootmem_core(NODE_DATA(0)->bdata);
 }
 
-//将bitmap中表示[sidx,eidx]这段page的bit清0
+/* 将bitmap中表示[sidx,eidx)这段page的bit清0 */
 static void __init __free(bootmem_data_t *bdata,
 			unsigned long sidx, unsigned long eidx)
 {
@@ -247,6 +247,7 @@ static void __init __free(bootmem_data_t *bdata,
 		sidx + bdata->node_min_pfn,
 		eidx + bdata->node_min_pfn);
 
+	/* 更新分配时的结束页框 */
 	if (bdata->hint_idx > sidx)
 		bdata->hint_idx = sidx;
 
@@ -267,10 +268,10 @@ static int __init __reserve(bootmem_data_t *bdata, unsigned long sidx,
 		eidx + bdata->node_min_pfn,
 		flags);
 
-	//将sidx到eidx这段page标记为不可用,也就是说这些page已经被占用
+	/* 将sidx到eidx这段page标记为不可用,也就是说这些page已经被占用 */
 	for (idx = sidx; idx < eidx; idx++)
 		if (test_and_set_bit(idx, bdata->node_bootmem_map)) {
-			//如果之前idx这个bit的值是1,并且设置了BOOTMEM_EXCLUSIVE标志的话,就需要返回busy状态
+			/* 如果之前idx这个bit的值是1,并且设置了BOOTMEM_EXCLUSIVE标志的话,就需要返回busy状态 */
 			if (exclusive) {
 				__free(bdata, sidx, idx);
 				return -EBUSY;
@@ -285,7 +286,7 @@ static int __init mark_bootmem_node(bootmem_data_t *bdata,
 				unsigned long start, unsigned long end,
 				int reserve, int flags)
 {
-	//sidx和eidx分别表示物理页框位图的开始和结束的索引,也即相对于node_min_pfn的偏移
+	/* sidx和eidx分别表示物理页框位图的开始和结束的索引,也即相对于node_min_pfn的偏移 */
 	unsigned long sidx, eidx;
 
 	bdebug("nid=%td start=%lx end=%lx reserve=%d flags=%x\n",
@@ -346,15 +347,15 @@ static int __init mark_bootmem(unsigned long start, unsigned long end,
  *
  * The range must reside completely on the specified node.
  */
-//在bitmap中标记physaddr到physaddr+size这段内存的page可用
+/* 在bitmap中标记physaddr到physaddr+size这段内存的page可用 */
 void __init free_bootmem_node(pg_data_t *pgdat, unsigned long physaddr,
 			      unsigned long size)
 {
 	unsigned long start, end;
 
-	//起始地址以page size向上对齐
+	/* 起始地址以page size向上对齐 */
 	start = PFN_UP(physaddr);
-	//结束地址以page size向下对齐
+	/* 结束地址以page size向下对齐 */
 	end = PFN_DOWN(physaddr + size);
 
 	mark_bootmem_node(pgdat->bdata, start, end, 0, 0);
@@ -458,7 +459,7 @@ static void * __init alloc_bootmem_core(struct bootmem_data *bdata,
 				unsigned long goal, unsigned long limit)
 {
 	unsigned long fallback = 0;
-	//sidx为查询的页帧的index
+	/* sidx为查询的页帧的index */
 	unsigned long min, max, start, sidx, midx, step;
 
 	BUG_ON(!size);
@@ -483,18 +484,18 @@ static void * __init alloc_bootmem_core(struct bootmem_data *bdata,
 	if (max <= min)
 		return NULL;
 
-	//step最小是1
+	/* step最小是1 */
 	step = max(align >> PAGE_SHIFT, 1UL);
 
 	if (goal && min < goal && goal < max)
-		//如果goal处在当前bdata DRAM的范围内
+		/* 如果goal处在当前bdata DRAM的范围内 */
 		start = ALIGN(goal, step);
 	else
-		//goal不在当前bdata DRAM的范围内,就以DRAM最低页面作为start
+		/* goal不在当前bdata DRAM的范围内,就以DRAM最低页面作为start */
 		start = ALIGN(min, step);
 
 	sidx = start - bdata->node_min_pfn;
-	//bdata页框个数
+	/* bdata页框个数 */
 	midx = max - bdata->node_min_pfn;
 
 	if (bdata->hint_idx > sidx) {
@@ -514,21 +515,21 @@ static void * __init alloc_bootmem_core(struct bootmem_data *bdata,
 	while (1) {
 		int merge;
 		void *region;
-		//eidx记录需要申请的最后一个页框,start_off记录申请的第一个页框的地址偏移
+		/* eidx记录需要申请的最后一个页框,start_off记录申请的第一个页框的地址偏移 */
 		unsigned long eidx, i, start_off, end_off;
 find_block:
 		sidx = find_next_zero_bit(bdata->node_bootmem_map, midx, sidx);
 		sidx = align_idx(bdata, sidx, step);
-		//eidx以页的大小向上对齐,也就是说若size未满页大小的部分也会被分配一个page
+		/* eidx以页的大小向上对齐,也就是说若size未满页大小的部分也会被分配一个page */
 		eidx = sidx + PFN_UP(size);
 
 		if (sidx >= midx || eidx > midx)
 			break;
 
-		//申请eidx - sidx个连续的页框
+		/* 申请eidx - sidx个连续的页框 */
 		for (i = sidx; i < eidx; i++)
 			if (test_bit(i, bdata->node_bootmem_map)) {
-				//如果某一个page被占用,调整申请起始page的位置
+				/* 如果某一个page被占用,调整申请起始page的位置 */
 				sidx = align_idx(bdata, i, step);
 				if (sidx == i)
 					sidx += step;
@@ -537,18 +538,18 @@ find_block:
 
 		if (bdata->last_end_off & (PAGE_SIZE - 1) &&
 				PFN_DOWN(bdata->last_end_off) + 1 == sidx)
-			//优先从上次查询过的结尾开始
+			/* 如果上次分配时,数据末端没有占满一个page,优先从上次查询过的结尾开始分配 */
 			start_off = align_off(bdata, bdata->last_end_off, align);
 		else
 			start_off = PFN_PHYS(sidx);
 
-		//merge ==1, 表示sidx上个页框还有空间可以容纳部分数据
+		/* merge ==1, 表示sidx上个页框还有空间可以容纳部分数据 */
 		merge = PFN_DOWN(start_off) < sidx;
 		end_off = start_off + size;
 
-		//记录本次分配的结束页框idx对应的地址
+		/* 记录本次分配的结束页框idx对应的地址 */
 		bdata->last_end_off = end_off;
-		//记录本次分配的结束页框idx
+		/* 记录本次分配的结束页框idx */
 		bdata->hint_idx = PFN_UP(end_off);
 
 		/*
@@ -562,7 +563,7 @@ find_block:
 				PFN_UP(end_off), BOOTMEM_EXCLUSIVE))
 			BUG();
 
-		//清空start_off到start_off + size表示的虚拟内存区域
+		/* 清空start_off到start_off + size表示的虚拟内存区域 */
 		region = phys_to_virt(PFN_PHYS(bdata->node_min_pfn) +
 				start_off);
 		memset(region, 0, size);
@@ -578,7 +579,7 @@ find_block:
 	return NULL;
 }
 
-//遍历系统中所有的bdata,分配连续的物理空间
+/* 遍历系统中所有的bdata,分配连续的物理空间 */
 static void * __init ___alloc_bootmem_nopanic(unsigned long size,
 					unsigned long align,
 					unsigned long goal,
@@ -587,11 +588,11 @@ static void * __init ___alloc_bootmem_nopanic(unsigned long size,
 	bootmem_data_t *bdata;
 
 restart:
-	//遍历系统中所有的bdata
+	/* 遍历系统中所有的bdata */
 	list_for_each_entry(bdata, &bdata_list, list) {
 		void *region;
 
-		//如果目标物理地址的页帧号超过了当前bdata的DRAM的结束页帧号,这个bdata不符合条件
+		/* 如果目标物理地址的页帧号超过了当前bdata的DRAM的结束页帧号,这个bdata不符合条件*/
 		if (goal && bdata->node_low_pfn <= PFN_DOWN(goal))
 			continue;
 		if (limit && bdata->node_min_pfn >= PFN_DOWN(limit))
@@ -602,6 +603,7 @@ restart:
 			return region;
 	}
 
+	/* 以上搜索从goal这个物理地址开始搜索,如果搜索失败,就需要从0开始搜索 */
 	if (goal) {
 		goal = 0;
 		goto restart;
@@ -629,6 +631,7 @@ void * __init __alloc_bootmem_nopanic(unsigned long size, unsigned long align,
 	return ___alloc_bootmem_nopanic(size, align, goal, 0);
 }
 
+/* limit限制分配时最大的页框number */
 static void * __init ___alloc_bootmem(unsigned long size, unsigned long align,
 					unsigned long goal, unsigned long limit)
 {
@@ -669,12 +672,12 @@ static void * __init ___alloc_bootmem_node(bootmem_data_t *bdata,
 {
 	void *ptr;
 
-	//ptr是当前bdata的bootmem中连续size的物理内存的虚拟地址
+	/* ptr是当前bdata的bootmem中连续size的物理内存的虚拟地址 */
 	ptr = alloc_bootmem_core(bdata, size, align, goal, limit);
 	if (ptr)
 		return ptr;
 
-	//如果alloc_bootmem_core分配失败
+	/* 如果alloc_bootmem_core分配失败,遍历系统中所有的bdata */
 	return ___alloc_bootmem(size, align, goal, limit);
 }
 

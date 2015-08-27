@@ -3348,7 +3348,7 @@ static unsigned long __meminit zone_absent_pages_in_node(int nid,
 }
 
 #else
-//mini6410
+/* mini6410 */
 static inline unsigned long __meminit zone_spanned_pages_in_node(int nid,
 					unsigned long zone_type,
 					unsigned long *zones_size)
@@ -3356,7 +3356,7 @@ static inline unsigned long __meminit zone_spanned_pages_in_node(int nid,
 	return zones_size[zone_type];
 }
 
-//zone中的空洞页面个数
+/* zone中的空洞页面个数 */
 static inline unsigned long __meminit zone_absent_pages_in_node(int nid,
 						unsigned long zone_type,
 						unsigned long *zholes_size)
@@ -3380,14 +3380,14 @@ static void __meminit calculate_node_totalpages(struct pglist_data *pgdat,
 	unsigned long realtotalpages, totalpages = 0;
 	enum zone_type i;
 
-	//mini6410只在zones_size[0]保存了页面个数,zones_size[0]和zones_size[1]均为0
+	/* mini6410只在zones_size[0]保存了页面个数,zones_size[1]和zones_size[2]均为0 */
 	for (i = 0; i < MAX_NR_ZONES; i++)
 		totalpages += zone_spanned_pages_in_node(pgdat->node_id, i,
 								zones_size);
 	pgdat->node_spanned_pages = totalpages;
 
 	realtotalpages = totalpages;
-	//MAX_NR_ZONES在编译时自动生成,与__MAX_NR_ZONES相等
+	/* MAX_NR_ZONES在编译时自动生成,与__MAX_NR_ZONES相等 */
 	for (i = 0; i < MAX_NR_ZONES; i++)
 		realtotalpages -=
 			zone_absent_pages_in_node(pgdat->node_id, i,
@@ -3590,11 +3590,11 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
 	}
 }
 
-//每一个物理页框对应一个struct page结构,alloc_node_mem_map就用来为所有的物理页面分配该结构体空间
+/* 每一个物理页框对应一个struct page结构,alloc_node_mem_map就用来为所有的物理页面分配该结构体空间 */
 static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
 {
 	/* Skip empty nodes */
-	//当前node中没有物理页面,直接返回
+	/* 当前node中没有物理页面,直接返回 */
 	if (!pgdat->node_spanned_pages)
 		return;
 
@@ -3609,15 +3609,15 @@ static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
 		 * aligned but the node_mem_map endpoints must be in order
 		 * for the buddy allocator to function correctly.
 		 */
-		//这里对齐是为了buddy allocator需要
+		/* 这里对齐是为了buddy allocator需要 */
 		start = pgdat->node_start_pfn & ~(MAX_ORDER_NR_PAGES - 1);
 		end = pgdat->node_start_pfn + pgdat->node_spanned_pages;
 		end = ALIGN(end, MAX_ORDER_NR_PAGES);
-		//系统中DRAM对应的页框的个数 * 一个page对象的大小,这个size就是系统中所有page的开销
+		/* 系统中DRAM对应的页框的个数 * 一个page对象的大小,这个size就是系统中所有page的开销 */
 		size =  (end - start) * sizeof(struct page);
 		map = alloc_remap(pgdat->node_id, size);
 		if (!map)
-			//在bootmem区域分配连续的size
+			/* 在bootmem区域分配连续的size */
 			map = alloc_bootmem_node(pgdat, size);
 		pgdat->node_mem_map = map + (pgdat->node_start_pfn - start);
 	}

@@ -702,9 +702,9 @@ extern struct page *mem_map;
  * per-zone basis.
  */
 struct bootmem_data;
-//用于描述一个内存节点
+/* 用于描述一个内存节点 */
 typedef struct pglist_data {
-    //包含了结点各内存域的数据结构,这个数组总有3项,即使内存域没那么多也是如此
+    /* 包含了结点各内存域的数据结构,这个数组总有3项,即使内存域没那么多也是如此 */
 	struct zone node_zones[MAX_NR_ZONES];
     /*
      * For performance reasons,the kernel always attempts to perform memery
@@ -716,16 +716,16 @@ typedef struct pglist_data {
      * alternatives for memery allocation.The further back an entry on the list,
      * the less suitable it is.
     */
-    //指定了备用结点及其内存域的链表,以便在当前结点没有可用空间时,在备用节点分配内存
+    /* 指定了备用结点及其内存域的链表,以便在当前结点没有可用空间时,在备用节点分配内存 */
 	struct zonelist node_zonelists[MAX_ZONELISTS];
-	//用于保存结点中不同内存域的数目
+	/* 用于保存结点中不同内存域的数目 */
 	int nr_zones;
 #ifdef CONFIG_FLAT_NODE_MEM_MAP	/* means !SPARSEMEM */
     /*
     * point to the page array, this page array includes all the pages in this 
     * node. 
     */
-    //指向page实例数组的指针,用于描述结点的所有物理内存页.它包含了结点中所有内存域的页
+    /* 指向page实例数组的指针,用于描述结点的所有物理内存页.它包含了结点中所有内存域的页 */
 	struct page *node_mem_map;
 #ifdef CONFIG_CGROUP_MEM_RES_CTLR
 	struct page_cgroup *node_page_cgroup;
@@ -757,7 +757,7 @@ typedef struct pglist_data {
      * 在arm架构中,node_start_pfn记录的是DRAM起始地址的页帧号.
 	 */
 	unsigned long node_start_pfn;
-	//结点中页帧的数目,不包括空洞
+	/* 结点中页帧的数目,不包括空洞 */
 	unsigned long node_present_pages; /* total number of physical pages */
 	/*
 	 * 该结点以页帧为单位计算的长度,该成员和node_present_pages不一定相同,
@@ -765,16 +765,14 @@ typedef struct pglist_data {
 	 */
 	unsigned long node_spanned_pages; /* total size of physical page
 					     range, including holes */
-	//全局结点id
+	/* 全局结点id */
 	int node_id;
     //Wait queue for swap daemon
-    //交换守护进程(swap daemon)的等待队列,在将页帧换出结点时会用到.
+    /* 交换守护进程(swap daemon)的等待队列,在将页帧换出结点时会用到. */
 	wait_queue_head_t kswapd_wait;
-    //Point to the task_struct of swap daemon of this node
-    // 指向负责该结点的交换守护进程的task_struct.
+    /* 指向负责该结点的交换守护进程的task_struct. */
 	struct task_struct *kswapd;
-    //The length for release
-    //用于页交换子系统的实现,用来定义需要释放的区域的长度
+    /* 用于页交换子系统的实现,用来定义需要释放的区域的长度 */
 	int kswapd_max_order;
 } pg_data_t;
 
@@ -921,7 +919,7 @@ extern char numa_zonelist_order[];
 //mini6410
 
 extern struct pglist_data contig_page_data;
-//bootmem_node_data[0]
+/* bootmem_node_data[0] */
 #define NODE_DATA(nid)		(&contig_page_data)
 #define NODE_MEM_MAP(nid)	mem_map
 

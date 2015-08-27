@@ -391,10 +391,10 @@ static inline int node_state(int node, enum node_states state)
 	return node_isset(node, node_states[state]);
 }
 
-//设置特定结点的状态
+/* 设置特定结点的状态 */
 static inline void node_set_state(int node, enum node_states state)
 {
-    //node_states is global variable defined in page_alloc.c
+    /* node_states is global variable defined in page_alloc.c */
 	__node_set(node, &node_states[state]);
 }
 
@@ -417,7 +417,7 @@ static inline int num_node_state(enum node_states state)
 extern int nr_node_ids;
 #else
 
-//mini6410只有一个node
+/* mini6410只有一个node */
 static inline int node_state(int node, enum node_states state)
 {
 	return node == 0;

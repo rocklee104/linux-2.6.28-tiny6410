@@ -32,7 +32,7 @@
  * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area
  */
 #define PAGE_OFFSET		UL(CONFIG_PAGE_OFFSET)
-/* 0xC0000000 - 16MB */
+/* 0xC0000000 - 16MB, 0xC0000000及以上的地址属于kernel space */
 #define TASK_SIZE		(UL(CONFIG_PAGE_OFFSET) - UL(0x01000000))
 #define TASK_UNMAPPED_BASE	(UL(CONFIG_PAGE_OFFSET) / 3)
 
