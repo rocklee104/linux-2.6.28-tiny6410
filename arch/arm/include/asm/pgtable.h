@@ -277,6 +277,7 @@ extern struct page *empty_zero_page;
 #define ZERO_PAGE(vaddr)	(empty_zero_page)
 
 #define pte_pfn(pte)		(pte_val(pte) >> PAGE_SHIFT)
+/* 将物理内存地址和标志位组成L2的entry */
 #define pfn_pte(pfn,prot)	(__pte(((pfn) << PAGE_SHIFT) | pgprot_val(prot)))
 
 #define pte_none(pte)		(!pte_val(pte))
@@ -362,7 +363,9 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
 {
 	unsigned long ptr;
 
+	/* 清除低9位 */
 	ptr = pmd_val(pmd) & ~(PTRS_PER_PTE * sizeof(void *) - 1);
+	/* 指向linux pte */
 	ptr += PTRS_PER_PTE * sizeof(void *);
 
 	return __va(ptr);

@@ -67,7 +67,7 @@
 #ifndef CONFIG_NEED_MULTIPLE_NODES
 /* use the per-pgdat data instead for discontigmem - mbligh */
 unsigned long max_mapnr;
-//记录了系统中所有的page指针
+/* 记录了系统中所有的page指针 */
 struct page *mem_map;
 
 EXPORT_SYMBOL(max_mapnr);
@@ -83,7 +83,7 @@ unsigned long num_physpages;
  * highstart_pfn must be the same; there must be no gap between ZONE_NORMAL
  * and ZONE_HIGHMEM.
  */
-//记录DRAM结束物理地址的虚拟地址
+/* 记录DRAM结束物理地址的虚拟地址 */
 void * high_memory;
 
 EXPORT_SYMBOL(num_physpages);

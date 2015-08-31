@@ -208,7 +208,7 @@ static inline void map_memory_bank(struct membank *bank)
 	/* DRAM区域地址的mem type属于MT_MEMORY */
 	map.type = MT_MEMORY;
 
-	/* 为每一个bank建立段页表 */
+	/* 为物理内存建立段页表 */
 	create_mapping(&map);
 #endif
 }
@@ -417,6 +417,7 @@ void __init bootmem_init(struct meminfo *mi)
 	 * Note: max_low_pfn and max_pfn reflect the number of _pages_ in
 	 * the system, not the maximum PFN.
 	 */
+	/* 记录最大可用的物理页框个数 */
 	max_pfn = max_low_pfn = memend_pfn - PHYS_PFN_OFFSET;
 }
 

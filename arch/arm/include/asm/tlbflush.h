@@ -347,17 +347,17 @@ static inline void flush_pmd_entry(pmd_t *pmd)
 	const unsigned int __tlb_flag = __cpu_tlb_flags;
 
 	if (tlb_flag(TLB_DCLEAN))
-		//Clean Data Cache Line
+		/* Clean Data Cache Line */
 		asm("mcr	p15, 0, %0, c7, c10, 1	@ flush_pmd"
 			: : "r" (pmd) : "cc");
 
-	//arm1176s的tlb flags中没有TLB_L2CLEAN_FR
+	/* arm1176s的tlb flags中没有TLB_L2CLEAN_FR */
 	if (tlb_flag(TLB_L2CLEAN_FR))
 		asm("mcr	p15, 1, %0, c15, c9, 1  @ L2 flush_pmd"
 			: : "r" (pmd) : "cc");
 
 	if (tlb_flag(TLB_WB))
-		//确保Clean Data Cache Line执行完成之后才退出本函数
+		/* 确保Clean Data Cache Line执行完成之后才退出本函数 */
 		dsb();
 }
 
@@ -365,12 +365,12 @@ static inline void clean_pmd_entry(pmd_t *pmd)
 {
 	const unsigned int __tlb_flag = __cpu_tlb_flags;
 
-	//Clean Data Cache Line (using MVA)
+	/* Clean Data Cache Line (using MVA) */
 	if (tlb_flag(TLB_DCLEAN))
 		asm("mcr	p15, 0, %0, c7, c10, 1	@ flush_pmd"
 			: : "r" (pmd) : "cc");
 
-	//arm1176-s不会执行下面的代码
+	/* arm1176-s不会执行下面的代码 */
 	if (tlb_flag(TLB_L2CLEAN_FR))
 		asm("mcr	p15, 1, %0, c15, c9, 1  @ L2 flush_pmd"
 			: : "r" (pmd) : "cc");
