@@ -1,4 +1,4 @@
-/* linux/arch/arm/mach-s3c6410/mach-smdk6410.c
+﻿/* linux/arch/arm/mach-s3c6410/mach-smdk6410.c
  *
  * Copyright 2008 Openmoko, Inc.
  * Copyright 2008 Simtec Electronics
@@ -292,7 +292,9 @@ static void __init smdk6410_map_io(void)
 	s3c_device_nand.name = "s3c6410-nand";
 
 	s3c64xx_init_io(smdk6410_iodesc, ARRAY_SIZE(smdk6410_iodesc));
+	/* 设置晶振频率为12M */
 	s3c24xx_init_clocks(12000000);
+	/* 调用本函数之前的uart输出都是使用的u-boot中对串口的设置 */
 	s3c24xx_init_uarts(smdk6410_uartcfgs, ARRAY_SIZE(smdk6410_uartcfgs));
 	s3c64xx_reserve_bootmem();
 }

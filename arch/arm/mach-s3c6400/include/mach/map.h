@@ -1,4 +1,4 @@
-/* linux/arch/arm/mach-s3c6400/include/mach/map.h
+﻿/* linux/arch/arm/mach-s3c6400/include/mach/map.h
  *
  * Copyright 2008 Openmoko, Inc.
  * Copyright 2008 Simtec Electronics
@@ -17,6 +17,7 @@
 
 #include <plat/map-base.h>
 
+/* 下面是6410寄存器的定义,参考s3c6410 user's mannual table 2-4 */
 /* HSMMC units */
 #define S3C64XX_PA_HSMMC(x)	(0x7C200000 + ((x) * 0x100000))
 #define S3C64XX_PA_HSMMC0	S3C64XX_PA_HSMMC(0)
@@ -24,6 +25,7 @@
 #define S3C64XX_PA_HSMMC2	S3C64XX_PA_HSMMC(2)
 #define S3C_SZ_HSMMC	   	SZ_1M
 
+/* 0x7F005000到0x7F005C38为uart所用 */
 #define S3C_PA_UART		(0x7F005000)
 #define S3C_PA_UART0		(S3C_PA_UART + 0x00)
 #define S3C_PA_UART1		(S3C_PA_UART + 0x400)
@@ -40,7 +42,9 @@
 #define S3C_VA_UART3		S3C_VA_UARTx(3)
 #define S3C_SZ_UART		SZ_256
 
+/* 0x7E00_F000到0x7E00_FA0C为system controller所用 */
 #define S3C64XX_PA_SYSCON	(0x7E00F000)
+/* PWM timer */
 #define S3C64XX_PA_TIMER	(0x7F006000)
 #define S3C64XX_PA_IIC0		(0x7F004000)
 #define S3C64XX_PA_IIC1		(0x7F00F000)

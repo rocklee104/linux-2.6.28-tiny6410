@@ -30,7 +30,9 @@
 ENTRY(v6_flush_kern_cache_all)
 	mov	r0, #0
 #ifdef HARVARD_CACHE
+	#Clean and Invalidate Entire Data Cache
 	mcr	p15, 0, r0, c7, c14, 0		@ D cache clean+invalidate
+	#Invalidate Entire Instruction Cache
 	mcr	p15, 0, r0, c7, c5, 0		@ I+BTB cache invalidate
 #else
 	mcr	p15, 0, r0, c7, c15, 0		@ Cache clean+invalidate

@@ -98,10 +98,11 @@ static inline void pte_free(struct mm_struct *mm, pgtable_t pte)
 	__free_page(pte);
 }
 
+/* arm将虚拟地址划分 12 8 12,每个一级页表指向256个2级页表  */
 static inline void __pmd_populate(pmd_t *pmdp, unsigned long pmdval)
 {
 	pmdp[0] = __pmd(pmdval);
-	/* 一个pmd对应256个pte */
+	/* 下一个pmd在前一个pmd之后的1024的位置 */
 	pmdp[1] = __pmd(pmdval + 256 * sizeof(pte_t));
 	flush_pmd_entry(pmdp);
 }

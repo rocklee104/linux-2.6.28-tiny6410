@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  arch/arm/include/asm/cacheflush.h
  *
  *  Copyright (C) 1999-2002 Russell King
@@ -142,6 +142,7 @@ struct outer_cache_fns {
 
 extern struct cpu_cache_fns cpu_cache;
 
+/* cache-v6.S中的v6_flush_kern_cache_all */
 #define __cpuc_flush_kern_all		cpu_cache.flush_kern_all
 #define __cpuc_flush_user_all		cpu_cache.flush_user_all
 #define __cpuc_flush_user_range		cpu_cache.flush_user_range

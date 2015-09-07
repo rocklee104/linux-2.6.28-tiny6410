@@ -18,12 +18,17 @@
  */
 /* 一级页表项的类型,根据页表项的bit[0,1]判断 */
 #define PMD_TYPE_MASK		(3 << 0)
+/* 置bit[0:1]为b00,错误项 */
 #define PMD_TYPE_FAULT		(0 << 0)
-/* L1为coarse page table, L2只能是large page(64KB)/small page(4KB) */
+/* L1为coarse page table,L2只能是large page(64KB)/small page(4KB) */
 #define PMD_TYPE_TABLE		(1 << 0)
+/* 置bit[0:1]为b10,段页表 */
 #define PMD_TYPE_SECT		(2 << 0)
+/* 定义bit[4],禁止执行标志位 */
 #define PMD_BIT4		(1 << 4)
+/* 获取域标志位b[5:8] */
 #define PMD_DOMAIN(x)		((x) << 5)
+/* b[9]ECC使能标志 */
 #define PMD_PROTECTION		(1 << 9)	/* v5 */
 /*
  *   - section
@@ -84,7 +89,7 @@
 /*
  *   - extended small page/tiny page
  */
-/* 下面就是extended small page的页表项中的bit */
+/* 下面就是extended small page的页表项中的bit,见arm1176jzf-s technical reference mannual 6.11.2 */
 #define PTE_EXT_XN		(1 << 0)	/* v6 */
 /* extended small page的ap */
 #define PTE_EXT_AP_MASK		(3 << 4)
@@ -95,9 +100,23 @@
 #define PTE_EXT_AP_URO_SRW	(PTE_EXT_AP1)
 #define PTE_EXT_AP_URW_SRW	(PTE_EXT_AP1|PTE_EXT_AP0)
 #define PTE_EXT_TEX(x)		((x) << 6)	/* v5 */
+/*
+ * APX和AP bit联合作用用于访问控制权限.APX == 0的时候,supervisor permission可读写,
+ * APX == 1的时候,supervisor permision只读
+ */
 #define PTE_EXT_APX		(1 << 9)	/* v6 */
 #define PTE_EXT_COHERENT	(1 << 9)	/* XScale3 */
+/*
+ * The Shared (S) bit, determines if the translation is for Non-Shared (0), or Shared (1)
+ * memory. This only applies to Normal memory regions. Device memory can be Shared or
+ * Non-Shared as determined by the TEX bits and the C and B bits.
+ */
 #define PTE_EXT_SHARED		(1 << 10)	/* v6 */
+/*
+ * The Not-Global (nG) bit, determines if the translation is marked as global (0), or
+ * process-specific (1) in the TLB. For process-specific translations the translation is
+ * inserted into the TLB using the current ASID, from the ContextID Register, CP15 c13
+ */
 #define PTE_EXT_NG		(1 << 11)	/* v6 */
 
 /*

@@ -32,6 +32,7 @@ DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
  * empty_zero_page is a special page that is used for
  * zero-initialized data and COW.
  */
+/* 该区域被memzero函数初始化为全0,0页被用作0页拷贝,可以快速初始化需要清0的内存页面 */
 struct page *empty_zero_page;
 EXPORT_SYMBOL(empty_zero_page);
 
@@ -40,13 +41,13 @@ EXPORT_SYMBOL(empty_zero_page);
  */
 pmd_t *top_pmd;
 
-//不使用缓存
+/* 不使用缓存 */
 #define CPOLICY_UNCACHED	0
-//向缓存和内存之间使用写缓冲
+/* 向缓存和内存之间使用写缓冲 */
 #define CPOLICY_BUFFERED	1
-//缓存中发生写事件,直接反映到内存和内存下层.主要用于usb等经常插拔的存储设备
+/* 缓存中发生写事件,直接反映到内存和内存下层.主要用于usb等经常插拔的存储设备 */
 #define CPOLICY_WRITETHROUGH	2
-//优先使用缓存,在缓存替换策略作用下,当数据需要从缓存区域脱离时反映到内存
+/* 优先使用缓存,在缓存替换策略作用下,当数据需要从缓存区域脱离时反映到内存 */
 #define CPOLICY_WRITEBACK	3
 /*
  * 发送缓存失败时,缓存控制器分配cache line的方法有两种:
@@ -188,17 +189,17 @@ void adjust_cr(unsigned long mask, unsigned long set)
 }
 #endif
 
-//对应的page线性地址已经映射到物理内存,可以access也可以write
+/* 对应的page线性地址已经映射到物理内存,可以access也可以write */
 #define PROT_PTE_DEVICE		L_PTE_PRESENT|L_PTE_YOUNG|L_PTE_DIRTY|L_PTE_WRITE
 #define PROT_SECT_DEVICE	PMD_TYPE_SECT|PMD_SECT_AP_WRITE
 
 static struct mem_type mem_types[] = {
-	//设备空间,对应其他io设备,应用于ioremap
+	/* 设备空间,对应其他io设备,应用于ioremap */
 	[MT_DEVICE] = {		  /* Strongly ordered / ARMv6 shared device */
 		.prot_pte	= PROT_PTE_DEVICE | L_PTE_MT_DEV_SHARED |
 				  L_PTE_SHARED,
 		.prot_l1	= PMD_TYPE_TABLE,
-		//段页表,表示的页面设置share标志
+		/* 段页表,表示的页面设置share标志 */
 		.prot_sect	= PROT_SECT_DEVICE | PMD_SECT_S,
 		.domain		= DOMAIN_IO,
 	},
@@ -236,21 +237,21 @@ static struct mem_type mem_types[] = {
 		.prot_sect = PMD_TYPE_SECT | PMD_SECT_XN | PMD_SECT_MINICACHE,
 		.domain    = DOMAIN_KERNEL,
 	},
-	//低端中断向量,对应0地址开始的向量
+	/* 低端中断向量,对应0地址开始的向量 */
 	[MT_LOW_VECTORS] = {
 		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
 				L_PTE_EXEC,
 		.prot_l1   = PMD_TYPE_TABLE,
 		.domain    = DOMAIN_USER,
 	},
-	//高端中断向量，它有vector_base宏决定
+	/* 高端中断向量，它有vector_base宏决定 */
 	[MT_HIGH_VECTORS] = {
 		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
 				L_PTE_USER | L_PTE_EXEC,
 		.prot_l1   = PMD_TYPE_TABLE,
 		.domain    = DOMAIN_USER,
 	},
-	//RAM内存空间,段式映射,有读写权限,domain属于kernel
+	/* RAM内存空间,段式映射,有读写权限,domain属于kernel */
 	[MT_MEMORY] = {
 		.prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE,
 		.domain    = DOMAIN_KERNEL,
@@ -270,11 +271,11 @@ const struct mem_type *get_mem_type(unsigned int type)
 /*
  * Adjust the PMD section entries according to the CPU in use.
  */
-//根据不同的arm版本,设置不同mem_type
+/* 根据不同的arm版本,设置不同mem_type */
 static void __init build_mem_type_table(void)
 {
 	struct cachepolicy *cp;
-	//cr = 0xc5387f
+	/* cr = 0xc5387f */
 	unsigned int cr = get_cr();
 	unsigned int user_pgprot, kern_pgprot, vecs_pgprot;
 	/* cpu_arch ==9 */
@@ -348,7 +349,7 @@ static void __init build_mem_type_table(void)
 	/*
 	 * Now deal with the memory-type mappings
 	 */
-	//cachepolicy是一个全局变量,初始值是CPOLICY_WRITEBACK
+	/* cachepolicy是一个全局变量,初始值是CPOLICY_WRITEBACK */
 	cp = &cache_policies[cachepolicy];
 	vecs_pgprot = kern_pgprot = user_pgprot = cp->pte;
 
@@ -356,6 +357,7 @@ static void __init build_mem_type_table(void)
 	/*
 	 * Only use write-through for non-SMP systems
 	 */
+	/* 对于非SMP, 向量的pte采用write through的方式 */
 	if (cpu_arch >= CPU_ARCH_ARMv5 && cachepolicy > CPOLICY_WRITETHROUGH)
 		vecs_pgprot = cache_policies[CPOLICY_WRITETHROUGH].pte;
 #endif
@@ -375,7 +377,7 @@ static void __init build_mem_type_table(void)
 		 * Mark cache clean areas and XIP ROM read only
 		 * from SVC mode and no access from userspace.
 		 */
-		//特权模式下只读,用户模式下禁止访问
+		/* 特权模式下只读,用户模式下禁止访问 */
 		mem_types[MT_ROM].prot_sect |= PMD_SECT_APX|PMD_SECT_AP_WRITE;
 		mem_types[MT_MINICLEAN].prot_sect |= PMD_SECT_APX|PMD_SECT_AP_WRITE;
 		mem_types[MT_CACHECLEAN].prot_sect |= PMD_SECT_APX|PMD_SECT_AP_WRITE;
@@ -393,10 +395,11 @@ static void __init build_mem_type_table(void)
 
 	for (i = 0; i < 16; i++) {
 		unsigned long v = pgprot_val(protection_map[i]);
-		//为protection_map中的权限加上L_PTE_MT_WRITEBACK位
+		/* 为protection_map中的权限加上L_PTE_MT_WRITEBACK位 */
 		protection_map[i] = __pgprot(v | user_pgprot);
 	}
 
+	/* 对向量的pte进行再次处理 */
 	mem_types[MT_LOW_VECTORS].prot_pte |= vecs_pgprot;
 	mem_types[MT_HIGH_VECTORS].prot_pte |= vecs_pgprot;
 
@@ -443,12 +446,14 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
 	if (pmd_none(*pmd)) {
 		/* *pmd为0,分配1024个pte指针,刚好占用一个page */
 		pte = alloc_bootmem_low_pages(2 * PTRS_PER_PTE * sizeof(pte_t));
-		/* 根据pte生成pmd */
+		/* pmd中保存pte的地址以及对应type的prot_l1 */
 		__pmd_populate(pmd, __pa(pte) | type->prot_l1);
 	}
 
+	/* 获取linux pte entry的虚拟地址 */
 	pte = pte_offset_kernel(pmd, addr);
 	do {
+		/* 写入linux pte及其对应的hw pte(extended small page) */
 		set_pte_ext(pte, pfn_pte(pfn, __pgprot(type->prot_pte)), 0);
 		pfn++;
 	} while (pte++, addr += PAGE_SIZE, addr != end);
@@ -588,6 +593,7 @@ void __init create_mapping(struct map_desc *md)
 	/*
 	 * Catch 36-bit addresses
 	 */
+	/* 物理内存如果超过4G,就要用36位的页表 */
 	if (md->pfn >= 0x100000) {
 		create_36bit_mapping(md, type);
 		return;
@@ -655,7 +661,7 @@ __early_param("vmalloc=", early_vmalloc);
 
 #define VMALLOC_MIN	(void *)(VMALLOC_END - vmalloc_reserve)
 
-//mb->start + mb->size这片区域的虚拟地址是不能覆盖vmalloc区域的
+/* mb->start + mb->size这片区域的虚拟地址是不能覆盖vmalloc区域的 */
 static int __init check_membank_valid(struct membank *mb)
 {
 	/*
@@ -729,6 +735,7 @@ static inline void prepare_page_table(struct meminfo *mi)
 	 * Clear out all the kernel space mappings, except for the first
 	 * memory bank, up to the end of the vmalloc region.
 	 */
+	/* 清除物理内存结束虚拟地址到VMALLOC_END这段内存的段页表 */
 	for (addr = __phys_to_virt(mi->bank[0].start + mi->bank[0].size);
 	     addr < VMALLOC_END; addr += PGDIR_SIZE)
 		pmd_clear(pmd_off_k(addr));
@@ -754,7 +761,7 @@ void __init reserve_node_zero(pg_data_t *pgdat)
 	 * Reserve the page tables.  These are already in use,
 	 * and can only be in node 0.
 	 */
-	//保留段页表所在的page
+	/* 保留段页表所在的page */
 	reserve_bootmem_node(pgdat, __pa(swapper_pg_dir),
 			     PTRS_PER_PGD * sizeof(pgd_t), BOOTMEM_DEFAULT);
 }
@@ -775,41 +782,13 @@ static void __init devicemaps_init(struct machine_desc *mdesc)
 	/*
 	 * Allocate the vector page early.
 	 */
+	/* 在bootmem中分配一个物理页框 */
 	vectors = alloc_bootmem_low_pages(PAGE_SIZE);
 	BUG_ON(!vectors);
 
+	/* 清除VMALLOC_END到addr溢出的这段内存的段页表 */
 	for (addr = VMALLOC_END; addr; addr += PGDIR_SIZE)
 		pmd_clear(pmd_off_k(addr));
-
-	/*
-	 * Map the kernel if it is XIP.
-	 * It is always first in the modulearea.
-	 */
-#ifdef CONFIG_XIP_KERNEL
-	map.pfn = __phys_to_pfn(CONFIG_XIP_PHYS_ADDR & SECTION_MASK);
-	map.virtual = MODULES_VADDR;
-	map.length = ((unsigned long)&_etext - map.virtual + ~SECTION_MASK) & SECTION_MASK;
-	map.type = MT_ROM;
-	create_mapping(&map);
-#endif
-
-	/*
-	 * Map the cache flushing regions.
-	 */
-#ifdef FLUSH_BASE
-	map.pfn = __phys_to_pfn(FLUSH_BASE_PHYS);
-	map.virtual = FLUSH_BASE;
-	map.length = SZ_1M;
-	map.type = MT_CACHECLEAN;
-	create_mapping(&map);
-#endif
-#ifdef FLUSH_BASE_MINICACHE
-	map.pfn = __phys_to_pfn(FLUSH_BASE_PHYS + SZ_1M);
-	map.virtual = FLUSH_BASE_MINICACHE;
-	map.length = SZ_1M;
-	map.type = MT_MINICLEAN;
-	create_mapping(&map);
-#endif
 
 	/*
 	 * Create a mapping for the machine vectors at the high-vectors
@@ -831,6 +810,7 @@ static void __init devicemaps_init(struct machine_desc *mdesc)
 	/*
 	 * Ask the machine support to map in the statically mapped devices.
 	 */
+	/* 调用smdk6410_map_io,映射s3c及6410的寄存器,初始化部分外设 */
 	if (mdesc->map_io)
 		mdesc->map_io();
 
@@ -858,11 +838,13 @@ void __init paging_init(struct meminfo *mi, struct machine_desc *mdesc)
 	bootmem_init(mi);
 	devicemaps_init(mdesc);
 
+	/* top_pmd引用了32位4G虚拟地址空间最高处的页表 */
 	top_pmd = pmd_off_k(0xffff0000);
 
 	/*
 	 * allocate the zero page.  Note that we count on this going ok.
 	 */
+	/* 分配1个页面大小的0页 */
 	zero_page = alloc_bootmem_low_pages(PAGE_SIZE);
 	memzero(zero_page, PAGE_SIZE);
 	empty_zero_page = virt_to_page(zero_page);

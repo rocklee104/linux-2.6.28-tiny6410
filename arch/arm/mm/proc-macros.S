@@ -106,6 +106,7 @@
  */
 	.macro	armv6_mt_table pfx
 \pfx\()_mt_table:
+	#       hw pte buffer/cache 		linux pte buffer/cache
 	.long	0x00						@ L_PTE_MT_UNCACHED
 	.long	PTE_EXT_TEX(1)					@ L_PTE_MT_BUFFERABLE
 	.long	PTE_CACHEABLE					@ L_PTE_MT_WRITETHROUGH
@@ -125,46 +126,63 @@
 	.endm
 
 	#armv6_set_pte_ext(liux_pte_addr, value, type)
+	#在给high vector生成pte时,linux_pte_addr=0xc06befc0,value=0x506bd34b, type=0.
+	#pfn的值是0x506bd
+	#r1:linux pte项
+	#r2:buffer/cache特性
+	#r3:hw pte项
 	.macro	armv6_set_pte_ext pfx
-	#将linux L2 页表项的值写入pte entry, r0-=2048,指向对应的hw pte
+	#将linux L2 页表项的值写入pte entry, r0-=2048,指向对应的hw pte地址0xc06bd37c0
 	str	r1, [r0], #-2048		@ linux version
 
-	#清除页表项中bit[2-9]
+	#清除页表项中bit[0-9],页表项中的低10位是标志位,r3的值为0x506bd000
 	bic	r3, r1, #0x000003fc
-	#清除页表项中bit[2-5]
 	bic	r3, r3, #PTE_TYPE_MASK
 	#将页表项类型赋值给页表项
 	orr	r3, r3, r2
-	#页表项设置成small page
+	#页表项设置成small page,ap设置成特权模式可读写,普通模式禁止访问,r3=0x506bd012
 	orr	r3, r3, #PTE_EXT_AP0 | 2
 
 	#取\pfx\()_mt_table地址
 	adr	ip, \pfx\()_mt_table
+	#r2=8
 	and	r2, r1, #L_PTE_MT_MASK
-	#在上表中将对应的cache/buffer特性加载到r2中
+	#在上表中将对应的cache/buffer特性加载到r2中,即PTE_CACHEABLE,也即L_PTE_MT_WRITETHROUGH
 	ldr	r2, [ip, r2]
 
 	#测试页表项中是否置位L_PTE_WRITE
 	tst	r1, #L_PTE_WRITE
-	#如果没有置位L_PTE_WRITE,测试是否置位L_PTE_DIRTY
+	#如果置位L_PTE_WRITE,测试是否置位L_PTE_DIRTY
 	tstne	r1, #L_PTE_DIRTY
-	#在置位L_PTE_WRITE或置位L_PTE_DIRTY时,置位PTE_EXT_APX
+	#在没有置位L_PTE_WRITE或置位L_PTE_WRITE然而未置位L_PTE_DIRTY时,置位PTE_EXT_APX
+	#r3=0x506bd212
 	orreq	r3, r3, #PTE_EXT_APX
 
 	tst	r1, #L_PTE_USER
+	#如果r1设置了L_PTE_USER,那么r3需要置位PTE_EXT_AP1,r3=0x506bd232
 	orrne	r3, r3, #PTE_EXT_AP1
+	#如果r1设置了L_PTE_USER,那么还需要测试r3是否设置了PTE_EXT_APX
 	tstne	r3, #PTE_EXT_APX
+	#如果r1设置了L_PTE_USER,并且r3置位PTE_EXT_APX,那么清除r3的PTE_EXT_APX及PTE_EXT_AP0
+	#最终APX=0, AP[1:0]=10,svc模式可读写,user模式只读,r3=0x506bd022
 	bicne	r3, r3, #PTE_EXT_APX | PTE_EXT_AP0
 
+	#测试r1是否置位L_PTE_EXEC
 	tst	r1, #L_PTE_EXEC
+	#r1没有L_PTE_EXEC,则r3需要excute never,r3=0x506bd022
 	orreq	r3, r3, #PTE_EXT_XN
 
+	#给r3添加buffer/cache的特性,0x506bd02a
 	orr	r3, r3, r2
 
 	tst	r1, #L_PTE_YOUNG
+	#如果r1置位L_PTE_YOUNG,测试L_PTE_PRESENT
 	tstne	r1, #L_PTE_PRESENT
+	#如果r1没有置位L_PTE_YOUNG,或者置位L_PTE_YOUNG但是没有置位L_PTE_PRESENT
+	#说明页表项指向的page不能被访问
 	moveq	r3, #0
 
+	#写入hw pte
 	str	r3, [r0]
 	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
 	.endm

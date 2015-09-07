@@ -175,8 +175,10 @@ __v6_setup:
 	ldmia	r5, {r5, r6}
 	mrc	p15, 0, r0, c1, c0, 0		@ read control register
 	#清除control register中的r5中的(M/A/C/W/S/R/Z/I/V/RR/L4/FI/U/XP/VE)bit
+	#注意:这里清除xp后,MMU采用的Subpage AP bits enabled,也就是老式页表
 	bic	r0, r0, r5			@ clear bits them
 	#开启(M/C/W/Z/I/V/U/XP)
+	#采用armv6页表
 	orr	r0, r0, r6			@ set them
 	#跳转到__enable_mmu
 	mov	pc, lr				@ return to head.S:__ret

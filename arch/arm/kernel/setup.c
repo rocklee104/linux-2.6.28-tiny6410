@@ -96,6 +96,7 @@ struct cpu_tlb_fns cpu_tlb;
 struct cpu_user_fns cpu_user;
 #endif
 #ifdef MULTI_CACHE
+/* v6_cache_fn */
 struct cpu_cache_fns cpu_cache;
 #endif
 #ifdef CONFIG_OUTER_CACHE

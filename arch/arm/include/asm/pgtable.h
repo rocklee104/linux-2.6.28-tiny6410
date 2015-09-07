@@ -194,7 +194,7 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
  * These are the memory types, defined to be compatible with
  * pre-ARMv6 CPUs cacheable and bufferable bits:   XXCB
  */
-/* armv6前的页表,比如arm920t */
+/* armv6前的页表,比如arm920t,对buffer/cache的描述 */
 #define L_PTE_MT_UNCACHED	(0x00 << 2)	/* 0000 */
 #define L_PTE_MT_BUFFERABLE	(0x01 << 2)	/* 0001 */
 #define L_PTE_MT_WRITETHROUGH	(0x02 << 2)	/* 0010 */
@@ -363,7 +363,7 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
 {
 	unsigned long ptr;
 
-	/* 清除低9位 */
+	/* 清除低11位 */
 	ptr = pmd_val(pmd) & ~(PTRS_PER_PTE * sizeof(void *) - 1);
 	/* 指向linux pte */
 	ptr += PTRS_PER_PTE * sizeof(void *);

@@ -1,4 +1,4 @@
-/* linux/arch/arm/mach-s3c6410/cpu.c
+﻿/* linux/arch/arm/mach-s3c6410/cpu.c
  *
  * Copyright 2008 Simtec Electronics
  * Copyright 2008 Simtec Electronics
@@ -75,8 +75,14 @@ static void s3c6410_idle(void)
  * register the standard cpu IO areas
 */
 
+void __init s3c6410_init_uarts(struct s3c2410_uartcfg *cfg, int no)
+{
+	s3c24xx_init_uartdevs("s3c6400-uart", s3c64xx_uart_resources, cfg, no);
+}
+
 void __init s3c6410_map_io(void)
 {
+	/* 映射s3c6410设备 */
 	iotable_init(s3c6410_iodesc, ARRAY_SIZE(s3c6410_iodesc));
 
 	/* initialise device information early */

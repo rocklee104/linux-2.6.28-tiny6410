@@ -196,12 +196,10 @@ static inline void local_flush_tlb_all(void)
 	if (tlb_flag(TLB_WB))
 		dsb();
 
-	if (tlb_flag(TLB_V3_FULL))
-		asm("mcr p15, 0, %0, c6, c0, 0" : : "r" (zero) : "cc");
-	if (tlb_flag(TLB_V4_U_FULL | TLB_V6_U_FULL))
-		asm("mcr p15, 0, %0, c8, c7, 0" : : "r" (zero) : "cc");
+	/* Invalidate Instruction TLB unlocked entries */
 	if (tlb_flag(TLB_V4_D_FULL | TLB_V6_D_FULL))
 		asm("mcr p15, 0, %0, c8, c6, 0" : : "r" (zero) : "cc");
+	/* Invalidate Data TLB unlocked entries */
 	if (tlb_flag(TLB_V4_I_FULL | TLB_V6_I_FULL))
 		asm("mcr p15, 0, %0, c8, c5, 0" : : "r" (zero) : "cc");
 

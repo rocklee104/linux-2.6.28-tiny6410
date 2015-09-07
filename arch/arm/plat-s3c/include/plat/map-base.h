@@ -1,4 +1,4 @@
-/* linux/arch/arm/plat-s3c/include/plat/map-base.h
+﻿/* linux/arch/arm/plat-s3c/include/plat/map-base.h
  *
  * Copyright 2003, 2007 Simtec Electronics
  *	http://armlinux.simtec.co.uk/
@@ -21,7 +21,7 @@
  * we try to ensure stuff like the IRQ registers are available for
  * an single MOVS instruction (ie, only 8 bits of set data)
  */
-
+/* s3c寄存器的虚拟地址基址 */
 #define S3C_ADDR_BASE	(0xF4000000)
 
 #ifndef __ASSEMBLY__

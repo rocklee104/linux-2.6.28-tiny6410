@@ -1,4 +1,4 @@
-/* linux/arch/arm/plat-s3c64xx/cpu.c
+﻿/* linux/arch/arm/plat-s3c64xx/cpu.c
  *
  * Copyright 2008 Openmoko, Inc.
  * Copyright 2008 Simtec Electronics
@@ -33,25 +33,14 @@
 #include <plat/cpu.h>
 #include <plat/devs.h>
 #include <plat/clock.h>
-
-#include <plat/s3c6400.h>
 #include <plat/s3c6410.h>
 
 /* table of supported CPUs */
 
-static const char name_s3c6400[] = "S3C6400";
 static const char name_s3c6410[] = "S3C6410";
 
 static struct cpu_table cpu_ids[] __initdata = {
 	{
-		.idcode		= 0x36400000,
-		.idmask		= 0xfffff000,
-		.map_io		= s3c6400_map_io,
-		.init_clocks	= s3c6400_init_clocks,
-		.init_uarts	= s3c6400_init_uarts,
-		.init		= s3c6400_init,
-		.name		= name_s3c6400,
-	}, {
 		.idcode		= 0x36410100,
 		.idmask		= 0xffffff00,
 		.map_io		= s3c6410_map_io,
@@ -108,9 +97,12 @@ void __init s3c64xx_init_io(struct map_desc *mach_desc, int size)
 	unsigned long idcode;
 
 	/* initialise the io descriptors we need for initialisation */
+	/* 映射s3c设备 */
 	iotable_init(s3c_iodesc, ARRAY_SIZE(s3c_iodesc));
+	/* 完成DM9000A网卡外设的地址映射 */
 	iotable_init(mach_desc, size);
 
+	/* 读取SYS_ID, 值为0x36410101 */
 	idcode = __raw_readl(S3C_SYS_ID);
 	s3c_init_cpu(idcode, cpu_ids, ARRAY_SIZE(cpu_ids));
 }

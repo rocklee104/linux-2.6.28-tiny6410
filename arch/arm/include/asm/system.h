@@ -114,6 +114,10 @@ extern void (*arm_pm_restart)(char str);
 
 extern unsigned int user_debug;
 
+/*
+ * ARMv4及以上版本,ARM中断向量表的地址由CP15协处理器c1寄存器中的V位(bit[13])控制,
+ * 如果V位为1，那么该地址为0xffff0000
+ */
 #if __LINUX_ARM_ARCH__ >= 4
 #define vectors_high()	(cr_alignment & CR_V)
 #else
