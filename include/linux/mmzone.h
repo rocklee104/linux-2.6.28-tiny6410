@@ -343,10 +343,10 @@ struct zone {
 	 */
 	unsigned long		min_unmapped_pages;
 	unsigned long		min_slab_pages;
-	//NR_CPUS指的不是系统中实际的CPU数目,而是内核支持的CPU的最大数目
+	/* NR_CPUS指的不是系统中实际的CPU数目,而是内核支持的CPU的最大数目 */
 	struct per_cpu_pageset	*pageset[NR_CPUS];
 #else
-    //用于实现per-CPU的冷热页帧列表.内核使用这些列表来保存可用于满足实现的fresh page.
+    /* 用于实现per-CPU的冷热页帧列表.内核使用这些列表来保存可用于满足实现的fresh page. */
 	struct per_cpu_pageset	pageset[NR_CPUS];
 #endif
 	/*
@@ -357,7 +357,7 @@ struct zone {
 	/* see spanned/present_pages for more description */
 	seqlock_t		span_seqlock;
 #endif
-    //用于实现伙伴系统,free_area[0],链表每个成员1个page.free_area[1],链表每个成员2个page.
+    /* 用于实现伙伴系统,free_area[0],链表每个成员1个page.free_area[1],链表每个成员2个page. */
 	struct free_area	free_area[MAX_ORDER];
 
 #ifndef CONFIG_SPARSEMEM
@@ -365,7 +365,7 @@ struct zone {
 	 * Flags for a pageblock_nr_pages block. See pageblock-flags.h.
 	 * In SPARSEMEM, this map is stored in struct mem_section
 	 */
-	//zone中的所有page block都有一个migratetype放在zone->pageblock_flags,每个migratetype占3个bit
+	/* zone中的所有page block都有一个migratetype放在zone->pageblock_flags,每个migratetype占3个bit */
 	unsigned long		*pageblock_flags;
 #endif /* CONFIG_SPARSEMEM */
 
@@ -374,7 +374,7 @@ struct zone {
 
 	/* Fields commonly accessed by the page reclaim scanner */
 	spinlock_t		lru_lock;
-	//zone中的page根据类型的不同,通过NR_LRU_LISTS个LRU链接起来
+	/* zone中的page根据类型的不同,通过NR_LRU_LISTS个LRU链接起来 */
 	struct {
 		struct list_head list;
 		unsigned long nr_scan;
@@ -388,9 +388,9 @@ struct zone {
 	 *
 	 * The anon LRU stats live in [0], file LRU stats in [1]
 	 */
-	//分别记录anon LRU和file LRU被有多少个page从inactive转换到actives
+	/* 分别记录anon LRU和file LRU被有多少个page从inactive转换到actives */
 	unsigned long		recent_rotated[2];
-	//分别记录anon LRU和file LRU被scan的次数
+	/* 分别记录anon LRU和file LRU被scan的次数 */
 	unsigned long		recent_scanned[2];
 
     /*
@@ -401,7 +401,7 @@ struct zone {
 	unsigned long		flags;		   /* zone flags, see below */
 
 	/* Zone statistics */
-	//维护了大量有关内存域的统计信息.
+	/* 维护了大量有关内存域的统计信息. */
 	atomic_long_t		vm_stat[NR_VM_ZONE_STAT_ITEMS];
 
 	/*
@@ -468,18 +468,18 @@ struct zone {
 	 *    上wait的进程， 因而进程即可获得对页的访问权.
 	*/
 	wait_queue_head_t	* wait_table;
-	//等待队列头的个数
+	/* 等待队列头的个数 */
 	unsigned long		wait_table_hash_nr_entries;
-	//等待队列头个数是2的多少次幂
+	/* 等待队列头个数是2的多少次幂 */
 	unsigned long		wait_table_bits;
 
 	/*
 	 * Discontig memory support fields.
 	 */
-	//指向这个zone所属的节点
+	/* 指向这个zone所属的节点 */
 	struct pglist_data	*zone_pgdat;
 	/* zone_start_pfn == zone_start_paddr >> PAGE_SHIFT */
-	//内存域第一个页帧的索引
+	/* 内存域第一个页帧的索引 */
 	unsigned long		zone_start_pfn;
 
 	/*
@@ -492,16 +492,16 @@ struct zone {
 	 * frequently read in proximity to zone->lock.  It's good to
 	 * give them a chance of being in the same cacheline.
 	 */
-	//内存域中页的总数,包含空洞
+	/* 内存域中页的总数,包含空洞 */
 	unsigned long		spanned_pages;	/* total size, including holes */
-	//实际可用的页数目,不包含空洞,通常与spanned_pages相同
+	/* 实际可用的页数目,不包含空洞,通常与spanned_pages相同 */
 	unsigned long		present_pages;	/* amount of memory (excluding holes) */
 
 	/*
 	 * rarely used fields:
 	 */
 	const char		*name;
-    //compiler key word is used to achieve optimal cache alignment
+    /* compiler key word is used to achieve optimal cache alignment */
 } ____cacheline_internodealigned_in_smp;
 
 typedef enum {

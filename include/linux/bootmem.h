@@ -72,6 +72,10 @@ extern void free_bootmem(unsigned long addr, unsigned long size);
  * memory already was reserved.
  */
 #define BOOTMEM_DEFAULT		0
+/* 
+ * 保证在将要保留的整个页框中都是可以使用的,也即这些页框对应的bitmap连续为0,
+ * 否则遇到已保留的页框,将释放已经获取的页框,并返回EBUSY
+ */
 #define BOOTMEM_EXCLUSIVE	(1<<0)
 
 extern int reserve_bootmem_node(pg_data_t *pgdat,

@@ -120,7 +120,7 @@ static char * const zone_names[MAX_NR_ZONES] = {
 	 "Movable",
 };
 
-//用于关键性分配的内存空间最小值
+/* 用于关键性分配的内存空间最小值 */
 int min_free_kbytes = 1024;
 
 unsigned long __meminitdata nr_kernel_pages;
@@ -2637,13 +2637,13 @@ void __meminit memmap_init_zone(unsigned long size, int nid, unsigned long zone,
 			if (!early_pfn_in_nid(pfn, nid))
 				continue;
 		}
-		//页框转换成page
+		/* 页框转换成page */
 		page = pfn_to_page(pfn);
 		set_page_links(page, zone, nid, pfn);
 		mminit_verify_page_links(page, zone, nid, pfn);
 		init_page_count(page);
 		reset_page_mapcount(page);
-		//设置page->flags的PG_reserved这个bit
+		/* 设置page->flags的PG_reserved这个bit */
 		SetPageReserved(page);
 		/*
 		 * Mark the block movable so that blocks are reserved for
@@ -2677,14 +2677,14 @@ void __meminit memmap_init_zone(unsigned long size, int nid, unsigned long zone,
 	}
 }
 
-//将free_area[]的各个order的可用页数的值nr_free均初始化为0.
+/* 将free_area[]的各个order的可用页数的值nr_free均初始化为0. */
 static void __meminit zone_init_free_lists(struct zone *zone)
 {
 	int order, t;
 	for_each_migratetype_order(order, t) {
-		//初始化各个order的各种了MIGRATE_TYPES的链表
+		/* 初始化各个order的各种了MIGRATE_TYPES的链表 */
 		INIT_LIST_HEAD(&zone->free_area[order].free_list[t]);
-		//每个order的free_area中的可用页数初始化为0
+		/* 每个order的free_area中的可用页数初始化为0 */
 		zone->free_area[order].nr_free = 0;
 	}
 }
@@ -2704,11 +2704,11 @@ static int zone_batchsize(struct zone *zone)
 	 *
 	 * OK, so we don't know how big the cache is.  So guess.
 	 */
-	//per-cpu-pages一般设置成zone中可用page的1/1000,但是不能超过512k
+	/* per-cpu-pages一般设置成zone中可用page的1/1000,但是不能超过512k */
 	batch = zone->present_pages / 1024;
 	if (batch * PAGE_SIZE > 512 * 1024)
 		batch = (512 * 1024) / PAGE_SIZE;
-	//batch大约相当于内存域中页数的0.25‰
+	/* batch大约相当于内存域中页数的0.25‰ */
 	batch /= 4;		/* We effectively *= 4 below */
 	if (batch < 1)
 		batch = 1;
@@ -2735,7 +2735,7 @@ static void setup_pageset(struct per_cpu_pageset *p, unsigned long batch)
 	memset(p, 0, sizeof(*p));
 
 	pcp = &p->pcp;
-	//当前per_cpu_pages没有任何page
+	/* 当前per_cpu_pages没有任何page */
 	pcp->count = 0;
 	pcp->high = 6 * batch;
 	pcp->batch = max(1UL, 1 * batch);
@@ -2894,12 +2894,12 @@ int zone_wait_table_init(struct zone *zone, unsigned long zone_size_pages)
 		 wait_table_hash_nr_entries(zone_size_pages);
 	zone->wait_table_bits =
 		wait_table_bits(zone->wait_table_hash_nr_entries);
-    //等待队列头总共占用的空间
+    /* 等待队列头总共占用的空间 */
 	alloc_size = zone->wait_table_hash_nr_entries
 					* sizeof(wait_queue_head_t);
 
 	if (!slab_is_available()) {
-        //slab还用不了的时候就用alloc_bootmem_node分配空间
+        /* slab还用不了的时候就用alloc_bootmem_node分配空间 */
 		zone->wait_table = (wait_queue_head_t *)
 			alloc_bootmem_node(pgdat, alloc_size);
 	} else {
@@ -2919,13 +2919,13 @@ int zone_wait_table_init(struct zone *zone, unsigned long zone_size_pages)
 		return -ENOMEM;
 
 	for(i = 0; i < zone->wait_table_hash_nr_entries; ++i)
-        //初始化所有的等待队列头
+        /* 初始化所有的等待队列头 */
 		init_waitqueue_head(zone->wait_table + i);
 
 	return 0;
 }
 
-//设置zone的per-cpu-pageset
+/* 设置zone的per-cpu-pageset */
 static __meminit void zone_pcp_init(struct zone *zone)
 {
 	int cpu;
@@ -3405,33 +3405,33 @@ static void __meminit calculate_node_totalpages(struct pglist_data *pgdat,
  * round what is now in bits to nearest long in bits, then return it in
  * bytes.
  */
-//mini6410
-//每个zone中的页按pageblock被分成几个block
+/* mini6410 */
+/* 每个zone中的页按pageblock被分成几个block */
 static unsigned long __init usemap_size(unsigned long zonesize)
 {
 	unsigned long usemapsize;
 
-	//以2048向上对齐
+	/* 以2048向上对齐 */
 	usemapsize = roundup(zonesize, pageblock_nr_pages);
-	//zonesize对应多少个pageblock
+	/* zonesize对应多少个pageblock */
 	usemapsize = usemapsize >> pageblock_order;
-	//每一个pageblock都有一个migratetype放在zone->pageblock_flags中,每个migratetype占3个bit
+	/* 每一个pageblock都有一个migratetype放在zone->pageblock_flags中,每个migratetype占3个bit */
 	usemapsize *= NR_PAGEBLOCK_BITS;
-	//当前zone所有的pageblock的migratetype放在一个bitmap中,这个bitmap以long对齐.
+	/* 当前zone所有的pageblock的migratetype放在一个bitmap中,这个bitmap以long对齐. */
 	usemapsize = roundup(usemapsize, 8 * sizeof(unsigned long));
 
-	//计算zone中migratetype的bitmap占用的字节数
+	/* 计算zone中migratetype的bitmap占用的字节数 */
 	return usemapsize / 8;
 }
 
-//给zone->pageblock_flags分配usemap
+/* 给zone->pageblock_flags分配usemap */
 static void __init setup_usemap(struct pglist_data *pgdat,
 				struct zone *zone, unsigned long zonesize)
 {
 	unsigned long usemapsize = usemap_size(zonesize);
 	zone->pageblock_flags = NULL;
 	if (usemapsize) {
-		//为zone中的migratetype的bitmap分配空间,虽然usemapsize == 12,但是占用一个物理页框
+		/* 为zone中的migratetype的bitmap分配空间,虽然usemapsize == 12,但是占用一个物理页框 */
 		zone->pageblock_flags = alloc_bootmem_node(pgdat, usemapsize);
 		memset(zone->pageblock_flags, 0, usemapsize);
 	}
@@ -3488,7 +3488,7 @@ static inline int pageblock_default_order(unsigned int order)
  *   - mark all memory queues empty
  *   - clear the memory bitmaps
  */
-//初始化管理区zone
+/* 初始化管理区zone */
 static void __paginginit free_area_init_core(struct pglist_data *pgdat,
 		unsigned long *zones_size, unsigned long *zholes_size)
 {
@@ -3497,17 +3497,18 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
 	unsigned long zone_start_pfn = pgdat->node_start_pfn;
 	int ret;
 
-	//mini6410,空函数
+	/* mini6410,空函数 */
 	pgdat_resize_init(pgdat);
 	pgdat->nr_zones = 0;
 	init_waitqueue_head(&pgdat->kswapd_wait);
 	pgdat->kswapd_max_order = 0;
-	//mini6410,空函数
+	/* mini6410,空函数 */
 	pgdat_page_cgroup_init(pgdat);
 	
 	for (j = 0; j < MAX_NR_ZONES; j++) {
-		//初始化节点中所有的zone
+		/* 初始化节点中所有的zone */
 		struct zone *zone = pgdat->node_zones + j;
+		/* realsize不包含用于保存struct page实例的物理页框 */
 		unsigned long size, realsize, memmap_pages;
 		enum lru_list l;
 
@@ -3520,10 +3521,10 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
 		 * is used by this zone for memmap. This affects the watermark
 		 * and per-cpu initialisations
 		 */
-		//memmap_pages获取节点中node_mem_map这段空间的大小.sizeof(struct page) == 32
+		/* memmap_pages获取节点中node_mem_map这段空间的大小.sizeof(struct page) == 32 */
 		memmap_pages =
 			PAGE_ALIGN(size * sizeof(struct page)) >> PAGE_SHIFT;
-		//512 pages used for memmap
+		/* 512 pages used for memmap */
 		if (realsize >= memmap_pages) {
 			realsize -= memmap_pages;
 			printk(KERN_DEBUG
@@ -3536,7 +3537,7 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
 
 		/* Account for reserved pages */
 		if (j == 0 && realsize > dma_reserve) {
-			//0 pages reserved 
+			/* 0 pages reserved */
 			realsize -= dma_reserve;
 			printk(KERN_DEBUG "  %s zone: %lu pages reserved\n",
 					zone_names[0], dma_reserve);
@@ -3547,7 +3548,7 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
 		nr_all_pages += realsize;
 
 		zone->spanned_pages = size;
-		//present_pages不包含节点中用于保存page对象的页框
+		/* present_pages不包含节点中用于保存page对象的页框 */
 		zone->present_pages = realsize;
 #ifdef CONFIG_NUMA
 		zone->node = nid;
@@ -3563,9 +3564,9 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
 
 		zone->prev_priority = DEF_PRIORITY;
 
-		//设置zone的per-cpu-pageset
+		/* 设置zone的per-cpu-pageset */
 		zone_pcp_init(zone);
-		//初始当前zone中的所有lru
+		/* 初始当前zone中的所有lru */
 		for_each_lru(l) {
 			INIT_LIST_HEAD(&zone->lru[l].list);
 			zone->lru[l].nr_scan = 0;
@@ -3579,7 +3580,7 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
 		if (!size)
 			continue;
 
-		//mini6410,空函数
+		/* mini6410,空函数 */
 		set_pageblock_order(pageblock_default_order());
 		setup_usemap(pgdat, zone, size);
 		ret = init_currently_empty_zone(zone, zone_start_pfn,
@@ -4721,9 +4722,9 @@ void set_pageblock_flags_group(struct page *page, unsigned long flags,
 
 	zone = page_zone(page);
 	pfn = page_to_pfn(page);
-	//获取zone->pageblock_flags
+	/* 获取zone->pageblock_flags */
 	bitmap = get_pageblock_bitmap(zone, pfn);
-	//获取pfn在bitmap中的index
+	/* 获取pfn在bitmap中的index */
 	bitidx = pfn_to_bitidx(zone, pfn);
 	VM_BUG_ON(pfn < zone->zone_start_pfn);
 	VM_BUG_ON(pfn >= zone->zone_start_pfn + zone->spanned_pages);

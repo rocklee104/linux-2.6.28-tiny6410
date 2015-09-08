@@ -8,6 +8,7 @@
 #define L1_CACHE_ALIGN(x) ALIGN(x, L1_CACHE_BYTES)
 #endif
 
+/* SMP_CACHE_BYTES == 32 */
 #ifndef SMP_CACHE_BYTES
 #define SMP_CACHE_BYTES L1_CACHE_BYTES
 #endif

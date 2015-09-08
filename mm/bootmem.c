@@ -151,6 +151,7 @@ unsigned long __init init_bootmem(unsigned long start, unsigned long pages)
 {
 	max_low_pfn = pages;
 	min_low_pfn = start;
+	/* 从0号page开始 */
 	return init_bootmem_core(NODE_DATA(0)->bdata, start, 0, pages);
 }
 
@@ -453,6 +454,8 @@ static unsigned long align_off(struct bootmem_data *bdata, unsigned long off,
  * 申请size大小的连续物理空间,并返回这段物理空间对应的虚拟地址.
  * 如果goal对应的物理页框没有处在DRAM中,在bootmem中以DRAM所在的物理页框开始搜索bitmap,
  * 申请size大小的连续物理空间,并返回这段物理空间对应的虚拟地址.
+ *
+ * imit代表从bdata中node_min_pfn搜索空闲内存的终点地址,如果为0,则搜索到node_low_pfn结束
  */
 static void * __init alloc_bootmem_core(struct bootmem_data *bdata,
 				unsigned long size, unsigned long align,
@@ -462,8 +465,11 @@ static void * __init alloc_bootmem_core(struct bootmem_data *bdata,
 	/* sidx为查询的页帧的index */
 	unsigned long min, max, start, sidx, midx, step;
 
+	/* size不可为0 */
 	BUG_ON(!size);
+	/* align必须为2的整数倍 */
 	BUG_ON(align & (align - 1));
+	/* 如果limit不为0,那么需满足goal + size < limit */
 	BUG_ON(limit && goal + size > limit);
 
 	if (!bdata->node_bootmem_map)
@@ -484,7 +490,7 @@ static void * __init alloc_bootmem_core(struct bootmem_data *bdata,
 	if (max <= min)
 		return NULL;
 
-	/* step最小是1 */
+	/* step最小是1,也就是步进为1个page */
 	step = max(align >> PAGE_SHIFT, 1UL);
 
 	if (goal && min < goal && goal < max)
@@ -738,6 +744,10 @@ void * __init __alloc_bootmem_node_nopanic(pg_data_t *pgdat, unsigned long size,
 }
 
 #ifndef ARCH_LOW_ADDRESS_LIMIT
+/* 
+ * ARCH_LOW_ADDRESS_LIMIT只在特定的体系架构上起作用,对于mini6410来说,
+ * 当其作为limit时,也就是32位系统可以支持的最大虚拟地址,和0作用相同 
+ */
 #define ARCH_LOW_ADDRESS_LIMIT	0xffffffffUL
 #endif
 

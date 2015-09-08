@@ -575,7 +575,7 @@ static inline void set_page_section(struct page *page, unsigned long section)
 	page->flags |= (section & SECTIONS_MASK) << SECTIONS_PGSHIFT;
 }
 
-//设置page->flags中的关于zone,node,section的bits
+/* 设置page->flags中的关于zone,node,section的bits */
 static inline void set_page_links(struct page *page, enum zone_type zone,
 	unsigned long node, unsigned long pfn)
 {
