@@ -19,7 +19,7 @@ struct machine_desc {
 	 * Note! The first four elements are used
 	 * by assembler code in head.S, head-common.S
 	 */
-	//对mini6410来说这个值就是2520
+	/* 对mini6410来说这个值就是2520 */
 	unsigned int		nr;		/* architecture number	*/
 	unsigned int		phys_io;	/* start of physical io	*/
 	unsigned int		io_pg_offst;	/* byte offset for io 

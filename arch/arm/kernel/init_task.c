@@ -31,7 +31,7 @@ EXPORT_SYMBOL(init_mm);
  */
 union thread_union init_thread_union
 	__attribute__((__section__(".data.init_task"))) =
-		//初始化联合的第一个成员,也就是thread_info
+		/* 初始化联合的第一个成员,也就是thread_info */
 		{ INIT_THREAD_INFO(init_task) };
 
 /*
@@ -39,7 +39,7 @@ union thread_union init_thread_union
  *
  * All other task structs will be allocated on slabs in fork.c
  */
-//0号进程
+/* 0号进程 */
 struct task_struct init_task = INIT_TASK(init_task);
 
 EXPORT_SYMBOL(init_task);

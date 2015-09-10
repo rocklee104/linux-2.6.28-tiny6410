@@ -1,4 +1,4 @@
-/*
+﻿/*
  *	linux/kernel/resource.c
  *
  * Copyright (C) 1999	Linus Torvalds
@@ -149,20 +149,29 @@ static struct resource * __request_resource(struct resource *root, struct resour
 
 	if (end < start)
 		return root;
+	/* new的资源范围不能超过root的资源范围 */
 	if (start < root->start)
 		return root;
 	if (end > root->end)
 		return root;
+	/* 从root的child开始搜索 */
 	p = &root->child;
 	for (;;) {
 		tmp = *p;
 		if (!tmp || tmp->start > end) {
 			new->sibling = tmp;
+			/* 将tmp之前元素的sibling指向new,完成了插入操作 */
 			*p = new;
 			new->parent = root;
+			/* 没有冲突 */
 			return NULL;
 		}
 		p = &tmp->sibling;
+		/*
+		 * 当tmp->start <= end || tmp->end >= start时候,表示找到符合条件的resource,
+		 * 也就是new的资源范围只要有和tmp资源范围重合的部分就表示有冲突,
+		 * 最后返回这个冲突的resource.
+		 */
 		if (tmp->end < start)
 			continue;
 		return tmp;

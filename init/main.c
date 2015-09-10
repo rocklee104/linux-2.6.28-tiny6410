@@ -122,8 +122,10 @@ extern void softirq_init(void);
 /* Untouched command line saved by arch-specific code. */
 char __initdata boot_command_line[COMMAND_LINE_SIZE];
 /* Untouched saved command line (eg. for /proc) */
+/* 完整的cmdline */
 char *saved_command_line;
 /* Command line for parameter parsing */
+/* 不包含early_param的cmdline */
 static char *static_command_line;
 
 static char *execute_command;
@@ -352,15 +354,9 @@ __setup("rdinit=", rdinit_setup);
 
 #ifndef CONFIG_SMP
 
-#ifdef CONFIG_X86_LOCAL_APIC
-static void __init smp_init(void)
-{
-	APIC_init_uniprocessor();
-}
-#else
 #define smp_init()	do { } while (0)
-#endif
 
+/* mini6410 */
 static inline void setup_per_cpu_areas(void) { }
 static inline void setup_nr_cpu_ids(void) { }
 static inline void smp_prepare_cpus(unsigned int maxcpus) { }
@@ -404,7 +400,7 @@ static void __init setup_per_cpu_areas(void)
 
 	for_each_possible_cpu(i) {
 		__per_cpu_offset[i] = ptr - __per_cpu_start;
-        //为per-CPU区域创建副本
+        /* 为per-CPU区域创建副本 */
 		memcpy(ptr, __per_cpu_start, __per_cpu_end - __per_cpu_start);
 		ptr += size;
 	}
@@ -448,7 +444,9 @@ static void __init setup_command_line(char *command_line)
 {
 	saved_command_line = alloc_bootmem(strlen (boot_command_line)+1);
 	static_command_line = alloc_bootmem(strlen (command_line)+1);
+	/* 完整的cmdline */
 	strcpy (saved_command_line, boot_command_line);
+	/* 不包含early_param的cmdline */
 	strcpy (static_command_line, command_line);
 }
 
@@ -603,14 +601,15 @@ asmlinkage void __init start_kernel(void)
 	lock_kernel();
 	tick_init();
 	boot_cpu_init();
-	//空函数
+	/* 空函数 */
 	page_address_init();
 	printk(KERN_NOTICE);
 	printk(linux_banner);
-    //Get a command line without early params
+    /* Get a command line without early params */
 	setup_arch(&command_line);
 	mm_init_owner(&init_mm, &init_task);
 	setup_command_line(command_line);
+	/* 空函数 */
 	unwind_setup();
 	setup_per_cpu_areas();
 	setup_nr_cpu_ids();

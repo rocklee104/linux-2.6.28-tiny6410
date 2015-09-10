@@ -1,4 +1,4 @@
-/*
+﻿/*
  * ioport.h	Definitions of routines for detecting, reserving and
  *		allocating system resources.
  *
@@ -36,6 +36,7 @@ struct resource_list {
 
 #define IORESOURCE_TYPE_BITS	0x00000f00	/* Resource type */
 #define IORESOURCE_IO		0x00000100
+/* 使用内存映射的资源 */
 #define IORESOURCE_MEM		0x00000200
 #define IORESOURCE_IRQ		0x00000400
 #define IORESOURCE_DMA		0x00000800

@@ -1018,6 +1018,7 @@ __kuser_helper_end:
 	.align	5
 
 vector_\name:
+	# lr偏差校正
 	.if \correction
 	sub	lr, lr, #\correction
 	.endif
@@ -1026,6 +1027,7 @@ vector_\name:
 	@ Save r0, lr_<exception> (parent PC) and spsr_<exception>
 	@ (parent CPSR)
 	@
+	# 为了处理异常后修复上下文,保存r0,lr,spsr.sp并没有改变
 	stmia	sp, {r0, lr}		@ save r0, lr
 	mrs	lr, spsr
 	str	lr, [sp, #8]		@ save spsr
@@ -1033,16 +1035,25 @@ vector_\name:
 	@
 	@ Prepare for SVC32 mode.  IRQs remain disabled.
 	@
+	#读出cpsr的值
 	mrs	r0, cpsr
+	#将cpsr中的值和mode逻辑异或,实际上,当前cpsr中的模式和mode应该相等,这里运算结果就是SVC_MODE
 	eor	r0, r0, #(\mode ^ SVC_MODE)
+	#将修正模式后的cpsr保存到spsr,还未切换状态
 	msr	spsr_cxsf, r0
 
 	@
 	@ the branch table must immediately follow this code
 	@
+	#取出spsr中的[M3:M0],这里不用取M4,因为M4是表示26位还是32位寻址的,如果只想知道模式的话,取[M3:M0]就够了
 	and	lr, lr, #0x0f
+	#将irq模式的栈基地址填到r0,以后在svc_entry中可以通过r0去读取irq的栈
 	mov	r0, sp
+	#将pc+lr*4的字数据读入寄存器lr,并将新地址pc+lr*4写入pc
+	#直接将[M3:M0]乘以4再加上pc就可以计算出入口(因为一个entry占4个字节),
+	#结果为__irq_usr或__irq_svc,具体是usr还是svc要看发生中断之前是什么模式
 	ldr	lr, [pc, lr, lsl #2]
+	#跳进入口(__irq_usr或__irq_svc),同时做模式切换(mov带了s,就会给pc赋值的同时将用spsr去填cpsr)
 	movs	pc, lr			@ branch to handler in SVC mode
 ENDPROC(vector_\name)
 	.endm
@@ -1054,6 +1065,7 @@ __stubs_start:
  */
 	vector_stub	irq, IRQ_MODE, 4
 
+	#对应了[M3:M0]的所有可能取值,所以entry的地址就可以用[M3:M0]很快的算出来
 	.long	__irq_usr			@  0  (USR_26 / USR_32)
 	.long	__irq_invalid			@  1  (FIQ_26 / FIQ_32)
 	.long	__irq_invalid			@  2  (IRQ_26 / IRQ_32)
@@ -1183,6 +1195,7 @@ __stubs_end:
 	.globl	__vectors_start
 __vectors_start:
 	swi	SYS_ERROR0
+	#跳转到__vectors_start+0x200之后的vector_xxx函数中
 	b	vector_und + stubs_offset
 	ldr	pc, .LCvswi + stubs_offset
 	b	vector_pabt + stubs_offset

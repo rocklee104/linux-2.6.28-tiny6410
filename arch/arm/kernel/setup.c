@@ -109,6 +109,10 @@ struct stack {
 	u32 und[3];
 } ____cacheline_aligned;
 
+/*
+ * 为irq,abt,und这3种中断异常定义了stack, 在arch/arm/kernel/entry-armv.S的
+ * vector_\name宏中用于对终端异常之前的状态进行备份.
+ */
 static struct stack stacks[NR_CPUS];
 
 char elf_platform[ELF_PLATFORM_SIZE];
@@ -132,12 +136,6 @@ DEFINE_PER_CPU(struct cpuinfo_arm, cpu_data);
  */
 static struct resource mem_res[] = {
 	{
-		.name = "Video RAM",
-		.start = 0,
-		.end = 0,
-		.flags = IORESOURCE_MEM
-	},
-	{
 		.name = "Kernel text",
 		.start = 0,
 		.end = 0,
@@ -151,34 +149,8 @@ static struct resource mem_res[] = {
 	}
 };
 
-#define video_ram   mem_res[0]
-#define kernel_code mem_res[1]
-#define kernel_data mem_res[2]
-
-static struct resource io_res[] = {
-	{
-		.name = "reserved",
-		.start = 0x3bc,
-		.end = 0x3be,
-		.flags = IORESOURCE_IO | IORESOURCE_BUSY
-	},
-	{
-		.name = "reserved",
-		.start = 0x378,
-		.end = 0x37f,
-		.flags = IORESOURCE_IO | IORESOURCE_BUSY
-	},
-	{
-		.name = "reserved",
-		.start = 0x278,
-		.end = 0x27f,
-		.flags = IORESOURCE_IO | IORESOURCE_BUSY
-	}
-};
-
-#define lp0 io_res[0]
-#define lp1 io_res[1]
-#define lp2 io_res[2]
+#define kernel_code mem_res[0]
+#define kernel_data mem_res[1]
 
 static const char *proc_arch[] = {
 	"undefined/unknown",
@@ -348,6 +320,7 @@ void cpu_init(void)
 	"msr	cpsr_c, %7"
 	    :
 	    : "r" (stk),
+		  /* irq/abt/und模式下禁止中断和快中断,任何模式都有独立的sp寄存器, 将sp指向各个模式下的[0] */
 	      "I" (PSR_F_BIT | PSR_I_BIT | IRQ_MODE),
 	      "I" (offsetof(struct stack, irq[0])),
 	      "I" (PSR_F_BIT | PSR_I_BIT | ABT_MODE),
@@ -356,6 +329,7 @@ void cpu_init(void)
 	      "I" (offsetof(struct stack, und[0])),
 	      "I" (PSR_F_BIT | PSR_I_BIT | SVC_MODE)
 	    : "r14");
+	/* svc模式下的sp指向init_thread_union + THREAD_START_SP */
 }
 
 static struct machine_desc * __init setup_machine(unsigned int nr)
@@ -505,8 +479,10 @@ request_standard_resources(struct meminfo *mi, struct machine_desc *mdesc)
 	struct resource *res;
 	int i;
 
+	/* kernel代码段起始及结束物理地址 */
 	kernel_code.start   = virt_to_phys(&_text);
 	kernel_code.end     = virt_to_phys(&_etext - 1);
+	/* kernel数据段起始及结束物理地址 */
 	kernel_data.start   = virt_to_phys(&__data_start);
 	kernel_data.end     = virt_to_phys(&_end - 1);
 
@@ -514,14 +490,17 @@ request_standard_resources(struct meminfo *mi, struct machine_desc *mdesc)
 		if (mi->bank[i].size == 0)
 			continue;
 
+		/* 分配一个struct resource类型的资源描述符 */
 		res = alloc_bootmem_low(sizeof(*res));
 		res->name  = "System RAM";
 		res->start = mi->bank[i].start;
 		res->end   = mi->bank[i].start + mi->bank[i].size - 1;
 		res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
 
+		/* 申请该资源同时注册到内核资源管理树中,以声明RAM设备对这一I/O地址区域的占有 */
 		request_resource(&iomem_resource, res);
 
+		/* 预留kernel_code和kernel_data区,以防其他外设的I/O地址映射到内核代码和数据区 */
 		if (kernel_code.start >= res->start &&
 		    kernel_code.end <= res->end)
 			request_resource(res, &kernel_code);
@@ -529,23 +508,6 @@ request_standard_resources(struct meminfo *mi, struct machine_desc *mdesc)
 		    kernel_data.end <= res->end)
 			request_resource(res, &kernel_data);
 	}
-
-	if (mdesc->video_start) {
-		video_ram.start = mdesc->video_start;
-		video_ram.end   = mdesc->video_end;
-		request_resource(&iomem_resource, &video_ram);
-	}
-
-	/*
-	 * Some machines don't have the possibility of ever
-	 * possessing lp0, lp1 or lp2
-	 */
-	if (mdesc->reserve_lp0)
-		request_resource(&ioport_resource, &lp0);
-	if (mdesc->reserve_lp1)
-		request_resource(&ioport_resource, &lp1);
-	if (mdesc->reserve_lp2)
-		request_resource(&ioport_resource, &lp2);
 }
 
 /*

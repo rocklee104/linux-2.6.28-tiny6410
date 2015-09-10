@@ -707,8 +707,10 @@ void __init trap_init(void)
 
 void __init early_trap_init(void)
 {
+	/* 页表中建立的中断向量的入口地址 */
 	unsigned long vectors = CONFIG_VECTORS_BASE;
 	extern char __stubs_start[], __stubs_end[];
+	/* 异常向量表定义在arch/arm/kernel/entry-armv.S */
 	extern char __vectors_start[], __vectors_end[];
 	extern char __kuser_helper_start[], __kuser_helper_end[];
 	int kuser_sz = __kuser_helper_end - __kuser_helper_start;
@@ -719,6 +721,10 @@ void __init early_trap_init(void)
 	 * are visible to the instruction stream.
 	 */
 	memcpy((void *)vectors, __vectors_start, __vectors_end - __vectors_start);
+	/*
+	 * 把__stubs_start~__stubs_end之间的异常处理代码复制到了0xffff0200起始处,
+	 * 这里可直接用b指令跳转过去,这样比使用绝对跳转（ldr)效率高
+	 */
 	memcpy((void *)vectors + 0x200, __stubs_start, __stubs_end - __stubs_start);
 	memcpy((void *)vectors + 0x1000 - kuser_sz, __kuser_helper_start, kuser_sz);
 
@@ -730,6 +736,6 @@ void __init early_trap_init(void)
 	       sizeof(sigreturn_codes));
 
 	flush_icache_range(vectors, vectors + PAGE_SIZE);
-	//使用arm的D1,设置类型为DOMAIN_CLIENT
+	/* 使用arm的D1,设置类型为DOMAIN_CLIENT */
 	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
 }
