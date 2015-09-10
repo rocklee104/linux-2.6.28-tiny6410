@@ -1163,7 +1163,7 @@ source "drivers/md/Kconfig"
 
 source "drivers/message/fusion/Kconfig"
 
-source "drivers/ieee1394/Kconfig"
+# source "drivers/ieee1394/Kconfig"
 
 source "drivers/message/i2o/Kconfig"
 

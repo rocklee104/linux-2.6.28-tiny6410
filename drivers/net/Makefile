@@ -2,8 +2,8 @@
 # Makefile for the Linux network (ethercard) device drivers.
 #
 
-obj-$(CONFIG_E1000) += e1000/
-obj-$(CONFIG_E1000E) += e1000e/
+# obj-$(CONFIG_E1000) += e1000/
+# obj-$(CONFIG_E1000E) += e1000e/
 obj-$(CONFIG_IBM_NEW_EMAC) += ibm_newemac/
 obj-$(CONFIG_IGB) += igb/
 obj-$(CONFIG_IXGBE) += ixgbe/
