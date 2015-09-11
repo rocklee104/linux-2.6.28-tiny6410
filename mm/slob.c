@@ -233,12 +233,6 @@ static int slob_last(slob_t *s)
 static void *slob_new_page(gfp_t gfp, int order, int node)
 {
 	void *page;
-
-#ifdef CONFIG_NUMA
-	if (node != -1)
-		page = alloc_pages_node(node, gfp, order);
-	else
-#endif
 		page = alloc_pages(gfp, order);
 
 	if (!page)
@@ -319,14 +313,6 @@ static void *slob_alloc(size_t size, gfp_t gfp, int align, int node)
 	spin_lock_irqsave(&slob_lock, flags);
 	/* Iterate through each partially free page, try to find room */
 	list_for_each_entry(sp, slob_list, list) {
-#ifdef CONFIG_NUMA
-		/*
-		 * If there's a node specification, search for a partial
-		 * page with a matching node id in the freelist.
-		 */
-		if (node != -1 && page_to_nid(&sp->page) != node)
-			continue;
-#endif
 		/* Enough room on this page? */
 		if (sp->units < SLOB_UNITS(size))
 			continue;

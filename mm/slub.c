@@ -220,11 +220,7 @@ int slab_is_available(void)
 
 static inline struct kmem_cache_node *get_node(struct kmem_cache *s, int node)
 {
-#ifdef CONFIG_NUMA
-	return s->node[node];
-#else
 	return &s->local_node;
-#endif
 }
 
 static inline struct kmem_cache_cpu *get_cpu_slab(struct kmem_cache *s, int cpu)
@@ -1294,49 +1290,6 @@ out:
  */
 static struct page *get_any_partial(struct kmem_cache *s, gfp_t flags)
 {
-#ifdef CONFIG_NUMA
-	struct zonelist *zonelist;
-	struct zoneref *z;
-	struct zone *zone;
-	enum zone_type high_zoneidx = gfp_zone(flags);
-	struct page *page;
-
-	/*
-	 * The defrag ratio allows a configuration of the tradeoffs between
-	 * inter node defragmentation and node local allocations. A lower
-	 * defrag_ratio increases the tendency to do local allocations
-	 * instead of attempting to obtain partial slabs from other nodes.
-	 *
-	 * If the defrag_ratio is set to 0 then kmalloc() always
-	 * returns node local objects. If the ratio is higher then kmalloc()
-	 * may return off node objects because partial slabs are obtained
-	 * from other nodes and filled up.
-	 *
-	 * If /sys/kernel/slab/xx/defrag_ratio is set to 100 (which makes
-	 * defrag_ratio = 1000) then every (well almost) allocation will
-	 * first attempt to defrag slab caches on other nodes. This means
-	 * scanning over all nodes to look for partial slabs which may be
-	 * expensive if we do it every time we are trying to find a slab
-	 * with available objects.
-	 */
-	if (!s->remote_node_defrag_ratio ||
-			get_cycles() % 1024 > s->remote_node_defrag_ratio)
-		return NULL;
-
-	zonelist = node_zonelist(slab_node(current->mempolicy), flags);
-	for_each_zone_zonelist(zone, z, zonelist, high_zoneidx) {
-		struct kmem_cache_node *n;
-
-		n = get_node(s, zone_to_nid(zone));
-
-		if (n && cpuset_zone_allowed_hardwall(zone, flags) &&
-				n->nr_partial > n->min_partial) {
-			page = get_partial_node(n);
-			if (page)
-				return page;
-		}
-	}
-#endif
 	return NULL;
 }
 
@@ -1474,10 +1427,6 @@ static void flush_all(struct kmem_cache *s)
  */
 static inline int node_match(struct kmem_cache_cpu *c, int node)
 {
-#ifdef CONFIG_NUMA
-	if (node != -1 && c->node != node)
-		return 0;
-#endif
 	return 1;
 }
 
@@ -1616,14 +1565,6 @@ void *kmem_cache_alloc(struct kmem_cache *s, gfp_t gfpflags)
 	return slab_alloc(s, gfpflags, -1, __builtin_return_address(0));
 }
 EXPORT_SYMBOL(kmem_cache_alloc);
-
-#ifdef CONFIG_NUMA
-void *kmem_cache_alloc_node(struct kmem_cache *s, gfp_t gfpflags, int node)
-{
-	return slab_alloc(s, gfpflags, node, __builtin_return_address(0));
-}
-EXPORT_SYMBOL(kmem_cache_alloc_node);
-#endif
 
 /*
  * Slow patch handling. This may still be called frequently since objects
@@ -2063,106 +2004,6 @@ static inline int alloc_kmem_cache_cpus(struct kmem_cache *s, gfp_t flags)
 }
 #endif
 
-#ifdef CONFIG_NUMA
-/*
- * No kmalloc_node yet so do it by hand. We know that this is the first
- * slab on the node for this slabcache. There are no concurrent accesses
- * possible.
- *
- * Note that this function only works on the kmalloc_node_cache
- * when allocating for the kmalloc_node_cache. This is used for bootstrapping
- * memory on a fresh node that has no slab structures yet.
- */
-static struct kmem_cache_node *early_kmem_cache_node_alloc(gfp_t gfpflags,
-							   int node)
-{
-	struct page *page;
-	struct kmem_cache_node *n;
-	unsigned long flags;
-
-	BUG_ON(kmalloc_caches->size < sizeof(struct kmem_cache_node));
-
-	page = new_slab(kmalloc_caches, gfpflags, node);
-
-	BUG_ON(!page);
-	if (page_to_nid(page) != node) {
-		printk(KERN_ERR "SLUB: Unable to allocate memory from "
-				"node %d\n", node);
-		printk(KERN_ERR "SLUB: Allocating a useless per node structure "
-				"in order to be able to continue\n");
-	}
-
-	n = page->freelist;
-	BUG_ON(!n);
-	page->freelist = get_freepointer(kmalloc_caches, n);
-	page->inuse++;
-	kmalloc_caches->node[node] = n;
-#ifdef CONFIG_SLUB_DEBUG
-	init_object(kmalloc_caches, n, 1);
-	init_tracking(kmalloc_caches, n);
-#endif
-	init_kmem_cache_node(n, kmalloc_caches);
-	inc_slabs_node(kmalloc_caches, node, page->objects);
-
-	/*
-	 * lockdep requires consistent irq usage for each lock
-	 * so even though there cannot be a race this early in
-	 * the boot sequence, we still disable irqs.
-	 */
-	local_irq_save(flags);
-	add_partial(n, page, 0);
-	local_irq_restore(flags);
-	return n;
-}
-
-static void free_kmem_cache_nodes(struct kmem_cache *s)
-{
-	int node;
-
-	for_each_node_state(node, N_NORMAL_MEMORY) {
-		struct kmem_cache_node *n = s->node[node];
-		if (n && n != &s->local_node)
-			kmem_cache_free(kmalloc_caches, n);
-		s->node[node] = NULL;
-	}
-}
-
-static int init_kmem_cache_nodes(struct kmem_cache *s, gfp_t gfpflags)
-{
-	int node;
-	int local_node;
-
-	if (slab_state >= UP)
-		local_node = page_to_nid(virt_to_page(s));
-	else
-		local_node = 0;
-
-	for_each_node_state(node, N_NORMAL_MEMORY) {
-		struct kmem_cache_node *n;
-
-		if (local_node == node)
-			n = &s->local_node;
-		else {
-			if (slab_state == DOWN) {
-				n = early_kmem_cache_node_alloc(gfpflags,
-								node);
-				continue;
-			}
-			n = kmem_cache_alloc_node(kmalloc_caches,
-							gfpflags, node);
-
-			if (!n) {
-				free_kmem_cache_nodes(s);
-				return 0;
-			}
-
-		}
-		s->node[node] = n;
-		init_kmem_cache_node(n, s);
-	}
-	return 1;
-}
-#else
 static void free_kmem_cache_nodes(struct kmem_cache *s)
 {
 }
@@ -2172,7 +2013,6 @@ static int init_kmem_cache_nodes(struct kmem_cache *s, gfp_t gfpflags)
 	init_kmem_cache_node(&s->local_node, s);
 	return 1;
 }
-#endif
 
 /*
  * calculate_sizes() determines the order and the distribution of data within
@@ -2313,9 +2153,6 @@ static int kmem_cache_open(struct kmem_cache *s, gfp_t gfpflags,
 		goto error;
 
 	s->refcount = 1;
-#ifdef CONFIG_NUMA
-	s->remote_node_defrag_ratio = 1000;
-#endif
 	if (!init_kmem_cache_nodes(s, gfpflags & ~SLUB_DMA))
 		goto error;
 
@@ -2674,24 +2511,6 @@ static void *kmalloc_large_node(size_t size, gfp_t flags, int node)
 		return NULL;
 }
 
-#ifdef CONFIG_NUMA
-void *__kmalloc_node(size_t size, gfp_t flags, int node)
-{
-	struct kmem_cache *s;
-
-	if (unlikely(size > PAGE_SIZE))
-		return kmalloc_large_node(size, flags, node);
-
-	s = get_slab(size, flags);
-
-	if (unlikely(ZERO_OR_NULL_PTR(s)))
-		return s;
-
-	return slab_alloc(s, flags, node, __builtin_return_address(0));
-}
-EXPORT_SYMBOL(__kmalloc_node);
-#endif
-
 size_t ksize(const void *object)
 {
 	struct page *page;
@@ -2823,123 +2642,6 @@ int kmem_cache_shrink(struct kmem_cache *s)
 }
 EXPORT_SYMBOL(kmem_cache_shrink);
 
-#if defined(CONFIG_NUMA) && defined(CONFIG_MEMORY_HOTPLUG)
-static int slab_mem_going_offline_callback(void *arg)
-{
-	struct kmem_cache *s;
-
-	down_read(&slub_lock);
-	list_for_each_entry(s, &slab_caches, list)
-		kmem_cache_shrink(s);
-	up_read(&slub_lock);
-
-	return 0;
-}
-
-static void slab_mem_offline_callback(void *arg)
-{
-	struct kmem_cache_node *n;
-	struct kmem_cache *s;
-	struct memory_notify *marg = arg;
-	int offline_node;
-
-	offline_node = marg->status_change_nid;
-
-	/*
-	 * If the node still has available memory. we need kmem_cache_node
-	 * for it yet.
-	 */
-	if (offline_node < 0)
-		return;
-
-	down_read(&slub_lock);
-	list_for_each_entry(s, &slab_caches, list) {
-		n = get_node(s, offline_node);
-		if (n) {
-			/*
-			 * if n->nr_slabs > 0, slabs still exist on the node
-			 * that is going down. We were unable to free them,
-			 * and offline_pages() function shoudn't call this
-			 * callback. So, we must fail.
-			 */
-			BUG_ON(slabs_node(s, offline_node));
-
-			s->node[offline_node] = NULL;
-			kmem_cache_free(kmalloc_caches, n);
-		}
-	}
-	up_read(&slub_lock);
-}
-
-static int slab_mem_going_online_callback(void *arg)
-{
-	struct kmem_cache_node *n;
-	struct kmem_cache *s;
-	struct memory_notify *marg = arg;
-	int nid = marg->status_change_nid;
-	int ret = 0;
-
-	/*
-	 * If the node's memory is already available, then kmem_cache_node is
-	 * already created. Nothing to do.
-	 */
-	if (nid < 0)
-		return 0;
-
-	/*
-	 * We are bringing a node online. No memory is available yet. We must
-	 * allocate a kmem_cache_node structure in order to bring the node
-	 * online.
-	 */
-	down_read(&slub_lock);
-	list_for_each_entry(s, &slab_caches, list) {
-		/*
-		 * XXX: kmem_cache_alloc_node will fallback to other nodes
-		 *      since memory is not yet available from the node that
-		 *      is brought up.
-		 */
-		n = kmem_cache_alloc(kmalloc_caches, GFP_KERNEL);
-		if (!n) {
-			ret = -ENOMEM;
-			goto out;
-		}
-		init_kmem_cache_node(n, s);
-		s->node[nid] = n;
-	}
-out:
-	up_read(&slub_lock);
-	return ret;
-}
-
-static int slab_memory_callback(struct notifier_block *self,
-				unsigned long action, void *arg)
-{
-	int ret = 0;
-
-	switch (action) {
-	case MEM_GOING_ONLINE:
-		ret = slab_mem_going_online_callback(arg);
-		break;
-	case MEM_GOING_OFFLINE:
-		ret = slab_mem_going_offline_callback(arg);
-		break;
-	case MEM_OFFLINE:
-	case MEM_CANCEL_ONLINE:
-		slab_mem_offline_callback(arg);
-		break;
-	case MEM_ONLINE:
-	case MEM_CANCEL_OFFLINE:
-		break;
-	}
-	if (ret)
-		ret = notifier_from_errno(ret);
-	else
-		ret = NOTIFY_OK;
-	return ret;
-}
-
-#endif /* CONFIG_MEMORY_HOTPLUG */
-
 /********************************************************************
  *			Basic setup of slabs
  *******************************************************************/
@@ -2950,20 +2652,6 @@ void __init kmem_cache_init(void)
 	int caches = 0;
 
 	init_alloc_cpu();
-
-#ifdef CONFIG_NUMA
-	/*
-	 * Must first have the slab cache available for the allocations of the
-	 * struct kmem_cache_node's. There is special bootstrap code in
-	 * kmem_cache_open for slab_state == DOWN.
-	 */
-	create_kmalloc_cache(&kmalloc_caches[0], "kmem_cache_node",
-		sizeof(struct kmem_cache_node), GFP_KERNEL);
-	kmalloc_caches[0].refcount = -1;
-	caches++;
-
-	hotplug_memory_notifier(slab_memory_callback, SLAB_CALLBACK_PRI);
-#endif
 
 	/* Able to allocate the per node structures */
 	slab_state = PARTIAL;
@@ -3728,12 +3416,6 @@ static ssize_t show_slab_objects(struct kmem_cache *s,
 		}
 	}
 	x = sprintf(buf, "%lu", total);
-#ifdef CONFIG_NUMA
-	for_each_node_state(node, N_NORMAL_MEMORY)
-		if (nodes[node])
-			x += sprintf(buf + x, " N%d=%lu",
-					node, nodes[node]);
-#endif
 	kfree(nodes);
 	return x + sprintf(buf + x, "\n");
 }
@@ -4046,30 +3728,6 @@ static ssize_t free_calls_show(struct kmem_cache *s, char *buf)
 }
 SLAB_ATTR_RO(free_calls);
 
-#ifdef CONFIG_NUMA
-static ssize_t remote_node_defrag_ratio_show(struct kmem_cache *s, char *buf)
-{
-	return sprintf(buf, "%d\n", s->remote_node_defrag_ratio / 10);
-}
-
-static ssize_t remote_node_defrag_ratio_store(struct kmem_cache *s,
-				const char *buf, size_t length)
-{
-	unsigned long ratio;
-	int err;
-
-	err = strict_strtoul(buf, 10, &ratio);
-	if (err)
-		return err;
-
-	if (ratio <= 100)
-		s->remote_node_defrag_ratio = ratio * 10;
-
-	return length;
-}
-SLAB_ATTR(remote_node_defrag_ratio);
-#endif
-
 #ifdef CONFIG_SLUB_STATS
 static int show_stat(struct kmem_cache *s, char *buf, enum stat_item si)
 {
@@ -4155,9 +3813,6 @@ static struct attribute *slab_attrs[] = {
 	&free_calls_attr.attr,
 #ifdef CONFIG_ZONE_DMA
 	&cache_dma_attr.attr,
-#endif
-#ifdef CONFIG_NUMA
-	&remote_node_defrag_ratio_attr.attr,
 #endif
 #ifdef CONFIG_SLUB_STATS
 	&alloc_fastpath_attr.attr,

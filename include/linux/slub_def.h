@@ -95,13 +95,6 @@ struct kmem_cache {
 	struct kobject kobj;	/* For sysfs */
 #endif
 
-#ifdef CONFIG_NUMA
-	/*
-	 * Defragmentation by allocating from a remote node.
-	 */
-	int remote_node_defrag_ratio;
-	struct kmem_cache_node *node[MAX_NUMNODES];
-#endif
 #ifdef CONFIG_SMP
 	struct kmem_cache_cpu *cpu_slab[NR_CPUS];
 #else
@@ -226,24 +219,5 @@ static __always_inline void *kmalloc(size_t size, gfp_t flags)
 	}
 	return __kmalloc(size, flags);
 }
-
-#ifdef CONFIG_NUMA
-void *__kmalloc_node(size_t size, gfp_t flags, int node);
-void *kmem_cache_alloc_node(struct kmem_cache *, gfp_t flags, int node);
-
-static __always_inline void *kmalloc_node(size_t size, gfp_t flags, int node)
-{
-	if (__builtin_constant_p(size) &&
-		size <= PAGE_SIZE && !(flags & SLUB_DMA)) {
-			struct kmem_cache *s = kmalloc_slab(size);
-
-		if (!s)
-			return ZERO_SIZE_PTR;
-
-		return kmem_cache_alloc_node(s, flags, node);
-	}
-	return __kmalloc_node(size, flags, node);
-}
-#endif
 
 #endif /* _LINUX_SLUB_DEF_H */

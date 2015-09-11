@@ -1079,69 +1079,6 @@ redirty:
 	return 0;
 }
 
-#ifdef CONFIG_NUMA
-#ifdef CONFIG_TMPFS
-static void shmem_show_mpol(struct seq_file *seq, struct mempolicy *mpol)
-{
-	char buffer[64];
-
-	if (!mpol || mpol->mode == MPOL_DEFAULT)
-		return;		/* show nothing */
-
-	mpol_to_str(buffer, sizeof(buffer), mpol, 1);
-
-	seq_printf(seq, ",mpol=%s", buffer);
-}
-
-static struct mempolicy *shmem_get_sbmpol(struct shmem_sb_info *sbinfo)
-{
-	struct mempolicy *mpol = NULL;
-	if (sbinfo->mpol) {
-		spin_lock(&sbinfo->stat_lock);	/* prevent replace/use races */
-		mpol = sbinfo->mpol;
-		mpol_get(mpol);
-		spin_unlock(&sbinfo->stat_lock);
-	}
-	return mpol;
-}
-#endif /* CONFIG_TMPFS */
-
-static struct page *shmem_swapin(swp_entry_t entry, gfp_t gfp,
-			struct shmem_inode_info *info, unsigned long idx)
-{
-	struct mempolicy mpol, *spol;
-	struct vm_area_struct pvma;
-	struct page *page;
-
-	spol = mpol_cond_copy(&mpol,
-				mpol_shared_policy_lookup(&info->policy, idx));
-
-	/* Create a pseudo vma that just contains the policy */
-	pvma.vm_start = 0;
-	pvma.vm_pgoff = idx;
-	pvma.vm_ops = NULL;
-	pvma.vm_policy = spol;
-	page = swapin_readahead(entry, gfp, &pvma, 0);
-	return page;
-}
-
-static struct page *shmem_alloc_page(gfp_t gfp,
-			struct shmem_inode_info *info, unsigned long idx)
-{
-	struct vm_area_struct pvma;
-
-	/* Create a pseudo vma that just contains the policy */
-	pvma.vm_start = 0;
-	pvma.vm_pgoff = idx;
-	pvma.vm_ops = NULL;
-	pvma.vm_policy = mpol_shared_policy_lookup(&info->policy, idx);
-
-	/*
-	 * alloc_page_vma() will drop the shared policy reference
-	 */
-	return alloc_page_vma(gfp, &pvma, 0);
-}
-#else /* !CONFIG_NUMA */
 #ifdef CONFIG_TMPFS
 static inline void shmem_show_mpol(struct seq_file *seq, struct mempolicy *p)
 {
@@ -1159,9 +1096,8 @@ static inline struct page *shmem_alloc_page(gfp_t gfp,
 {
 	return alloc_page(gfp);
 }
-#endif /* CONFIG_NUMA */
 
-#if !defined(CONFIG_NUMA) || !defined(CONFIG_TMPFS)
+#if !defined(CONFIG_TMPFS)
 static inline struct mempolicy *shmem_get_sbmpol(struct shmem_sb_info *sbinfo)
 {
 	return NULL;
@@ -1447,24 +1383,6 @@ static int shmem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	mark_page_accessed(vmf->page);
 	return ret | VM_FAULT_LOCKED;
 }
-
-#ifdef CONFIG_NUMA
-static int shmem_set_policy(struct vm_area_struct *vma, struct mempolicy *new)
-{
-	struct inode *i = vma->vm_file->f_path.dentry->d_inode;
-	return mpol_set_shared_policy(&SHMEM_I(i)->policy, vma, new);
-}
-
-static struct mempolicy *shmem_get_policy(struct vm_area_struct *vma,
-					  unsigned long addr)
-{
-	struct inode *i = vma->vm_file->f_path.dentry->d_inode;
-	unsigned long idx;
-
-	idx = ((addr - vma->vm_start) >> PAGE_SHIFT) + vma->vm_pgoff;
-	return mpol_shared_policy_lookup(&SHMEM_I(i)->policy, idx);
-}
-#endif
 
 int shmem_lock(struct file *file, int lock, struct user_struct *user)
 {
@@ -2467,10 +2385,6 @@ static const struct super_operations shmem_ops = {
 
 static struct vm_operations_struct shmem_vm_ops = {
 	.fault		= shmem_fault,
-#ifdef CONFIG_NUMA
-	.set_policy     = shmem_set_policy,
-	.get_policy     = shmem_get_policy,
-#endif
 };
 
 

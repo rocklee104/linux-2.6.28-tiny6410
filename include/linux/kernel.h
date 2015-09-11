@@ -518,7 +518,6 @@ struct sysinfo {
 /* Trap pasters of __FUNCTION__ at compile-time */
 #define __FUNCTION__ (__func__)
 
-/* This helps us to avoid #ifdef CONFIG_NUMA */
 #define NUMA_BUILD 0
 
 /* Rebuild everything on CONFIG_FTRACE_MCOUNT_RECORD */

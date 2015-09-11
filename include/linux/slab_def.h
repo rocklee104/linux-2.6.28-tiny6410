@@ -55,38 +55,4 @@ found:
 	return __kmalloc(size, flags);
 }
 
-#ifdef CONFIG_NUMA
-extern void *__kmalloc_node(size_t size, gfp_t flags, int node);
-extern void *kmem_cache_alloc_node(struct kmem_cache *, gfp_t flags, int node);
-
-static inline void *kmalloc_node(size_t size, gfp_t flags, int node)
-{
-	if (__builtin_constant_p(size)) {
-		int i = 0;
-
-		if (!size)
-			return ZERO_SIZE_PTR;
-
-#define CACHE(x) \
-		if (size <= x) \
-			goto found; \
-		else \
-			i++;
-#include <linux/kmalloc_sizes.h>
-#undef CACHE
-		return NULL;
-found:
-#ifdef CONFIG_ZONE_DMA
-		if (flags & GFP_DMA)
-			return kmem_cache_alloc_node(malloc_sizes[i].cs_dmacachep,
-						flags, node);
-#endif
-		return kmem_cache_alloc_node(malloc_sizes[i].cs_cachep,
-						flags, node);
-	}
-	return __kmalloc_node(size, flags, node);
-}
-
-#endif	/* CONFIG_NUMA */
-
 #endif	/* _LINUX_SLAB_DEF_H */
