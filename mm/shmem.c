@@ -1097,7 +1097,7 @@ static inline struct page *shmem_alloc_page(gfp_t gfp,
 	return alloc_page(gfp);
 }
 
-#if !defined(CONFIG_TMPFS)
+#if !defined(CONFIG_NUMA) || !defined(CONFIG_TMPFS)
 static inline struct mempolicy *shmem_get_sbmpol(struct shmem_sb_info *sbinfo)
 {
 	return NULL;
