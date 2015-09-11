@@ -207,14 +207,10 @@ static inline void page_unfreeze_refs(struct page *page, int count)
 	atomic_set(&page->_count, count);
 }
 
-#ifdef CONFIG_NUMA
-extern struct page *__page_cache_alloc(gfp_t gfp);
-#else
 static inline struct page *__page_cache_alloc(gfp_t gfp)
 {
 	return alloc_pages(gfp, 0);
 }
-#endif
 
 static inline struct page *page_cache_alloc(struct address_space *x)
 {

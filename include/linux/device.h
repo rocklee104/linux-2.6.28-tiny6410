@@ -389,9 +389,6 @@ struct device {
 					   core doesn't touch it */
 	struct dev_pm_info	power;
 
-#ifdef CONFIG_NUMA
-	int		numa_node;	/* NUMA node this device is close to */
-#endif
 	u64		*dma_mask;	/* dma mask (if dma'able device) */
 	u64		coherent_dma_mask;/* Like dma_mask, but for
 					     alloc_coherent mappings as
@@ -431,16 +428,6 @@ static inline const char *dev_name(const struct device *dev)
 extern int dev_set_name(struct device *dev, const char *name, ...)
 			__attribute__((format(printf, 2, 3)));
 
-#ifdef CONFIG_NUMA
-static inline int dev_to_node(struct device *dev)
-{
-	return dev->numa_node;
-}
-static inline void set_dev_node(struct device *dev, int node)
-{
-	dev->numa_node = node;
-}
-#else
 static inline int dev_to_node(struct device *dev)
 {
 	return -1;
@@ -448,7 +435,6 @@ static inline int dev_to_node(struct device *dev)
 static inline void set_dev_node(struct device *dev, int node)
 {
 }
-#endif
 
 static inline void *dev_get_drvdata(const struct device *dev)
 {

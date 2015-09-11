@@ -162,11 +162,7 @@ extern void *alloc_large_system_hash(const char *tablename,
 /* Only NUMA needs hash distribution.
  * IA64 and x86_64 have sufficient vmalloc space.
  */
-#if defined(CONFIG_NUMA) && (defined(CONFIG_IA64) || defined(CONFIG_X86_64))
-#define HASHDIST_DEFAULT 1
-#else
 #define HASHDIST_DEFAULT 0
-#endif
 extern int hashdist;		/* Distribute hashes across NUMA nodes? */
 
 

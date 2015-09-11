@@ -529,18 +529,6 @@ int add_to_page_cache_lru(struct page *page, struct address_space *mapping,
 	return ret;
 }
 
-#ifdef CONFIG_NUMA
-struct page *__page_cache_alloc(gfp_t gfp)
-{
-	if (cpuset_do_page_mem_spread()) {
-		int n = cpuset_mem_spread_node();
-		return alloc_pages_node(n, gfp, 0);
-	}
-	return alloc_pages(gfp, 0);
-}
-EXPORT_SYMBOL(__page_cache_alloc);
-#endif
-
 static int __sleep_on_page_lock(void *word)
 {
 	io_schedule();

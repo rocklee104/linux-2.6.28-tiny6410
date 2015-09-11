@@ -519,11 +519,7 @@ struct sysinfo {
 #define __FUNCTION__ (__func__)
 
 /* This helps us to avoid #ifdef CONFIG_NUMA */
-#ifdef CONFIG_NUMA
-#define NUMA_BUILD 1
-#else
 #define NUMA_BUILD 0
-#endif
 
 /* Rebuild everything on CONFIG_FTRACE_MCOUNT_RECORD */
 #ifdef CONFIG_FTRACE_MCOUNT_RECORD

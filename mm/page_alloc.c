@@ -877,31 +877,6 @@ static int rmqueue_bulk(struct zone *zone, unsigned int order,
 	return i;
 }
 
-#ifdef CONFIG_NUMA
-/*
- * Called from the vmstat counter updater to drain pagesets of this
- * currently executing processor on remote nodes after they have
- * expired.
- *
- * Note that this function must be called with the thread pinned to
- * a single processor.
- */
-void drain_zone_pages(struct zone *zone, struct per_cpu_pages *pcp)
-{
-	unsigned long flags;
-	int to_drain;
-
-	local_irq_save(flags);
-	if (pcp->count >= pcp->batch)
-		to_drain = pcp->batch;
-	else
-		to_drain = pcp->count;
-	free_pages_bulk(zone, to_drain, &pcp->list, 0);
-	pcp->count -= to_drain;
-	local_irq_restore(flags);
-}
-#endif
-
 /*
  * Drain pages of the indicated processor.
  *

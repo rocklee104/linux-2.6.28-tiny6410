@@ -1055,15 +1055,6 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	p->io_context = NULL;
 	p->audit_context = NULL;
 	cgroup_fork(p);
-#ifdef CONFIG_NUMA
-	p->mempolicy = mpol_dup(p->mempolicy);
- 	if (IS_ERR(p->mempolicy)) {
- 		retval = PTR_ERR(p->mempolicy);
- 		p->mempolicy = NULL;
- 		goto bad_fork_cleanup_cgroup;
- 	}
-	mpol_fix_fork_child_flag(p);
-#endif
 #ifdef CONFIG_TRACE_IRQFLAGS
 	p->irq_events = 0;
 #ifdef __ARCH_WANT_INTERRUPTS_ON_CTXSW
@@ -1301,10 +1292,6 @@ bad_fork_cleanup_audit:
 bad_fork_cleanup_security:
 	security_task_free(p);
 bad_fork_cleanup_policy:
-#ifdef CONFIG_NUMA
-	mpol_put(p->mempolicy);
-bad_fork_cleanup_cgroup:
-#endif
 	cgroup_exit(p, cgroup_callbacks_done);
 	delayacct_tsk_free(p);
 	if (p->binfmt)

@@ -100,11 +100,7 @@ struct vm_area_struct;
 				 __GFP_HARDWALL | __GFP_HIGHMEM | \
 				 __GFP_MOVABLE)
 
-#ifdef CONFIG_NUMA
-#define GFP_THISNODE	(__GFP_THISNODE | __GFP_NOWARN | __GFP_NORETRY)
-#else
 #define GFP_THISNODE	((__force gfp_t)0)
-#endif
 
 /* This mask makes up all the page movable related flags */
 #define GFP_MOVABLE_MASK (__GFP_RECLAIMABLE|__GFP_MOVABLE)
@@ -234,24 +230,9 @@ static inline struct page *alloc_pages_node(int nid, gfp_t gfp_mask,
 	return __alloc_pages(gfp_mask, order, node_zonelist(nid, gfp_mask));
 }
 
-#ifdef CONFIG_NUMA
-extern struct page *alloc_pages_current(gfp_t gfp_mask, unsigned order);
-
-static inline struct page *
-alloc_pages(gfp_t gfp_mask, unsigned int order)
-{
-	if (unlikely(order >= MAX_ORDER))
-		return NULL;
-
-	return alloc_pages_current(gfp_mask, order);
-}
-extern struct page *alloc_page_vma(gfp_t gfp_mask,
-			struct vm_area_struct *vma, unsigned long addr);
-#else
 #define alloc_pages(gfp_mask, order) \
 		alloc_pages_node(numa_node_id(), gfp_mask, order)
 #define alloc_page_vma(gfp_mask, vma, addr) alloc_pages(gfp_mask, 0)
-#endif
 #define alloc_page(gfp_mask) alloc_pages(gfp_mask, 0)
 
 extern unsigned long __get_free_pages(gfp_t gfp_mask, unsigned int order);
