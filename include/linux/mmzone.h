@@ -817,6 +817,7 @@ unsigned long __init node_memmap_size_bytes(int, unsigned long, unsigned long);
  */
 #define zone_idx(zone)		((zone) - (zone)->zone_pgdat->node_zones)
 
+/* 当zone中有物理页面时,返回1,否则返回0 */
 static inline int populated_zone(struct zone *zone)
 {
 	return (!!zone->present_pages);

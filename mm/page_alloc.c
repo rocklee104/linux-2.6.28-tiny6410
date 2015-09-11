@@ -2003,6 +2003,7 @@ static int build_zonelists_node(pg_data_t *pgdat, struct zonelist *zonelist,
 	do {
 		zone_type--;
 		zone = pgdat->node_zones + zone_type;
+		/* 判断zone中是否含有物理页面 */
 		if (populated_zone(zone)) {
 			zoneref_set_zone(zone,
 				&zonelist->_zonerefs[nr_zones++]);
@@ -2373,6 +2374,7 @@ static void build_zonelist_cache(pg_data_t *pgdat)
 
 
 #else	/* CONFIG_NUMA */
+/* mini6410 */
 
 static void set_zonelist_order(void)
 {
@@ -2441,6 +2443,7 @@ void build_all_zonelists(void)
 {
 	set_zonelist_order();
 
+	/* 系统状态初始化为SYSTEM_BOOTING,在rest_init才会被改变为SYSTEM_RUNNING */
 	if (system_state == SYSTEM_BOOTING) {
 		__build_all_zonelists(NULL);
 		mminit_verify_zonelist();

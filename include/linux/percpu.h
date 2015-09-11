@@ -49,6 +49,7 @@
 #define PERCPU_MODULE_RESERVE	0
 #endif
 
+/* 每一个cpu的percpu区域大小 */
 #define PERCPU_ENOUGH_ROOM						\
 	(__per_cpu_end - __per_cpu_start + PERCPU_MODULE_RESERVE)
 #endif	/* PERCPU_ENOUGH_ROOM */

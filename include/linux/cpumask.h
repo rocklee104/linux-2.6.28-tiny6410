@@ -298,7 +298,7 @@ static inline const cpumask_t *get_cpu_mask(unsigned int cpu)
 #if NR_CPUS <= BITS_PER_LONG
 /* 如果CPU的个数能够被一个位图容纳 */
 
-/* 将位图中能够使用的CPU全部置位 */
+/* 将位图中能够使用的CPU全部置位,当NR_CPUS == 4时,在位图中置位bit[15] */
 #define CPU_MASK_ALL							\
 (cpumask_t) { {								\
 	[BITS_TO_LONGS(NR_CPUS)-1] = CPU_MASK_LAST_WORD			\

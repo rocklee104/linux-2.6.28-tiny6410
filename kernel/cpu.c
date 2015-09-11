@@ -1,4 +1,4 @@
-/* CPU control.
+﻿/* CPU control.
  * (C) 2001, 2002, 2003, 2004 Rusty Russell
  *
  * This code is licenced under the GPL.
@@ -32,6 +32,7 @@ EXPORT_SYMBOL(cpu_present_map);
 cpumask_t cpu_online_map __read_mostly = CPU_MASK_ALL;
 EXPORT_SYMBOL(cpu_online_map);
 
+/* 根据cpu个数创建位图,并且在位图中标记cpu个数 */
 cpumask_t cpu_possible_map __read_mostly = CPU_MASK_ALL;
 EXPORT_SYMBOL(cpu_possible_map);
 
