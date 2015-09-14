@@ -35,13 +35,13 @@
  */
 #define PAGE_ALLOC_COSTLY_ORDER 3
 
-//不可移动页
+/* 不可移动页 */
 #define MIGRATE_UNMOVABLE     0
-//可回收页
+/* 可回收页 */
 #define MIGRATE_RECLAIMABLE   1
-//可移动页
+/* 可移动页 */
 #define MIGRATE_MOVABLE       2
-//如果向特定可移动性的列表请求分配内存失败,这种紧急情况下可以从MIGRATE_RESERVE分配内存
+/* 如果向特定可移动性的列表请求分配内存失败,这种紧急情况下可以从MIGRATE_RESERVE分配内存 */
 #define MIGRATE_RESERVE       3
 /*
  * MIGRATE_ISOLATE是一个特殊的虚拟区,用于跨越NUMA节点移动物理内存页.在大型系统上,
@@ -51,7 +51,7 @@
 /*迁移类型的数目*/
 #define MIGRATE_TYPES         5
 
-//遍历所有migrata types的所有分配阶
+/* 遍历所有migrata types的所有分配阶 */
 #define for_each_migratetype_order(order, type) \
 	for (order = 0; order < MAX_ORDER; order++) \
 		for (type = 0; type < MIGRATE_TYPES; type++)
@@ -67,9 +67,9 @@ static inline int get_pageblock_migratetype(struct page *page)
 }
 
 struct free_area {
-	//根据不同的migrate_type分为不同的链表
+	/* 根据不同的migrate_type分为不同的链表 */
 	struct list_head	free_list[MIGRATE_TYPES];
-	//统计所有list的可用页数
+	/* 统计所有list的可用页数 */
 	unsigned long		nr_free;
 };
 
@@ -179,21 +179,21 @@ static inline int is_unevictable_lru(enum lru_list l)
 }
 
 struct per_cpu_pages {
-	//高速缓存中页框的个数,如果count值超过了high,表明链表中的页太多了
+	/* 高速缓存中页框的个数,如果count值超过了high,表明链表中的页太多了 */
 	int count;		/* number of pages in the list */
-	//上界,表示高速缓存用尽
+	/* 上界,表示高速缓存用尽 */
 	int high;		/* high watermark, emptying needed */
 	/* 
 	 * 如果可能,CPU高速缓存不是用单个页来填充,而是多个页组成的块.
 	 * batch是每次添加页数的一个参考值
 	 */
 	int batch;		/* chunk size for buddy add/remove */
-	//高速缓存中包含的页框描述符链表
+	/* 高速缓存中包含的页框描述符链表 */
 	struct list_head list;	/* the list of pages */
 };
 
 struct per_cpu_pageset {
-	//冷热页放到同一个链表中
+	/* 冷热页放到同一个链表中 */
 	struct per_cpu_pages pcp;
 #ifdef CONFIG_SMP
 	s8 stat_threshold;
@@ -232,24 +232,15 @@ enum zone_type {
 	 */
 	ZONE_DMA,
 #endif
-#ifdef CONFIG_ZONE_DMA32
-//6410用不到
-	/*
-	 * x86_64 needs two ZONE_DMAs because it supports devices that are
-	 * only able to do DMA to the lower 16M but also 32 bit devices that
-	 * can only do DMA areas below 4G.
-	 */
-	ZONE_DMA32,
-#endif
 	/*
 	 * Normal addressable memory is in ZONE_NORMAL. DMA operations can be
 	 * performed on pages in ZONE_NORMAL if the DMA devices support
 	 * transfers to all addressable memory.
 	 */
-	//常规内存访问.如果DMA设备支持在此区域内存访问,也可以使用本区域
+	/* 常规内存访问.如果DMA设备支持在此区域内存访问,也可以使用本区域 */
 	ZONE_NORMAL,
 #ifdef CONFIG_HIGHMEM
-	//6410 256MB的内存,没有高端内存T-T
+	/* 6410 256MB的内存,没有高端内存T-T */
 	/*
 	 * A memory area that is only addressable by the kernel through
 	 * mapping portions into its own address space. This is for example
@@ -265,7 +256,7 @@ enum zone_type {
 	 */
 	ZONE_HIGHMEM,
 #endif
-	//在防止物理内存碎片的机制中需要使用该内存域
+	/* 在防止物理内存碎片的机制中需要使用该内存域 */
 	ZONE_MOVABLE,
 	__MAX_NR_ZONES
 };
@@ -280,7 +271,7 @@ enum zone_type {
  * match the requested limits. See gfp_zone() in include/linux/gfp.h
  */
 
-//ZONES_SHIFT == 2
+/* ZONES_SHIFT == 2 */
 #if MAX_NR_ZONES < 2
 #define ZONES_SHIFT 0
 #elif MAX_NR_ZONES <= 2
@@ -564,7 +555,9 @@ struct zoneref {
  * zonelist_node_idx()	- Return the index of the node for an entry
  */
 struct zonelist {
+	/* struct zonelist_cache并没有实际定义,但是可以使用其指针,因为指针的大小固定 */
 	struct zonelist_cache *zlcache_ptr;		     // NULL or &zlcache
+	/* _zonerefs根据zone_type逆序保存.如果zone[2]有页面,那么_zonerefs[0]中就保存zone[2] */
 	struct zoneref _zonerefs[MAX_ZONES_PER_ZONELIST + 1];
 };
 
@@ -706,6 +699,7 @@ unsigned long __init node_memmap_size_bytes(int, unsigned long, unsigned long);
 /*
  * zone_idx() returns 0 for the ZONE_DMA zone, 1 for the ZONE_NORMAL zone, etc.
  */
+/* 获取当前zone在node_zones中的下标 */
 #define zone_idx(zone)		((zone) - (zone)->zone_pgdat->node_zones)
 
 /* 当zone中有物理页面时,返回1,否则返回0 */
@@ -808,7 +802,7 @@ extern char numa_zonelist_order[];
 #endif
 
 #ifndef CONFIG_NEED_MULTIPLE_NODES
-//mini6410
+/* mini6410 */
 
 extern struct pglist_data contig_page_data;
 /* bootmem_node_data[0] */
@@ -910,6 +904,7 @@ static inline struct zoneref *first_zones_zonelist(struct zonelist *zonelist,
  * This iterator iterates though all zones at or below a given zone index and
  * within a given nodemask
  */
+/* 遍历zonelist中的zone */
 #define for_each_zone_zonelist_nodemask(zone, z, zlist, highidx, nodemask) \
 	for (z = first_zones_zonelist(zlist, highidx, nodemask, &zone);	\
 		zone;							\
@@ -1098,11 +1093,11 @@ void sparse_init(void);
 #ifdef CONFIG_NODES_SPAN_OTHER_NODES
 #define early_pfn_in_nid(pfn, nid)	(early_pfn_to_nid(pfn) == (nid))
 #else
-//mini6410
+/* mini6410 */
 #define early_pfn_in_nid(pfn, nid)	(1)
 #endif
 
-//mini6410
+/* mini6410 */
 #ifndef early_pfn_valid
 #define early_pfn_valid(pfn)	(1)
 #endif

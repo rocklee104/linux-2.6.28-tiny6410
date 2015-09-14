@@ -55,7 +55,7 @@ extern int pageblock_order;
 
 #endif /* CONFIG_HUGETLB_PAGE */
 
-//每个page block占用2048个page
+/* 每个page block占用2048个page */
 #define pageblock_nr_pages	(1UL << pageblock_order)
 
 /* Forward declaration */

@@ -1,4 +1,4 @@
-#include <linux/module.h>
+﻿#include <linux/module.h>
 #include <linux/bitops.h>
 #include <asm/types.h>
 
@@ -9,6 +9,7 @@
  * The Hamming Weight of a number is the total number of bits set in it.
  */
 
+/* 统计w中1的个数 */
 unsigned int hweight32(unsigned int w)
 {
 	unsigned int res = w - ((w >> 1) & 0x55555555);

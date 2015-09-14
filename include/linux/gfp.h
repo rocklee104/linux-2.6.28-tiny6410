@@ -17,11 +17,11 @@ struct vm_area_struct;
  * be used in bit comparisons.
  */
 /*没有__GFP_NORMAL这样的掩码,当没有指定__GFP_HIGHMEM及__GFP_DMA时,就相当于__GFP_NORMAL*/
-//在ZONE_DMA标识的内存区域中查找空闲页
+/* 在ZONE_DMA标识的内存区域中查找空闲页 */
 #define __GFP_DMA	((__force gfp_t)0x01u)
-//在ZONE_HIGHMEM标识的内存区域中查找空闲页
+/* 在ZONE_HIGHMEM标识的内存区域中查找空闲页 */
 #define __GFP_HIGHMEM	((__force gfp_t)0x02u)
-//在ZONE_DMA32标识的内存区域中查找空闲页
+/* 在ZONE_DMA32标识的内存区域中查找空闲页 */
 #define __GFP_DMA32	((__force gfp_t)0x04u)
 
 /*
@@ -38,58 +38,59 @@ struct vm_area_struct;
  * __GFP_MOVABLE: Flag that this page will be movable by the page migration
  * mechanism or reclaimed
  */
-//当前正在向内核申请页分配的进程可以被阻塞,意味着调度器可以在此请求期间调度另外一个进程执行
+/* 当前正在向内核申请页分配的进程可以被阻塞,意味着调度器可以在此请求期间调度另外一个进程执行 */
 #define __GFP_WAIT	((__force gfp_t)0x10u)	/* Can wait and reschedule? */
-//内核允许使用紧急分配链表中的保留内存页,该请求必须以原子方式完成,意味着请求过程不允许被中断
+/* 内核允许使用紧急分配链表中的保留内存页,该请求必须以原子方式完成,意味着请求过程不允许被中断 */
 #define __GFP_HIGH	((__force gfp_t)0x20u)	/* Should access emergency pools? */
-//内核在查找空闲页的过程中可以进行io操作,如此内核可以将换出的页写到硬盘
+/* 内核在查找空闲页的过程中可以进行io操作,如此内核可以将换出的页写到硬盘 */
 #define __GFP_IO	((__force gfp_t)0x40u)	/* Can start physical IO? */
-//查找空闲页的过程中允许执行文件系统相关操作
+/* 查找空闲页的过程中允许执行文件系统相关操作 */
 #define __GFP_FS	((__force gfp_t)0x80u)	/* Can call down to low-level FS? */
-//从非缓存的冷页中分配
+/* 从非缓存的冷页中分配 */
 #define __GFP_COLD	((__force gfp_t)0x100u)	/* Cache-cold page required */
-//禁止分配失败时的警告
+/* 禁止分配失败时的警告 */
 #define __GFP_NOWARN	((__force gfp_t)0x200u)	/* Suppress page allocation failure warning */
-//如果分配行为失败,可以自动尝试再次分配.尝试若干次后会终止
+/* 如果分配行为失败,可以自动尝试再次分配.尝试若干次后会终止 */
 #define __GFP_REPEAT	((__force gfp_t)0x400u)	/* See above */
-//分配失败后一直重试,直到分配成功为止,分配函数的调用者无法处理分配失败的情形
+/* 分配失败后一直重试,直到分配成功为止,分配函数的调用者无法处理分配失败的情形 */
 #define __GFP_NOFAIL	((__force gfp_t)0x800u)	/* See above */
-//如果分配失败,不会进行重试操作
+/* 如果分配失败,不会进行重试操作 */
 #define __GFP_NORETRY	((__force gfp_t)0x1000u)/* See above */
-//增加复合页元素
+/* 增加复合页元素 */
 #define __GFP_COMP	((__force gfp_t)0x4000u)/* Add compound page metadata */
-//用0填充成功分配出来的物理页
+/* 用0填充成功分配出来的物理页 */
 #define __GFP_ZERO	((__force gfp_t)0x8000u)/* Return zeroed page on success */
-//不要使用仅限紧急分配使用的保留分配链表
+/* 不要使用仅限紧急分配使用的保留分配链表 */
 #define __GFP_NOMEMALLOC ((__force gfp_t)0x10000u) /* Don't use emergency reserves */
-//只能在当前进程允许运行的各个CPU所关联的节点分配内存.该标志只有在NUMA系统上才有意义
+/* 只能在当前进程允许运行的各个CPU所关联的节点分配内存.该标志只有在NUMA系统上才有意义 */
 #define __GFP_HARDWALL   ((__force gfp_t)0x20000u) /* Enforce hardwall cpuset memory allocs */
 #define __GFP_THISNODE	((__force gfp_t)0x40000u)/* No fallback, no policies */
 #define __GFP_RECLAIMABLE ((__force gfp_t)0x80000u) /* Page is reclaimable */
-//将分配的物理页标记为可移动的
+/* 将分配的物理页标记为可移动的 */
 #define __GFP_MOVABLE	((__force gfp_t)0x100000u)  /* Page is movable */
 
-//用于hight == 0, radix tree root中直接保存数据的情况
+/* 用于hight == 0, radix tree root中直接保存数据的情况 */
 #define __GFP_BITS_SHIFT 21	/* Room for 21 __GFP_FOO bits */
 #define __GFP_BITS_MASK ((__force gfp_t)((1 << __GFP_BITS_SHIFT) - 1))
 
 /* This equals 0, but use constants in case they ever change */
 #define GFP_NOWAIT	(GFP_ATOMIC & ~__GFP_HIGH)
 /* GFP_ATOMIC means both !wait (__GFP_WAIT not set) and use emergency pool */
-//用于原子分配,也是下面几个掩码中唯一不带__GFP_WAIT的
+/* 用于原子分配,也是下面几个掩码中唯一不带__GFP_WAIT的 */
 #define GFP_ATOMIC	(__GFP_HIGH)
-//禁止io操作,是下面几个掩码中唯一不带__GFP_IO的
+/* 禁止io操作,是下面几个掩码中唯一不带__GFP_IO的 */
 #define GFP_NOIO	(__GFP_WAIT)
-//禁止文件系统相关调用
+/* 禁止文件系统相关调用 */
 #define GFP_NOFS	(__GFP_WAIT | __GFP_IO)
 #define GFP_KERNEL	(__GFP_WAIT | __GFP_IO | __GFP_FS)
 #define GFP_TEMPORARY	(__GFP_WAIT | __GFP_IO | __GFP_FS | \
 			 __GFP_RECLAIMABLE)
-//为用户空间分配内存页
+/* 为用户空间分配内存页 */
 #define GFP_USER	(__GFP_WAIT | __GFP_IO | __GFP_FS | __GFP_HARDWALL)
-//对GFP_USER的一个扩展,可以使用非线性映射的高端内存
+/* 对GFP_USER的一个扩展,可以使用非线性映射的高端内存 */
 #define GFP_HIGHUSER	(__GFP_WAIT | __GFP_IO | __GFP_FS | __GFP_HARDWALL | \
 			 __GFP_HIGHMEM)
+/* 表示高端内存区域的可移动页 */
 #define GFP_HIGHUSER_MOVABLE	(__GFP_WAIT | __GFP_IO | __GFP_FS | \
 				 __GFP_HARDWALL | __GFP_HIGHMEM | \
 				 __GFP_MOVABLE)
@@ -126,7 +127,7 @@ struct vm_area_struct;
 #define GFP_DMA32	__GFP_DMA32
 
 /* Convert GFP flags to their corresponding migrate type */
-//将分配时用到的flag(GFP_)转换成migrate type
+/* 将分配时用到的flag(GFP_)转换成migrate type */
 static inline int allocflags_to_migratetype(gfp_t gfp_flags)
 {
 	WARN_ON((gfp_flags & GFP_MOVABLE_MASK) == GFP_MOVABLE_MASK);
@@ -146,10 +147,6 @@ static inline enum zone_type gfp_zone(gfp_t flags)
 	if (flags & __GFP_DMA)
 		return ZONE_DMA;
 #endif
-#ifdef CONFIG_ZONE_DMA32
-	if (flags & __GFP_DMA32)
-		return ZONE_DMA32;
-#endif
 	if ((flags & (__GFP_HIGHMEM | __GFP_MOVABLE)) ==
 			(__GFP_HIGHMEM | __GFP_MOVABLE))
 		return ZONE_MOVABLE;
@@ -157,7 +154,7 @@ static inline enum zone_type gfp_zone(gfp_t flags)
 	if (flags & __GFP_HIGHMEM)
 		return ZONE_HIGHMEM;
 #endif
-	//既不在ZONE_DMA也不在ZONE_HIGHMEM就返回ZONE_NORMAL
+	/* 既不在ZONE_DMA也不在ZONE_HIGHMEM就返回ZONE_NORMAL */
 	return ZONE_NORMAL;
 }
 
@@ -201,7 +198,7 @@ struct page *
 __alloc_pages_internal(gfp_t gfp_mask, unsigned int order,
 		       struct zonelist *zonelist, nodemask_t *nodemask);
 
-//分配2的order次方个连续的物理页面并返回起始页的struct page *
+/* 分配2的order次方个连续的物理页面并返回起始页的struct page * */
 static inline struct page *
 __alloc_pages(gfp_t gfp_mask, unsigned int order,
 		struct zonelist *zonelist)

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * linux/include/asm-generic/topology.h
  *
  * Written by: Matthew Dobson, IBM Corporation
@@ -29,6 +29,7 @@
 
 /* Other architectures wishing to use this simple topology API should fill
    in the below functions as appropriate in their own <asm/topology.h> file. */
+/* 逗号运算结果为0 */
 #ifndef cpu_to_node
 #define cpu_to_node(cpu)	((void)(cpu),0)
 #endif

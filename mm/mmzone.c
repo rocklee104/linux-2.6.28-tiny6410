@@ -1,4 +1,4 @@
-/*
+﻿/*
  * linux/mm/mmzone.c
  *
  * management codes for pgdats and zones.
@@ -58,6 +58,7 @@ struct zoneref *next_zones_zonelist(struct zoneref *z,
 	 * Only filter based on nodemask if it's set
 	 */
 	if (likely(nodes == NULL))
+		/* zoneref根据zone_type逆序保存 */
 		while (zonelist_zone_idx(z) > highest_zoneidx)
 			z++;
 	else

@@ -1,4 +1,4 @@
-#ifndef __LINUX_BITMAP_H
+﻿#ifndef __LINUX_BITMAP_H
 #define __LINUX_BITMAP_H
 
 #ifndef __ASSEMBLY__
@@ -131,6 +131,7 @@ extern void bitmap_release_region(unsigned long *bitmap, int pos, int order);
 extern int bitmap_allocate_region(unsigned long *bitmap, int pos, int order);
 extern void bitmap_copy_le(void *dst, const unsigned long *src, int nbits);
 
+/* 返回nbits个1 */
 #define BITMAP_LAST_WORD_MASK(nbits)					\
 (									\
 	((nbits) % BITS_PER_LONG) ?					\

@@ -1661,6 +1661,7 @@ static unsigned int nr_free_zone_pages(int offset)
 
 	for_each_zone_zonelist(zone, z, zonelist, offset) {
 		unsigned long size = zone->present_pages;
+		/* high == 0 */
 		unsigned long high = zone->pages_high;
 		if (size > high)
 			sum += size - high;
@@ -1851,9 +1852,11 @@ static int build_zonelists_node(pg_data_t *pgdat, struct zonelist *zonelist,
 
 	do {
 		zone_type--;
+		/* 取出节点中对应zone_type的zone指针 */
 		zone = pgdat->node_zones + zone_type;
 		/* 判断zone中是否含有物理页面 */
 		if (populated_zone(zone)) {
+			/* 将zone加入zonelist对应zone_type的_zonerefs */
 			zoneref_set_zone(zone,
 				&zonelist->_zonerefs[nr_zones++]);
 			check_highest_zone(zone_type);
@@ -1874,7 +1877,9 @@ static int build_zonelists_node(pg_data_t *pgdat, struct zonelist *zonelist,
  *  the same zonelist. So only NUMA can configure this param.
  */
 #define ZONELIST_ORDER_DEFAULT  0
+/* 按节点排列,Node(0)ZONE_NORMAL->Node(0)ZONE_DMA->Node(1)ZONE_NORMAL */
 #define ZONELIST_ORDER_NODE     1
+/* 按zone排列,Node(0)ZONE_NORMAL->Node(1)ZONE_NORMAL->Node(0)ZONE_DMA */
 #define ZONELIST_ORDER_ZONE     2
 
 /* zonelist order in the kernel.
@@ -1897,6 +1902,7 @@ static void build_zonelists(pg_data_t *pgdat)
 	local_node = pgdat->node_id;
 
 	zonelist = &pgdat->node_zonelists[0];
+	/* 遍历节点中所有的zone, 返回含有物理页面的zone的个数 */
 	j = build_zonelists_node(pgdat, zonelist, 0, MAX_NR_ZONES - 1);
 
 	/*
@@ -1910,12 +1916,14 @@ static void build_zonelists(pg_data_t *pgdat)
 	for (node = local_node + 1; node < MAX_NUMNODES; node++) {
 		if (!node_online(node))
 			continue;
+		/* mini6410只有一个node,不会走到下面的函数 */
 		j = build_zonelists_node(NODE_DATA(node), zonelist, j,
 							MAX_NR_ZONES - 1);
 	}
 	for (node = 0; node < local_node; node++) {
 		if (!node_online(node))
 			continue;
+		/* mini6410只有一个node,不会走到下面的函数 */
 		j = build_zonelists_node(NODE_DATA(node), zonelist, j,
 							MAX_NR_ZONES - 1);
 	}
@@ -1944,6 +1952,7 @@ static int __build_all_zonelists(void *dummy)
 	return 0;
 }
 
+/* 构建备份列表 */
 void build_all_zonelists(void)
 {
 	set_zonelist_order();
@@ -1952,6 +1961,7 @@ void build_all_zonelists(void)
 	if (system_state == SYSTEM_BOOTING) {
 		__build_all_zonelists(NULL);
 		mminit_verify_zonelist();
+		/* 6410空函数 */
 		cpuset_init_current_mems_allowed();
 	} else {
 		/* we have to stop all cpus to guarantee there is no user
@@ -1959,6 +1969,7 @@ void build_all_zonelists(void)
 		stop_machine(__build_all_zonelists, NULL, NULL);
 		/* cpuset refresh routine should be here */
 	}
+	/* vm_total_pages = 65024 */
 	vm_total_pages = nr_free_pagecache_pages();
 	/*
 	 * Disable grouping by mobility if the number of pages in the
@@ -1970,6 +1981,7 @@ void build_all_zonelists(void)
 	if (vm_total_pages < (pageblock_nr_pages * MIGRATE_TYPES))
 		page_group_by_mobility_disabled = 1;
 	else
+		/* 启用分组,减少内存碎片 */
 		page_group_by_mobility_disabled = 0;
 
 	printk("Built %i zonelists in %s order, mobility grouping %s.  "
