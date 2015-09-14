@@ -360,43 +360,6 @@ exit:
 	return err;
 }
 
-#ifdef CONFIG_HOTPLUG_CPU
-static void coretemp_device_remove(unsigned int cpu)
-{
-	struct pdev_entry *p, *n;
-	mutex_lock(&pdev_list_mutex);
-	list_for_each_entry_safe(p, n, &pdev_list, list) {
-		if (p->cpu == cpu) {
-			platform_device_unregister(p->pdev);
-			list_del(&p->list);
-			kfree(p);
-		}
-	}
-	mutex_unlock(&pdev_list_mutex);
-}
-
-static int __cpuinit coretemp_cpu_callback(struct notifier_block *nfb,
-				 unsigned long action, void *hcpu)
-{
-	unsigned int cpu = (unsigned long) hcpu;
-
-	switch (action) {
-	case CPU_ONLINE:
-	case CPU_DOWN_FAILED:
-		coretemp_device_add(cpu);
-		break;
-	case CPU_DOWN_PREPARE:
-		coretemp_device_remove(cpu);
-		break;
-	}
-	return NOTIFY_OK;
-}
-
-static struct notifier_block coretemp_cpu_notifier __refdata = {
-	.notifier_call = coretemp_cpu_callback,
-};
-#endif				/* !CONFIG_HOTPLUG_CPU */
-
 static int __init coretemp_init(void)
 {
 	int i, err = -ENODEV;
@@ -436,9 +399,6 @@ static int __init coretemp_init(void)
 		goto exit_driver_unreg;
 	}
 
-#ifdef CONFIG_HOTPLUG_CPU
-	register_hotcpu_notifier(&coretemp_cpu_notifier);
-#endif
 	return 0;
 
 exit_devices_unreg:
@@ -458,9 +418,6 @@ exit:
 static void __exit coretemp_exit(void)
 {
 	struct pdev_entry *p, *n;
-#ifdef CONFIG_HOTPLUG_CPU
-	unregister_hotcpu_notifier(&coretemp_cpu_notifier);
-#endif
 	mutex_lock(&pdev_list_mutex);
 	list_for_each_entry_safe(p, n, &pdev_list, list) {
 		platform_device_unregister(p->pdev);

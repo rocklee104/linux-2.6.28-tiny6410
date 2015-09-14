@@ -18,9 +18,6 @@
 struct percpu_counter {
 	spinlock_t lock;
 	s64 count;
-#ifdef CONFIG_HOTPLUG_CPU
-	struct list_head list;	/* All percpu_counters are on a list */
-#endif
 	s32 *counters;
 };
 

@@ -742,26 +742,3 @@ const struct file_operations proc_pagemap_operations = {
 	.read		= pagemap_read,
 };
 #endif /* CONFIG_PROC_PAGE_MONITOR */
-
-#ifdef CONFIG_NUMA
-extern int show_numa_map(struct seq_file *m, void *v);
-
-static const struct seq_operations proc_pid_numa_maps_op = {
-        .start  = m_start,
-        .next   = m_next,
-        .stop   = m_stop,
-        .show   = show_numa_map,
-};
-
-static int numa_maps_open(struct inode *inode, struct file *file)
-{
-	return do_maps_open(inode, file, &proc_pid_numa_maps_op);
-}
-
-const struct file_operations proc_numa_maps_operations = {
-	.open		= numa_maps_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= seq_release_private,
-};
-#endif

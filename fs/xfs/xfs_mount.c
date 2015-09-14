@@ -1927,71 +1927,6 @@ xfs_mount_log_sb(
  * is present to prevent thrashing).
  */
 
-#ifdef CONFIG_HOTPLUG_CPU
-/*
- * hot-plug CPU notifier support.
- *
- * We need a notifier per filesystem as we need to be able to identify
- * the filesystem to balance the counters out. This is achieved by
- * having a notifier block embedded in the xfs_mount_t and doing pointer
- * magic to get the mount pointer from the notifier block address.
- */
-STATIC int
-xfs_icsb_cpu_notify(
-	struct notifier_block *nfb,
-	unsigned long action,
-	void *hcpu)
-{
-	xfs_icsb_cnts_t *cntp;
-	xfs_mount_t	*mp;
-
-	mp = (xfs_mount_t *)container_of(nfb, xfs_mount_t, m_icsb_notifier);
-	cntp = (xfs_icsb_cnts_t *)
-			per_cpu_ptr(mp->m_sb_cnts, (unsigned long)hcpu);
-	switch (action) {
-	case CPU_UP_PREPARE:
-	case CPU_UP_PREPARE_FROZEN:
-		/* Easy Case - initialize the area and locks, and
-		 * then rebalance when online does everything else for us. */
-		memset(cntp, 0, sizeof(xfs_icsb_cnts_t));
-		break;
-	case CPU_ONLINE:
-	case CPU_ONLINE_FROZEN:
-		xfs_icsb_lock(mp);
-		xfs_icsb_balance_counter(mp, XFS_SBS_ICOUNT, 0);
-		xfs_icsb_balance_counter(mp, XFS_SBS_IFREE, 0);
-		xfs_icsb_balance_counter(mp, XFS_SBS_FDBLOCKS, 0);
-		xfs_icsb_unlock(mp);
-		break;
-	case CPU_DEAD:
-	case CPU_DEAD_FROZEN:
-		/* Disable all the counters, then fold the dead cpu's
-		 * count into the total on the global superblock and
-		 * re-enable the counters. */
-		xfs_icsb_lock(mp);
-		spin_lock(&mp->m_sb_lock);
-		xfs_icsb_disable_counter(mp, XFS_SBS_ICOUNT);
-		xfs_icsb_disable_counter(mp, XFS_SBS_IFREE);
-		xfs_icsb_disable_counter(mp, XFS_SBS_FDBLOCKS);
-
-		mp->m_sb.sb_icount += cntp->icsb_icount;
-		mp->m_sb.sb_ifree += cntp->icsb_ifree;
-		mp->m_sb.sb_fdblocks += cntp->icsb_fdblocks;
-
-		memset(cntp, 0, sizeof(xfs_icsb_cnts_t));
-
-		xfs_icsb_balance_counter_locked(mp, XFS_SBS_ICOUNT, 0);
-		xfs_icsb_balance_counter_locked(mp, XFS_SBS_IFREE, 0);
-		xfs_icsb_balance_counter_locked(mp, XFS_SBS_FDBLOCKS, 0);
-		spin_unlock(&mp->m_sb_lock);
-		xfs_icsb_unlock(mp);
-		break;
-	}
-
-	return NOTIFY_OK;
-}
-#endif /* CONFIG_HOTPLUG_CPU */
-
 int
 xfs_icsb_init_counters(
 	xfs_mount_t	*mp)
@@ -2002,12 +1937,6 @@ xfs_icsb_init_counters(
 	mp->m_sb_cnts = alloc_percpu(xfs_icsb_cnts_t);
 	if (mp->m_sb_cnts == NULL)
 		return -ENOMEM;
-
-#ifdef CONFIG_HOTPLUG_CPU
-	mp->m_icsb_notifier.notifier_call = xfs_icsb_cpu_notify;
-	mp->m_icsb_notifier.priority = 0;
-	register_hotcpu_notifier(&mp->m_icsb_notifier);
-#endif /* CONFIG_HOTPLUG_CPU */
 
 	for_each_online_cpu(i) {
 		cntp = (xfs_icsb_cnts_t *)per_cpu_ptr(mp->m_sb_cnts, i);

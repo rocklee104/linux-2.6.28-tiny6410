@@ -2470,9 +2470,6 @@ static const struct pid_entry tgid_base_stuff[] = {
 	ONE("stat",       S_IRUGO, tgid_stat),
 	ONE("statm",      S_IRUGO, pid_statm),
 	REG("maps",       S_IRUGO, maps),
-#ifdef CONFIG_NUMA
-	REG("numa_maps",  S_IRUGO, numa_maps),
-#endif
 	REG("mem",        S_IRUSR|S_IWUSR, mem),
 	LNK("cwd",        cwd),
 	LNK("root",       root),
@@ -2806,9 +2803,6 @@ static const struct pid_entry tid_base_stuff[] = {
 	ONE("stat",      S_IRUGO, tid_stat),
 	ONE("statm",     S_IRUGO, pid_statm),
 	REG("maps",      S_IRUGO, maps),
-#ifdef CONFIG_NUMA
-	REG("numa_maps", S_IRUGO, numa_maps),
-#endif
 	REG("mem",       S_IRUSR|S_IWUSR, mem),
 	LNK("cwd",       cwd),
 	LNK("root",      root),

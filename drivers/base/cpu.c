@@ -20,63 +20,9 @@ EXPORT_SYMBOL(cpu_sysdev_class);
 
 static DEFINE_PER_CPU(struct sys_device *, cpu_sys_devices);
 
-#ifdef CONFIG_HOTPLUG_CPU
-static ssize_t show_online(struct sys_device *dev, struct sysdev_attribute *attr,
-			   char *buf)
-{
-	struct cpu *cpu = container_of(dev, struct cpu, sysdev);
-
-	return sprintf(buf, "%u\n", !!cpu_online(cpu->sysdev.id));
-}
-
-static ssize_t __ref store_online(struct sys_device *dev, struct sysdev_attribute *attr,
-				 const char *buf, size_t count)
-{
-	struct cpu *cpu = container_of(dev, struct cpu, sysdev);
-	ssize_t ret;
-
-	switch (buf[0]) {
-	case '0':
-		ret = cpu_down(cpu->sysdev.id);
-		if (!ret)
-			kobject_uevent(&dev->kobj, KOBJ_OFFLINE);
-		break;
-	case '1':
-		ret = cpu_up(cpu->sysdev.id);
-		if (!ret)
-			kobject_uevent(&dev->kobj, KOBJ_ONLINE);
-		break;
-	default:
-		ret = -EINVAL;
-	}
-
-	if (ret >= 0)
-		ret = count;
-	return ret;
-}
-static SYSDEV_ATTR(online, 0644, show_online, store_online);
-
-static void __cpuinit register_cpu_control(struct cpu *cpu)
-{
-	sysdev_create_file(&cpu->sysdev, &attr_online);
-}
-void unregister_cpu(struct cpu *cpu)
-{
-	int logical_cpu = cpu->sysdev.id;
-
-	unregister_cpu_under_node(logical_cpu, cpu_to_node(logical_cpu));
-
-	sysdev_remove_file(&cpu->sysdev, &attr_online);
-
-	sysdev_unregister(&cpu->sysdev);
-	per_cpu(cpu_sys_devices, logical_cpu) = NULL;
-	return;
-}
-#else /* ... !CONFIG_HOTPLUG_CPU */
 static inline void register_cpu_control(struct cpu *cpu)
 {
 }
-#endif /* CONFIG_HOTPLUG_CPU */
 
 #ifdef CONFIG_KEXEC
 #include <linux/kexec.h>

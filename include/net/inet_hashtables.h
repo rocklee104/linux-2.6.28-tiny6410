@@ -165,11 +165,6 @@ static inline int inet_ehash_locks_alloc(struct inet_hashinfo *hashinfo)
 	if (nr_pcpus >= 32)
 		size = 4096;
 	if (sizeof(rwlock_t) != 0) {
-#ifdef CONFIG_NUMA
-		if (size * sizeof(rwlock_t) > PAGE_SIZE)
-			hashinfo->ehash_locks = vmalloc(size * sizeof(rwlock_t));
-		else
-#endif
 		hashinfo->ehash_locks =	kmalloc(size * sizeof(rwlock_t),
 						GFP_KERNEL);
 		if (!hashinfo->ehash_locks)
@@ -184,13 +179,6 @@ static inline int inet_ehash_locks_alloc(struct inet_hashinfo *hashinfo)
 static inline void inet_ehash_locks_free(struct inet_hashinfo *hashinfo)
 {
 	if (hashinfo->ehash_locks) {
-#ifdef CONFIG_NUMA
-		unsigned int size = (hashinfo->ehash_locks_mask + 1) *
-							sizeof(rwlock_t);
-		if (size > PAGE_SIZE)
-			vfree(hashinfo->ehash_locks);
-		else
-#endif
 		kfree(hashinfo->ehash_locks);
 		hashinfo->ehash_locks = NULL;
 	}

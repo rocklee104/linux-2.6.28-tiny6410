@@ -484,17 +484,6 @@ static void acpi_processor_idle(void)
 		}
 	}
 
-#ifdef CONFIG_HOTPLUG_CPU
-	/*
-	 * Check for P_LVL2_UP flag before entering C2 and above on
-	 * an SMP system. We do it here instead of doing it at _CST/P_LVL
-	 * detection phase, to work cleanly with logical CPU hotplug.
-	 */
-	if ((cx->type != ACPI_STATE_C1) && (num_online_cpus() > 1) &&
-	    !pr->flags.has_cst && !(acpi_gbl_FADT.flags & ACPI_FADT_C2_MP_SUPPORTED))
-		cx = &pr->power.states[ACPI_STATE_C1];
-#endif
-
 	/*
 	 * Sleep:
 	 * ------
@@ -645,15 +634,6 @@ static void acpi_processor_idle(void)
 		cx->time += sleep_ticks;
 
 	next_state = pr->power.state;
-
-#ifdef CONFIG_HOTPLUG_CPU
-	/* Don't do promotion/demotion */
-	if ((cx->type == ACPI_STATE_C1) && (num_online_cpus() > 1) &&
-	    !pr->flags.has_cst && !(acpi_gbl_FADT.flags & ACPI_FADT_C2_MP_SUPPORTED)) {
-		next_state = cx;
-		goto end;
-	}
-#endif
 
 	/*
 	 * Promotion?
@@ -816,16 +796,6 @@ static int acpi_processor_get_power_info_fadt(struct acpi_processor *pr)
 	/* if info is obtained from pblk/fadt, type equals state */
 	pr->power.states[ACPI_STATE_C2].type = ACPI_STATE_C2;
 	pr->power.states[ACPI_STATE_C3].type = ACPI_STATE_C3;
-
-#ifndef CONFIG_HOTPLUG_CPU
-	/*
-	 * Check for P_LVL2_UP flag before entering C2 and above on
-	 * an SMP system.
-	 */
-	if ((num_online_cpus() > 1) &&
-	    !(acpi_gbl_FADT.flags & ACPI_FADT_C2_MP_SUPPORTED))
-		return -ENODEV;
-#endif
 
 	/* determine C2 and C3 address from pblk */
 	pr->power.states[ACPI_STATE_C2].address = pr->pblk + 4;
@@ -1710,12 +1680,6 @@ static int acpi_processor_setup_cpuidle(struct acpi_processor *pr)
 		if (!cx->valid)
 			continue;
 
-#ifdef CONFIG_HOTPLUG_CPU
-		if ((cx->type != ACPI_STATE_C1) && (num_online_cpus() > 1) &&
-		    !pr->flags.has_cst &&
-		    !(acpi_gbl_FADT.flags & ACPI_FADT_C2_MP_SUPPORTED))
-			continue;
-#endif
 		cpuidle_set_statedata(state, cx);
 
 		snprintf(state->name, CPUIDLE_NAME_LEN, "C%d", i);

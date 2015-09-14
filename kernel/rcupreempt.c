@@ -966,95 +966,9 @@ void rcu_advance_callbacks(int cpu, int user)
 	spin_unlock_irqrestore(&rdp->lock, flags);
 }
 
-#ifdef CONFIG_HOTPLUG_CPU
-#define rcu_offline_cpu_enqueue(srclist, srctail, dstlist, dsttail) do { \
-		*dsttail = srclist; \
-		if (srclist != NULL) { \
-			dsttail = srctail; \
-			srclist = NULL; \
-			srctail = &srclist;\
-		} \
-	} while (0)
-
-void rcu_offline_cpu(int cpu)
-{
-	int i;
-	struct rcu_head *list = NULL;
-	unsigned long flags;
-	struct rcu_data *rdp = RCU_DATA_CPU(cpu);
-	struct rcu_head *schedlist = NULL;
-	struct rcu_head **schedtail = &schedlist;
-	struct rcu_head **tail = &list;
-
-	/*
-	 * Remove all callbacks from the newly dead CPU, retaining order.
-	 * Otherwise rcu_barrier() will fail
-	 */
-
-	spin_lock_irqsave(&rdp->lock, flags);
-	rcu_offline_cpu_enqueue(rdp->donelist, rdp->donetail, list, tail);
-	for (i = GP_STAGES - 1; i >= 0; i--)
-		rcu_offline_cpu_enqueue(rdp->waitlist[i], rdp->waittail[i],
-						list, tail);
-	rcu_offline_cpu_enqueue(rdp->nextlist, rdp->nexttail, list, tail);
-	rcu_offline_cpu_enqueue(rdp->waitschedlist, rdp->waitschedtail,
-				schedlist, schedtail);
-	rcu_offline_cpu_enqueue(rdp->nextschedlist, rdp->nextschedtail,
-				schedlist, schedtail);
-	rdp->rcu_sched_sleeping = 0;
-	spin_unlock_irqrestore(&rdp->lock, flags);
-	rdp->waitlistcount = 0;
-
-	/* Disengage the newly dead CPU from the grace-period computation. */
-
-	spin_lock_irqsave(&rcu_ctrlblk.fliplock, flags);
-	rcu_check_mb(cpu);
-	if (per_cpu(rcu_flip_flag, cpu) == rcu_flipped) {
-		smp_mb();  /* Subsequent counter accesses must see new value */
-		per_cpu(rcu_flip_flag, cpu) = rcu_flip_seen;
-		smp_mb();  /* Subsequent RCU read-side critical sections */
-			   /*  seen -after- acknowledgement. */
-	}
-
-	RCU_DATA_ME()->rcu_flipctr[0] += RCU_DATA_CPU(cpu)->rcu_flipctr[0];
-	RCU_DATA_ME()->rcu_flipctr[1] += RCU_DATA_CPU(cpu)->rcu_flipctr[1];
-
-	RCU_DATA_CPU(cpu)->rcu_flipctr[0] = 0;
-	RCU_DATA_CPU(cpu)->rcu_flipctr[1] = 0;
-
-	cpu_clear(cpu, rcu_cpu_online_map);
-
-	spin_unlock_irqrestore(&rcu_ctrlblk.fliplock, flags);
-
-	/*
-	 * Place the removed callbacks on the current CPU's queue.
-	 * Make them all start a new grace period: simple approach,
-	 * in theory could starve a given set of callbacks, but
-	 * you would need to be doing some serious CPU hotplugging
-	 * to make this happen.  If this becomes a problem, adding
-	 * a synchronize_rcu() to the hotplug path would be a simple
-	 * fix.
-	 */
-
-	local_irq_save(flags);  /* disable preempt till we know what lock. */
-	rdp = RCU_DATA_ME();
-	spin_lock(&rdp->lock);
-	*rdp->nexttail = list;
-	if (list)
-		rdp->nexttail = tail;
-	*rdp->nextschedtail = schedlist;
-	if (schedlist)
-		rdp->nextschedtail = schedtail;
-	spin_unlock_irqrestore(&rdp->lock, flags);
-}
-
-#else /* #ifdef CONFIG_HOTPLUG_CPU */
-
 void rcu_offline_cpu(int cpu)
 {
 }
-
-#endif /* #else #ifdef CONFIG_HOTPLUG_CPU */
 
 void __cpuinit rcu_online_cpu(int cpu)
 {

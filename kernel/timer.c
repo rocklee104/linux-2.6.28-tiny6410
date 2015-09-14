@@ -1483,52 +1483,6 @@ static int __cpuinit init_timers_cpu(int cpu)
 	return 0;
 }
 
-#ifdef CONFIG_HOTPLUG_CPU
-static void migrate_timer_list(struct tvec_base *new_base, struct list_head *head)
-{
-	struct timer_list *timer;
-
-	while (!list_empty(head)) {
-		timer = list_first_entry(head, struct timer_list, entry);
-		detach_timer(timer, 0);
-		timer_set_base(timer, new_base);
-		internal_add_timer(new_base, timer);
-	}
-}
-
-static void __cpuinit migrate_timers(int cpu)
-{
-	struct tvec_base *old_base;
-	struct tvec_base *new_base;
-	int i;
-
-	BUG_ON(cpu_online(cpu));
-	old_base = per_cpu(tvec_bases, cpu);
-	new_base = get_cpu_var(tvec_bases);
-	/*
-	 * The caller is globally serialized and nobody else
-	 * takes two locks at once, deadlock is not possible.
-	 */
-	spin_lock_irq(&new_base->lock);
-	spin_lock_nested(&old_base->lock, SINGLE_DEPTH_NESTING);
-
-	BUG_ON(old_base->running_timer);
-
-	for (i = 0; i < TVR_SIZE; i++)
-		migrate_timer_list(new_base, old_base->tv1.vec + i);
-	for (i = 0; i < TVN_SIZE; i++) {
-		migrate_timer_list(new_base, old_base->tv2.vec + i);
-		migrate_timer_list(new_base, old_base->tv3.vec + i);
-		migrate_timer_list(new_base, old_base->tv4.vec + i);
-		migrate_timer_list(new_base, old_base->tv5.vec + i);
-	}
-
-	spin_unlock(&old_base->lock);
-	spin_unlock_irq(&new_base->lock);
-	put_cpu_var(tvec_bases);
-}
-#endif /* CONFIG_HOTPLUG_CPU */
-
 static int __cpuinit timer_cpu_notify(struct notifier_block *self,
 				unsigned long action, void *hcpu)
 {
@@ -1539,12 +1493,6 @@ static int __cpuinit timer_cpu_notify(struct notifier_block *self,
 		if (init_timers_cpu(cpu) < 0)
 			return NOTIFY_BAD;
 		break;
-#ifdef CONFIG_HOTPLUG_CPU
-	case CPU_DEAD:
-	case CPU_DEAD_FROZEN:
-		migrate_timers(cpu);
-		break;
-#endif
 	default:
 		break;
 	}

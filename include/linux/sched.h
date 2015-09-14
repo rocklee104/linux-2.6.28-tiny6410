@@ -1649,11 +1649,7 @@ extern void sched_exec(void);
 extern void sched_clock_idle_sleep_event(void);
 extern void sched_clock_idle_wakeup_event(u64 delta_ns);
 
-#ifdef CONFIG_HOTPLUG_CPU
-extern void idle_task_exit(void);
-#else
 static inline void idle_task_exit(void) {}
-#endif
 
 extern void sched_idle_next(void);
 

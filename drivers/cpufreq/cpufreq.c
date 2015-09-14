@@ -39,10 +39,6 @@
  */
 static struct cpufreq_driver *cpufreq_driver;
 static DEFINE_PER_CPU(struct cpufreq_policy *, cpufreq_cpu_data);
-#ifdef CONFIG_HOTPLUG_CPU
-/* This one keeps track of the previously set governor of a removed CPU */
-static DEFINE_PER_CPU(struct cpufreq_governor *, cpufreq_cpu_governor);
-#endif
 static DEFINE_SPINLOCK(cpufreq_driver_lock);
 
 /*
@@ -829,15 +825,6 @@ static int cpufreq_add_dev(struct sys_device *sys_dev)
 				     CPUFREQ_START, policy);
 
 #ifdef CONFIG_SMP
-
-#ifdef CONFIG_HOTPLUG_CPU
-	if (per_cpu(cpufreq_cpu_governor, cpu)) {
-		policy->governor = per_cpu(cpufreq_cpu_governor, cpu);
-		dprintk("Restoring governor %s for cpu %d\n",
-		       policy->governor->name, cpu);
-	}
-#endif
-
 	for_each_cpu_mask_nr(j, policy->cpus) {
 		if (cpu == j)
 			continue;
@@ -1021,10 +1008,6 @@ static int __cpufreq_remove_dev(struct sys_device *sys_dev)
 
 #ifdef CONFIG_SMP
 
-#ifdef CONFIG_HOTPLUG_CPU
-	per_cpu(cpufreq_cpu_governor, cpu) = data->governor;
-#endif
-
 	/* if we have other CPUs still registered, we need to unlink them,
 	 * or else wait_for_completion below will lock up. Clean the
 	 * per_cpu(cpufreq_cpu_data) while holding the lock, and remove
@@ -1045,9 +1028,6 @@ static int __cpufreq_remove_dev(struct sys_device *sys_dev)
 			if (j == cpu)
 				continue;
 			dprintk("removing link for cpu %u\n", j);
-#ifdef CONFIG_HOTPLUG_CPU
-			per_cpu(cpufreq_cpu_governor, j) = data->governor;
-#endif
 			cpu_sys_dev = get_cpu_sysdev(j);
 			sysfs_remove_link(&cpu_sys_dev->kobj, "cpufreq");
 			cpufreq_cpu_put(data);

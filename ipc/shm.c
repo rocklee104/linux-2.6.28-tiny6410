@@ -217,33 +217,6 @@ static int shm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	return sfd->vm_ops->fault(vma, vmf);
 }
 
-#ifdef CONFIG_NUMA
-static int shm_set_policy(struct vm_area_struct *vma, struct mempolicy *new)
-{
-	struct file *file = vma->vm_file;
-	struct shm_file_data *sfd = shm_file_data(file);
-	int err = 0;
-	if (sfd->vm_ops->set_policy)
-		err = sfd->vm_ops->set_policy(vma, new);
-	return err;
-}
-
-static struct mempolicy *shm_get_policy(struct vm_area_struct *vma,
-					unsigned long addr)
-{
-	struct file *file = vma->vm_file;
-	struct shm_file_data *sfd = shm_file_data(file);
-	struct mempolicy *pol = NULL;
-
-	if (sfd->vm_ops->get_policy)
-		pol = sfd->vm_ops->get_policy(vma, addr);
-	else if (vma->vm_policy)
-		pol = vma->vm_policy;
-
-	return pol;
-}
-#endif
-
 static int shm_mmap(struct file * file, struct vm_area_struct * vma)
 {
 	struct shm_file_data *sfd = shm_file_data(file);
@@ -315,10 +288,6 @@ static struct vm_operations_struct shm_vm_ops = {
 	.open	= shm_open,	/* callback for a new vm-area open */
 	.close	= shm_close,	/* callback for when the vm-area is released */
 	.fault	= shm_fault,
-#if defined(CONFIG_NUMA)
-	.set_policy = shm_set_policy,
-	.get_policy = shm_get_policy,
-#endif
 };
 
 /**

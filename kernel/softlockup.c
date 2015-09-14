@@ -306,31 +306,6 @@ cpu_callback(struct notifier_block *nfb, unsigned long action, void *hcpu)
 		check_cpu = any_online_cpu(cpu_online_map);
 		wake_up_process(per_cpu(watchdog_task, hotcpu));
 		break;
-#ifdef CONFIG_HOTPLUG_CPU
-	case CPU_DOWN_PREPARE:
-	case CPU_DOWN_PREPARE_FROZEN:
-		if (hotcpu == check_cpu) {
-			cpumask_t temp_cpu_online_map = cpu_online_map;
-
-			cpu_clear(hotcpu, temp_cpu_online_map);
-			check_cpu = any_online_cpu(temp_cpu_online_map);
-		}
-		break;
-
-	case CPU_UP_CANCELED:
-	case CPU_UP_CANCELED_FROZEN:
-		if (!per_cpu(watchdog_task, hotcpu))
-			break;
-		/* Unbind so it can run.  Fall thru. */
-		kthread_bind(per_cpu(watchdog_task, hotcpu),
-			     any_online_cpu(cpu_online_map));
-	case CPU_DEAD:
-	case CPU_DEAD_FROZEN:
-		p = per_cpu(watchdog_task, hotcpu);
-		per_cpu(watchdog_task, hotcpu) = NULL;
-		kthread_stop(p);
-		break;
-#endif /* CONFIG_HOTPLUG_CPU */
 	}
 	return NOTIFY_OK;
 }

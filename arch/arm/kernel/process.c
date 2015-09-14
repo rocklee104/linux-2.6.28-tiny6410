@@ -152,13 +152,6 @@ void cpu_idle(void)
 	while (1) {
 		void (*idle)(void) = pm_idle;
 
-#ifdef CONFIG_HOTPLUG_CPU
-		if (cpu_is_offline(smp_processor_id())) {
-			leds_event(led_idle_start);
-			cpu_die();
-		}
-#endif
-
 		if (!idle)
 			idle = default_idle;
 		leds_event(led_idle_start);
