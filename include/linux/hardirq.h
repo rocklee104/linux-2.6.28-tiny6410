@@ -118,13 +118,8 @@ static inline void account_system_vtime(struct task_struct *tsk)
 }
 #endif
 
-#if defined(CONFIG_PREEMPT_RCU) && defined(CONFIG_NO_HZ)
-extern void rcu_irq_enter(void);
-extern void rcu_irq_exit(void);
-#else
 # define rcu_irq_enter() do { } while (0)
 # define rcu_irq_exit() do { } while (0)
-#endif /* CONFIG_PREEMPT_RCU */
 
 /*
  * It is safe to do non-atomic ops on ->hardirq_context,

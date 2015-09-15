@@ -1,4 +1,4 @@
-#ifndef _LINUX_INIT_H
+﻿#ifndef _LINUX_INIT_H
 #define _LINUX_INIT_H
 
 #include <linux/compiler.h>
@@ -219,8 +219,11 @@ extern void (*late_time_init)(void);
 	__used __section(.security_initcall.init) = fn
 
 struct obs_kernel_param {
+	/* 参数字符串 */
 	const char *str;
+	/* 参数设置回调函数 */
 	int (*setup_func)(char *);
+	/* 是否属于early param */
 	int early;
 };
 

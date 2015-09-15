@@ -1,4 +1,4 @@
-/* Helpers for initial module or kernel cmdline parsing
+﻿/* Helpers for initial module or kernel cmdline parsing
    Copyright (C) 2001 Rusty Russell.
 
     This program is free software; you can redistribute it and/or modify
@@ -24,7 +24,7 @@
 #include <linux/err.h>
 #include <linux/slab.h>
 
-#if 0
+#if 1
 #define DEBUGP printk
 #else
 #define DEBUGP(fmt, a...)
@@ -87,6 +87,7 @@ static char *next_arg(char *args, char **param, char **val)
 	}
 
 	for (i = 0; args[i]; i++) {
+		/* 遇到空格表示一个参数的结束(不在""中) */
 		if (args[i] == ' ' && !in_quote)
 			break;
 		if (equals == 0) {
@@ -97,15 +98,20 @@ static char *next_arg(char *args, char **param, char **val)
 			in_quote = !in_quote;
 	}
 
+	/* 保存这段参数 */
 	*param = args;
+	/* 如果一个参数字符遍历完成,但是没有找到"=",表示参数的值为空 */
 	if (!equals)
 		*val = NULL;
 	else {
+		/* 截取参数 */
 		args[equals] = '\0';
+		/* 参数被赋的值 */
 		*val = args + equals + 1;
 
 		/* Don't include quotes in value. */
 		if (**val == '"') {
+			/* 参数赋值语言中可能有"",将""去除 */
 			(*val)++;
 			if (args[i-1] == '"')
 				args[i-1] = '\0';
@@ -143,8 +149,10 @@ int parse_args(const char *name,
 
 	while (*args) {
 		int ret;
+		/* 0表示irq开启,1表示irq关闭*/
 		int irq_was_disabled;
 
+		/* 返回的args指向下一个参数,param指向当前解析的参数,val为这个参数的值 */
 		args = next_arg(args, &param, &val);
 		irq_was_disabled = irqs_disabled();
 		ret = parse_one(param, val, params, num, unknown);

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * include/linux/irqflags.h
  *
  * IRQ flags tracing: follow the state of the hardirq and softirq flags and
@@ -111,6 +111,7 @@
 		raw_local_save_flags(flags);		\
 	} while (0)
 
+/* 保存cpsr的状态到_flags,通过_flag判断中断是否关闭了 */
 #define irqs_disabled()						\
 ({								\
 	unsigned long _flags;					\

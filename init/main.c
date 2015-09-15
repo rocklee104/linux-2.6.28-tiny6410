@@ -196,6 +196,7 @@ static char * argv_init[MAX_INIT_ARGS+2] = { "init", NULL, };
 char * envp_init[MAX_INIT_ENVS+2] = { "HOME=/", "TERM=linux", NULL, };
 static const char *panic_later, *panic_param;
 
+/* 通过宏__setup,early_param和__setup_param将参数写入.init.setup段中 */
 extern struct obs_kernel_param __setup_start[], __setup_end[];
 
 static int __init obsolete_checksetup(char *line)
@@ -204,6 +205,7 @@ static int __init obsolete_checksetup(char *line)
 	int had_early_param = 0;
 
 	p = __setup_start;
+	/* 遍历__setup_start到__setup_end中的参数 */
 	do {
 		int n = strlen(p->str);
 		if (!strncmp(line, p->str, n)) {
@@ -218,6 +220,7 @@ static int __init obsolete_checksetup(char *line)
 				printk(KERN_WARNING "Parameter %s is obsolete,"
 				       " ignored\n", p->str);
 				return 1;
+			/* 跳过参数关键字,将值传给参数设置函数 */
 			} else if (p->setup_func(line + n))
 				return 1;
 		}
@@ -268,8 +271,10 @@ static int __init unknown_bootoption(char *param, char *val)
 	if (val) {
 		/* param=val or param="val"? */
 		if (val == param+strlen(param)+1)
+			/* 本来param和val之间是'/0',现在恢复'=' */
 			val[-1] = '=';
 		else if (val == param+strlen(param)+2) {
+			/* 处理param="val"这种情况 */
 			val[-2] = '=';
 			memmove(val-1, val, strlen(val)+1);
 			val--;
@@ -281,6 +286,7 @@ static int __init unknown_bootoption(char *param, char *val)
 	if (obsolete_checksetup(param))
 		return 0;
 
+	/* mini6410不会走到下面的流程 */
 	/*
 	 * Preemptive maintenance for "why didn't my misspelled command
 	 * line work?"
@@ -493,6 +499,7 @@ static int __init do_early_param(char *param, char *val)
 		    (strcmp(param, "console") == 0 &&
 		     strcmp(p->str, "earlycon") == 0)
 		) {
+			/* 初始化早期参数 */
 			if (p->setup_func(val) != 0)
 				printk(KERN_WARNING
 				       "Malformed early option '%s'\n", param);

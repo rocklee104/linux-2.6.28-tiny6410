@@ -1,4 +1,4 @@
-#include <linux/module.h>
+﻿#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/ctype.h>
 #include <linux/fd.h>
@@ -24,6 +24,7 @@ int __initdata rd_doload;	/* 1 = load RAM disk, 0 = don't load */
 
 int root_mountflags = MS_RDONLY | MS_SILENT;
 static char * __initdata root_device_name;
+/* 保存cmdline中指定的root name */
 static char __initdata saved_root_name[64];
 static int __initdata root_wait;
 

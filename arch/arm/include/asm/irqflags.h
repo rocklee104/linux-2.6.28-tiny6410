@@ -112,6 +112,7 @@
 /*
  * Save the current interrupt enable state.
  */
+/* 将CPSR的值保存到x中 */
 #define raw_local_save_flags(x)					\
 	({							\
 	__asm__ __volatile__(					\
