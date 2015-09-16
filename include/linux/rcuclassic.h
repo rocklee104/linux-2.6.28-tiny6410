@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Read-Copy Update mechanism for mutual exclusion (classic version)
  *
  * This program is free software; you can redistribute it and/or modify
@@ -78,7 +78,9 @@ static inline int rcu_batch_after(long a, long b)
 /* Per-CPU data for Read-Copy UPdate. */
 struct rcu_data {
 	/* 1) quiescent state handling : */
+	/* 用来比较当前cpu是否处于等待进程切换完成 */
 	long		quiescbatch;     /* Batch # for grace period */
+	/* 表示当前cpu是否已经切换过进程了 */
 	int		passed_quiesc;	 /* User-mode/idle loop etc. */
 	int		qs_pending;	 /* core waits for quiesc state */
 
@@ -97,6 +99,7 @@ struct rcu_data {
 	 *	the other grace-period-completed entries may be moved
 	 *	here temporarily in rcu_process_callbacks().
 	 */
+	/* 本次被阻塞的写者，需要在哪个graceperiod之后被激活 */
 	long  	       	batch;
 	struct rcu_head *nxtlist;
 	struct rcu_head **nxttail[3];

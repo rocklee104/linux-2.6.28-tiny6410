@@ -11,19 +11,8 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
 */
-
-#ifdef CONFIG_CPU_S3C6410
-
 extern  int s3c6410_init(void);
 extern void s3c6410_init_irq(void);
 extern void s3c6410_init_uarts(struct s3c2410_uartcfg *cfg, int no);
 extern void s3c6410_map_io(void);
 extern void s3c6410_init_clocks(int xtal);
-
-
-#else
-#define s3c6410_init_clocks NULL
-#define s3c6410_init_uarts NULL
-#define s3c6410_map_io NULL
-#define s3c6410_init NULL
-#endif

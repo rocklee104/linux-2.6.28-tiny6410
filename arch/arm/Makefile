@@ -76,10 +76,6 @@ textofs-y	:= 0x00008000
 
  machine-$(CONFIG_ARCH_S3C64XX)	   := s3c6400 s3c6410
     plat-$(CONFIG_PLAT_S3C64XX)	   := s3c64xx s3c
- machine-$(CONFIG_ARCH_S5P64XX)	   := s5p6440
-    plat-$(CONFIG_PLAT_S5P64XX)	   := s5p64xx s3c
- machine-$(CONFIG_ARCH_S5PC1XX)	   := s5pc100 
-    plat-$(CONFIG_PLAT_S5PC1XX)	   := s5pc1xx s3c
 
 # The byte offset of the kernel image in RAM from the start of RAM.
 TEXT_OFFSET := $(textofs-y)

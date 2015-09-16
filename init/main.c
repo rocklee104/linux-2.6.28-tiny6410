@@ -712,10 +712,6 @@ asmlinkage void __init start_kernel(void)
 	pgtable_cache_init();
 	prio_tree_init();
 	anon_vma_init();
-#ifdef CONFIG_X86
-	if (efi_enabled)
-		efi_enter_virtual_mode();
-#endif
 	thread_info_cache_init();
 	fork_init(num_physpages);
 	proc_caches_init();
