@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  linux/kernel/time/timekeeping.c
  *
  *  Kernel timekeeping code and accessor functions
@@ -42,8 +42,10 @@ __cacheline_aligned_in_smp DEFINE_SEQLOCK(xtime_lock);
  * - wall_to_monotonic is no longer the boot time, getboottime must be
  * used instead.
  */
+/* 墙上时间 */
 struct timespec xtime __attribute__ ((aligned (16)));
 struct timespec wall_to_monotonic __attribute__ ((aligned (16)));
+/* total_sleep_time用来统计时钟源的挂起时间,比如系统睡眠后可以停止该时钟源以节约电能 */
 static unsigned long total_sleep_time;		/* seconds */
 
 /* flag for if timekeeping is suspended */
@@ -285,20 +287,27 @@ unsigned long __attribute__((weak)) read_persistent_clock(void)
 void __init timekeeping_init(void)
 {
 	unsigned long flags;
+	/* read_persistent_clock直接返回0 */
 	unsigned long sec = read_persistent_clock();
 
 	write_seqlock_irqsave(&xtime_lock, flags);
 
+	/* 初始化内核时间同步协议相关的数据结构 */
 	ntp_init();
 
+	/* 内核初始化阶段clocksource_get_next会获取clocksource_jiffies */
 	clock = clocksource_get_next();
 	clocksource_calculate_interval(clock, NTP_INTERVAL_LENGTH);
+	/* 通过调用时钟源的read函数获取最后一次更新的时钟源的值 */
 	clock->cycle_last = clocksource_read(clock);
 
+	/* 初始化墙上时间 */
 	xtime.tv_sec = sec;
 	xtime.tv_nsec = 0;
+	/* 把xtime上的时间调整成struct timespec格式,并保存到wall_to_monotonic变量中 */
 	set_normalized_timespec(&wall_to_monotonic,
 		-xtime.tv_sec, -xtime.tv_nsec);
+	/* 更新名为xtime_cache的timespec结构体,time系统调用根据它来获取系统时间 */
 	update_xtime_cache(0);
 	total_sleep_time = 0;
 	write_sequnlock_irqrestore(&xtime_lock, flags);

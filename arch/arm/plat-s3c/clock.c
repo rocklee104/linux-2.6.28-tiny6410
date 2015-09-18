@@ -1,4 +1,4 @@
-/* linux/arch/arm/plat-s3c/clock.c
+﻿/* linux/arch/arm/plat-s3c/clock.c
  *
  * Copyright (c) 2004-2005 Simtec Electronics
  *	Ben Dooks <ben@simtec.co.uk>
@@ -50,6 +50,7 @@
 #include <plat/clock.h>
 #include <plat/cpu.h>
 
+/* 管理所有的时钟 */
 static LIST_HEAD(clocks);
 
 /* We originally used an mutex here, but some contexts (see resume)
@@ -116,6 +117,7 @@ int clk_enable(struct clk *clk)
 	if (IS_ERR(clk) || clk == NULL)
 		return -EINVAL;
 
+	/* 先enable其父 */
 	clk_enable(clk->parent);
 
 	spin_lock(&clocks_lock);
@@ -292,6 +294,7 @@ struct clk clk_hx2 = {
 };
 #endif
 
+/* rate在s3c6400_setup_clocks中设置 */
 struct clk clk_p = {
 	.name		= "pclk",
 	.id		= -1,
@@ -314,12 +317,13 @@ struct clk s3c24xx_uclk = {
 };
 
 /* initialise the clock system */
-
+/* 将时钟加入全局链表中 */
 int s3c24xx_register_clock(struct clk *clk)
 {
 	clk->owner = THIS_MODULE;
 
 	if (clk->enable == NULL)
+		/* 对于pclk,没有enable回调函数的要赋值一个enable */
 		clk->enable = clk_null_enable;
 
 	/* add to the list of available clocks */

@@ -1,4 +1,4 @@
-/* linux/arch/arm/plat-s3c/time.c
+﻿/* linux/arch/arm/plat-s3c/time.c
  *
  * Copyright (C) 2003-2005 Simtec Electronics
  *	Ben Dooks, <ben@simtec.co.uk>
@@ -124,7 +124,6 @@ static unsigned long s3c2410_gettimeoffset (void)
 	return timer_ticks_to_usec(tdone);
 }
 
-
 /*
  * IRQ handler for the timer
  */
@@ -141,172 +140,59 @@ static struct irqaction s3c2410_timer_irq = {
 	.handler	= s3c2410_timer_interrupt,
 };
 
-#define use_tclk1_12() ( \
-	machine_is_bast()	|| \
-	machine_is_vr1000()	|| \
-	machine_is_anubis()	|| \
-	machine_is_osiris())
-
-/*
- * Set up timer interrupt, and return the current time in seconds.
- *
- * Currently we only use timer4, as it is the only timer which has no
- * other function that can be exploited externally
- */
-static void s3c2410_timer_setup (void)
-{
-	unsigned long tcon;
-	unsigned long tcnt;
-	unsigned long tcfg1;
-	unsigned long tcfg0;
-
-	tcnt = TICK_MAX;  /* default value for tcnt */
-
-	/* read the current timer configuration bits */
-
-	tcon = __raw_readl(S3C2410_TCON);
-	tcfg1 = __raw_readl(S3C2410_TCFG1);
-	tcfg0 = __raw_readl(S3C2410_TCFG0);
-
-	/* configure the system for whichever machine is in use */
-
-	if (use_tclk1_12()) {
-		/* timer is at 12MHz, scaler is 1 */
-		timer_usec_ticks = timer_mask_usec_ticks(1, 12000000);
-		tcnt = 12000000 / HZ;
-
-		tcfg1 &= ~S3C2410_TCFG1_MUX4_MASK;
-		tcfg1 |= S3C2410_TCFG1_MUX4_TCLK1;
-	} else {
-		unsigned long pclk;
-		struct clk *clk;
-
-		/* for the h1940 (and others), we use the pclk from the core
-		 * to generate the timer values. since values around 50 to
-		 * 70MHz are not values we can directly generate the timer
-		 * value from, we need to pre-scale and divide before using it.
-		 *
-		 * for instance, using 50.7MHz and dividing by 6 gives 8.45MHz
-		 * (8.45 ticks per usec)
-		 */
-
-		/* this is used as default if no other timer can be found */
-
-		clk = clk_get(NULL, "timers");
-		if (IS_ERR(clk))
-			panic("failed to get clock for system timer");
-
-		clk_enable(clk);
-
-		pclk = clk_get_rate(clk);
-
-		/* configure clock tick */
-
-		timer_usec_ticks = timer_mask_usec_ticks(6, pclk);
-
-		tcfg1 &= ~S3C2410_TCFG1_MUX4_MASK;
-		tcfg1 |= S3C2410_TCFG1_MUX4_DIV2;
-
-		tcfg0 &= ~S3C2410_TCFG_PRESCALER1_MASK;
-		tcfg0 |= ((6 - 1) / 2) << S3C2410_TCFG_PRESCALER1_SHIFT;
-
-		tcnt = (pclk / 6) / HZ;
-	}
-
-	/* timers reload after counting zero, so reduce the count by 1 */
-
-	tcnt--;
-
-	printk(KERN_DEBUG "timer tcon=%08lx, tcnt %04lx, tcfg %08lx,%08lx, usec %08lx\n",
-	       tcon, tcnt, tcfg0, tcfg1, timer_usec_ticks);
-
-	/* check to see if timer is within 16bit range... */
-	if (tcnt > TICK_MAX) {
-		panic("setup_timer: HZ is too small, cannot configure timer!");
-		return;
-	}
-
-	__raw_writel(tcfg1, S3C2410_TCFG1);
-	__raw_writel(tcfg0, S3C2410_TCFG0);
-
-	timer_startval = tcnt;
-	__raw_writel(tcnt, S3C2410_TCNTB(4));
-
-	/* ensure timer is stopped... */
-
-	tcon &= ~(7<<20);
-	tcon |= S3C2410_TCON_T4RELOAD;
-	tcon |= S3C2410_TCON_T4MANUALUPD;
-
-	__raw_writel(tcon, S3C2410_TCON);
-	__raw_writel(tcnt, S3C2410_TCNTB(4));
-	__raw_writel(tcnt, S3C2410_TCMPB(4));
-
-	/* start the timer running */
-	tcon |= S3C2410_TCON_T4START;
-	tcon &= ~S3C2410_TCON_T4MANUALUPD;
-	__raw_writel(tcon, S3C2410_TCON);
-}
-
+/* 完成了PWM时钟源的初始化工作 */
 static void s3c64xx_timer_setup (void)
 {
 	unsigned long tcon;
 	unsigned long tcnt;
 	unsigned long tcfg1;
 	unsigned long tcfg0;
+	unsigned long pclk;
+	struct clk *clk;
 
 	tcnt = TICK_MAX;  /* default value for tcnt */
-
 	/* read the current timer configuration bits */
 
+	/* 读取TCON寄存器 */
 	tcon = __raw_readl(S3C2410_TCON);
+	/* 读取TCFG1寄存器 */
 	tcfg1 = __raw_readl(S3C2410_TCFG1);
+	/* 读取TCFG0寄存器 */
 	tcfg0 = __raw_readl(S3C2410_TCFG0);
 
 	/* configure the system for whichever machine is in use */
 
-	if (use_tclk1_12()) {
-		/* timer is at 12MHz, scaler is 1 */
-		timer_usec_ticks = timer_mask_usec_ticks(1, 12000000);
-		tcnt = 12000000 / HZ;
+	/* for the h1940 (and others), we use the pclk from the core
+	 * to generate the timer values. since values around 50 to
+	 * 70MHz are not values we can directly generate the timer
+	 * value from, we need to pre-scale and divide before using it.
+	 *
+	 * for instance, using 50.7MHz and dividing by 6 gives 8.45MHz
+	 * (8.45 ticks per usec)
+	 */
 
-		tcfg1 &= ~S3C2410_TCFG1_MUX4_MASK;
-		tcfg1 |= S3C2410_TCFG1_MUX4_TCLK1;
-	} else {
-		unsigned long pclk;
-		struct clk *clk;
+	/* this is used as default if no other timer can be found */
+	/* 获取PWM时钟 */
+	clk = clk_get(NULL, "timers");
+	if (IS_ERR(clk))
+		panic("failed to get clock for system timer");
 
-		/* for the h1940 (and others), we use the pclk from the core
-		 * to generate the timer values. since values around 50 to
-		 * 70MHz are not values we can directly generate the timer
-		 * value from, we need to pre-scale and divide before using it.
-		 *
-		 * for instance, using 50.7MHz and dividing by 6 gives 8.45MHz
-		 * (8.45 ticks per usec)
-		 */
+	clk_enable(clk);
 
-		/* this is used as default if no other timer can be found */
+	/* pclk == 6500000 */
+	pclk = clk_get_rate(clk);
 
-		clk = clk_get(NULL, "timers");
-		if (IS_ERR(clk))
-			panic("failed to get clock for system timer");
+	/* configure clock tick */
 
-		clk_enable(clk);
+	timer_usec_ticks = timer_mask_usec_ticks(6, pclk);
 
-		pclk = clk_get_rate(clk);
+	tcfg1 &= ~S3C2410_TCFG1_MUX4_MASK;
+	tcfg1 |= S3C2410_TCFG1_MUX4_DIV1;
 
-		/* configure clock tick */
+	tcfg0 &= ~S3C2410_TCFG_PRESCALER1_MASK;
+	tcfg0 |= (6) << S3C2410_TCFG_PRESCALER1_SHIFT;
 
-		timer_usec_ticks = timer_mask_usec_ticks(6, pclk);
-
-		tcfg1 &= ~S3C2410_TCFG1_MUX4_MASK;
-		tcfg1 |= S3C2410_TCFG1_MUX4_DIV1;
-
-		tcfg0 &= ~S3C2410_TCFG_PRESCALER1_MASK;
-		tcfg0 |= (6) << S3C2410_TCFG_PRESCALER1_SHIFT;
-
-		tcnt = (pclk / 7) / HZ;
-	}
+	tcnt = (pclk / 7) / HZ;
 
 	/* timers reload after counting zero, so reduce the count by 1 */
 
@@ -346,24 +232,12 @@ static void s3c64xx_timer_setup (void)
 	__raw_writel(__raw_readl(S3C64XX_TINT_CSTAT) | S3C_TINT_CSTAT_T4INTEN , S3C64XX_TINT_CSTAT);
 }
 
-
-static void __init s3c2410_timer_init(void)
-{
-	s3c2410_timer_setup();
-	setup_irq(IRQ_TIMER4, &s3c2410_timer_irq);
-}
-
 static void __init s3c64xx_timer_init(void)
 {
 	s3c64xx_timer_setup();
+	/* 安装了用于更新jiffy的IRQ_TIMER4中断函数s3c2410_timer_irq */
 	setup_irq(IRQ_TIMER4, &s3c2410_timer_irq);
 }
-
-struct sys_timer s3c24xx_timer = {
-	.init		= s3c2410_timer_init,
-	.offset		= s3c2410_gettimeoffset,
-	.resume		= s3c2410_timer_setup
-};
 
 struct sys_timer s3c64xx_timer = {
 	.init		= s3c64xx_timer_init,

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * arch/arm/include/asm/mach/time.h
  *
  * Copyright (C) 2004 MontaVista Software, Inc.
@@ -35,10 +35,14 @@
  */
 struct sys_timer {
 	struct sys_device	dev;
+	/* 用于初始化内核jiffy时钟源 */
 	void			(*init)(void);
+	/* 用于挂起时钟中断 */
 	void			(*suspend)(void);
+	/* 用于恢复挂起的时钟中断 */
 	void			(*resume)(void);
 #ifndef CONFIG_GENERIC_TIME
+	/* 返回上次中断后经过的时间，单位为微妙 */
 	unsigned long		(*offset)(void);
 #endif
 };

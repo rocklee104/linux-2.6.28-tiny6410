@@ -1,4 +1,4 @@
-/*****************************************************************************
+﻿/*****************************************************************************
  *                                                                           *
  * Copyright (c) David L. Mills 1993                                         *
  *                                                                           *
@@ -245,6 +245,7 @@ static inline int ntp_synced(void)
 #else
 #define NTP_INTERVAL_FREQ  (HZ)
 #endif
+/* 一个jiffies等于多少个ns */
 #define NTP_INTERVAL_LENGTH (NSEC_PER_SEC/NTP_INTERVAL_FREQ)
 
 /* Returns how long ticks are at present, in ns / 2^NTP_SCALE_SHIFT. */

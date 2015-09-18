@@ -1,4 +1,4 @@
-/*
+﻿/*
  * This is <linux/capability.h>
  *
  * Andrew G. Morgan <morgan@kernel.org>
@@ -308,6 +308,7 @@ typedef struct kernel_cap_struct {
 /* Allow irix_stime on mips */
 /* Allow setting the real-time clock */
 
+/* 运行设定时间 */
 #define CAP_SYS_TIME         25
 
 /* Allow configuration of tty devices */

@@ -655,6 +655,7 @@ asmlinkage void __init start_kernel(void)
 	init_timers();
 	hrtimers_init();
 	softirq_init();
+	/* 初始化内核时钟源,并且它的初始化早于硬件时钟中断的初始化 */
 	timekeeping_init();
 	time_init();
 	sched_clock_init();

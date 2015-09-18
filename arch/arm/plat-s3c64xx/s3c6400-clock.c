@@ -1,4 +1,4 @@
-/* linux/arch/arm/plat-s3c64xx/s3c6400-clock.c
+﻿/* linux/arch/arm/plat-s3c64xx/s3c6400-clock.c
  *
  * Copyright 2008 Openmoko, Inc.
  * Copyright 2008 Simtec Electronics
@@ -794,26 +794,33 @@ void __init_or_cpufreq s3c6400_setup_clocks(void)
 
 	printk(KERN_DEBUG "%s: registering clocks\n", __func__);
 
+	/* S3C_CLK_DIV0对应物理地址0x7E00F000,读取CLK_DIV0寄存器的值 */
 	clkdiv0 = __raw_readl(S3C_CLK_DIV0);
 	printk(KERN_DEBUG "%s: clkdiv0 = %08x\n", __func__, clkdiv0);
 
+	/* 在clocks链表中找到xtal对象 */
 	xtal_clk = clk_get(NULL, "xtal");
 	BUG_ON(IS_ERR(xtal_clk));
 
+	/* 12000000 */
 	xtal = clk_get_rate(xtal_clk);
 	clk_put(xtal_clk);
 
 	printk(KERN_DEBUG "%s: xtal is %ld\n", __func__, xtal);
 
+	/* 锁相环EPLL的输出频率 */
 	epll = s3c6400_get_epll(xtal);
+	/* 锁相环MPLL的输出频率 */
 	mpll = s3c6400_get_pll(xtal, __raw_readl(S3C_MPLL_CON));
 	apll = s3c6400_get_pll(xtal, __raw_readl(S3C_APLL_CON));
 
+	/* 获取ARMCLK */
 	fclk = apll / GET_DIV(clkdiv0, S3C6410_CLKDIV0_ARM);
 
 	printk(KERN_INFO "S3C64XX: PLL settings, A=%ld, M=%ld, E=%ld\n",
 	       apll, mpll, epll);
 
+	/* 获取HCLKX2的输出频率,参考6410x user's manual Figure 3-5 */
 	if(__raw_readl(S3C_OTHERS) & S3C_OTHERS_SYNCMUXSEL_SYNC) {
 		/* Synchronous mode */
 		hclkx2 = apll / GET_DIV(clkdiv0, S3C6400_CLKDIV0_HCLK2);
@@ -822,6 +829,7 @@ void __init_or_cpufreq s3c6400_setup_clocks(void)
 		hclkx2 = mpll / GET_DIV(clkdiv0, S3C6400_CLKDIV0_HCLK2);
 	}
 
+	/* 获取HCLK及PCLK */
 	hclk = hclkx2 / GET_DIV(clkdiv0, S3C6400_CLKDIV0_HCLK);
 	pclk = hclkx2 / GET_DIV(clkdiv0, S3C6400_CLKDIV0_PCLK);
 
@@ -843,8 +851,10 @@ void __init_or_cpufreq s3c6400_setup_clocks(void)
 		u32 tmp;
 
 		tmp = readl(S3C_CLK_SRC);
+		/* 在原有基础上选择MMC0_SEL, MMC1_SEL, MMC2_SEL*/
 		writel(tmp | 0x00540000, S3C_CLK_SRC);
 		tmp = readl(S3C_CLK_DIV1);
+		/* 在原有基础上设置MMC0_RATIO, MMC1_RATIO, MMC2_RATIO */
 		writel(tmp | 0x00000555, S3C_CLK_DIV1);
 		printk("div1: %08x\n", readl(S3C_CLK_DIV1));
 	}

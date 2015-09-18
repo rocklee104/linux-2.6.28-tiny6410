@@ -42,7 +42,7 @@
 #define S3C_VA_UART3		S3C_VA_UARTx(3)
 #define S3C_SZ_UART		SZ_256
 
-/* 0x7E00_F000到0x7E00_FA0C为system controller所用 */
+/* 0x7E00F000到0x7E00FA0C为system controller所用 */
 #define S3C64XX_PA_SYSCON	(0x7E00F000)
 /* PWM timer */
 #define S3C64XX_PA_TIMER	(0x7F006000)

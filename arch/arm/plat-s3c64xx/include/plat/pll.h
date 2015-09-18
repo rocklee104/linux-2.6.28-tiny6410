@@ -1,4 +1,4 @@
-/* arch/arm/plat-s3c64xx/include/plat/pll.h
+﻿/* arch/arm/plat-s3c64xx/include/plat/pll.h
  *
  * Copyright 2008 Openmoko, Inc.
  * Copyright 2008 Simtec Electronics
@@ -21,6 +21,7 @@
 
 #include <asm/div64.h>
 
+/* 根据FOUT = MDIV X FIN / (PDIV X 2SDIV)计算APLL和MPLL的输出频率 */
 static inline unsigned long s3c6400_get_pll(unsigned long baseclk,
 					    u32 pllcon)
 {
@@ -45,6 +46,7 @@ static inline unsigned long s3c6400_get_pll(unsigned long baseclk,
 #define S3C6400_EPLL_SDIV_SHIFT	(0)
 #define S3C6400_EPLL_KDIV_MASK  (0xffff)
 
+/* 根据公式FOUT = (MDIV + KDIV / 216) X FIN / (PDIV X 2SDIV)计算epll的输出频率 */
 static inline unsigned long s3c6400_get_epll(unsigned long baseclk)
 {
 	unsigned long result;
@@ -53,9 +55,11 @@ static inline unsigned long s3c6400_get_epll(unsigned long baseclk)
 	u32 mdiv, pdiv, sdiv, kdiv;
 	u64 tmp;
 
+	/* 获取PLL M divide value */
 	mdiv = (epll0 >> S3C6400_EPLL_MDIV_SHIFT) & S3C6400_EPLL_MDIV_MASK;
 	pdiv = (epll0 >> S3C6400_EPLL_PDIV_SHIFT) & S3C6400_EPLL_PDIV_MASK;
 	sdiv = (epll0 >> S3C6400_EPLL_SDIV_SHIFT) & S3C6400_EPLL_SDIV_MASK;
+	/* kdiv保存在EPLL_CON1中 */
 	kdiv = epll1 & S3C6400_EPLL_KDIV_MASK;
 
 	/* We need to multiple baseclk by mdiv (the integer part) and kdiv

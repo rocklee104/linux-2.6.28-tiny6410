@@ -1,4 +1,4 @@
-/*  linux/include/linux/clocksource.h
+﻿/*  linux/include/linux/clocksource.h
  *
  *  This file contains the structure definitions for clocksources.
  *
@@ -58,23 +58,29 @@ struct clocksource {
 	/*
 	 * First part of structure is read mostly
 	 */
+	/* 时钟源的名称,如"jiffies" */
 	char *name;
+	/* 用于将时钟源链接在一个双向内核链表中 */
 	struct list_head list;
+	/*
+	 * rating就是用来指明时钟源的精确度.值越小,表明质量越差.rating在100~199之间,表明可以使用,
+	 * 但质量不好.rating在300~399区间,表示时钟源相当快速且准确.在1~99之间说明它非常差,仅仅
+	 * 用于启动期间.超过400的rating指明这是一个完美的时钟源.
+	 */
 	int rating;
+	/* read 函数指针用于读取时钟周期的当前计数值,这个计数值是基于cycle的 */
 	cycle_t (*read)(void);
 	cycle_t mask;
+	/* mult和shift用于将cycle转换成ns */
 	u32 mult;
 	u32 mult_orig;
 	u32 shift;
 	unsigned long flags;
 	cycle_t (*vread)(void);
+	/* 电源管理相关 */
 	void (*resume)(void);
-#ifdef CONFIG_IA64
-	void *fsys_mmio;        /* used by fsyscall asm code */
-#define CLKSRC_FSYS_MMIO_SET(mmio, addr)      ((mmio) = (addr))
-#else
+
 #define CLKSRC_FSYS_MMIO_SET(mmio, addr)      do { } while (0)
-#endif
 
 	/* timekeeping specific data, ignore */
 	cycle_t cycle_interval;

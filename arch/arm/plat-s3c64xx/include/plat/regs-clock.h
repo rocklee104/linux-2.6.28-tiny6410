@@ -1,4 +1,4 @@
-/* arch/arm/plat-s3c64xx/include/plat/regs-clock.h
+﻿/* arch/arm/plat-s3c64xx/include/plat/regs-clock.h
  *
  * Copyright 2008 Openmoko, Inc.
  * Copyright 2008 Simtec Electronics
@@ -17,6 +17,7 @@
 
 #define S3C_CLKREG(x)		(S3C_VA_SYS + (x))
 
+/* 对应物理地址0x7E00F000 */
 #define S3C_APLL_LOCK		S3C_CLKREG(0x00)
 #define S3C_MPLL_LOCK		S3C_CLKREG(0x04)
 #define S3C_EPLL_LOCK		S3C_CLKREG(0x08)
@@ -31,6 +32,7 @@
 #define S3C_CLK_DIV2		S3C_CLKREG(0x28)
 #define S3C_CLK_OUT		S3C_CLKREG(0x2C)
 #define S3C_HCLK_GATE		S3C_CLKREG(0x30)
+/* 对应物理地址0x7E00F034 */
 #define S3C_PCLK_GATE		S3C_CLKREG(0x34)
 #define S3C_SCLK_GATE		S3C_CLKREG(0x38)
 #define S3C_SDMA_SEL            S3C_CLKREG(0x110)
@@ -179,6 +181,7 @@
 #define S3C_CLKCON_PCLK_IRDA		(1<<10)
 #define S3C_CLKCON_PCLK_PCM1		(1<<9)
 #define S3C_CLKCON_PCLK_PCM0		(1<<8)
+/* 选通PWM的时钟源为PCLK */
 #define S3C_CLKCON_PCLK_PWM		(1<<7)
 #define S3C_CLKCON_PCLK_RTC		(1<<6)
 #define S3C_CLKCON_PCLK_WDT		(1<<5)
@@ -224,6 +227,7 @@
 
 /*OTHERS Resgister */
 #define S3C_OTHERS_USB_SIG_MASK		(1<<16)
+/* SYNCMUX选择APLL */
 #define S3C_OTHERS_SYNCMUXSEL_SYNC	(1<<6)
 #define S3C_OTHERS_SYNCMODE_SYNC	(1<<7)
 

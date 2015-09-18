@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  linux/kernel/time.c
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
@@ -654,6 +654,7 @@ u64 nsec_to_clock_t(u64 x)
 }
 
 #if (BITS_PER_LONG < 64)
+/* 32位系统读取jiffies64不是原子的,需要读取两个字长的数据 */
 u64 get_jiffies_64(void)
 {
 	unsigned long seq;

@@ -1,4 +1,4 @@
-/* linux/arch/arm/plat-s3c64xx/clock.c
+﻿/* linux/arch/arm/plat-s3c64xx/clock.c
  *
  * Copyright 2008 Openmoko, Inc.
  * Copyright 2008 Simtec Electronics
@@ -178,6 +178,7 @@ struct clk clk_cpu = {
 	.round_rate	= s3c_fclk_round_rate,
 };
 
+/* 操作PCKL_GAGE/HCLK_GATE等 */
 static int inline s3c64xx_gate(void __iomem *reg,
 				struct clk *clk,
 				int enable)
@@ -211,6 +212,7 @@ int s3c64xx_sclk_ctrl(struct clk *clk, int enable)
 	return s3c64xx_gate(S3C_SCLK_GATE, clk, enable);
 }
 
+/* 必须显示调用enable的clock */
 static struct clk init_clocks_disable[] = {
 	{
 		.name		= "nand",
@@ -292,6 +294,7 @@ static struct clk init_clocks_disable[] = {
 
 };
 
+/* 默认启用的clock */
 static struct clk init_clocks[] = {
 	{
 		.name		= "lcd",
@@ -330,8 +333,10 @@ static struct clk init_clocks[] = {
 		.enable		= s3c64xx_hclk_ctrl,
 		.ctrlbit	= S3C_CLKCON_HCLK_HSMMC2,
 	}, {
+		/* PWM时钟 */
 		.name		= "timers",
 		.id		= -1,
+		/* PWM时钟是同过pclk分配获取的,见6410x user's manual Figure 32-1 */
 		.parent		= &clk_p,
 		.enable		= s3c64xx_pclk_ctrl,
 		.ctrlbit	= S3C_CLKCON_PCLK_PWM,

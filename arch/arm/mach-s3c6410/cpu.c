@@ -98,11 +98,15 @@ void __init s3c6410_map_io(void)
 	s3c64xx_idle = s3c6410_idle;
 }
 
+/* 调用smdk6410_map_io时,已经将xtal这个clock的频率设置为12M了 */
 void __init s3c6410_init_clocks(int xtal)
 {
 	printk(KERN_DEBUG "%s: initialising clocks\n", __func__);
+	/* 初始化基本的时钟 */
 	s3c24xx_register_baseclocks(xtal);
+	/* 初始化64xx使用的时钟 */
 	s3c64xx_register_clocks();
+	/* 初始化6400/6410特有的时钟 */
 	s3c6400_register_clocks();
 	s3c6400_setup_clocks();
 #ifdef CONFIG_HAVE_PWM

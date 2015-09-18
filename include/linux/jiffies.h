@@ -1,4 +1,4 @@
-#ifndef _LINUX_JIFFIES_H
+﻿#ifndef _LINUX_JIFFIES_H
 #define _LINUX_JIFFIES_H
 
 #include <linux/math64.h>
@@ -55,6 +55,7 @@
                              + ((((NOM) % (DEN)) << (LSH)) + (DEN) / 2) / (DEN))
 
 /* HZ is the requested value. ACTHZ is actual HZ ("<< 8" is for accuracy) */
+/* ACTHZ表示时钟实际上运行的频率 */
 #define ACTHZ (SH_DIV (CLOCK_TICK_RATE, LATCH, 8))
 
 /* TICK_NSEC is the time between ticks in nsec assuming real ACTHZ */

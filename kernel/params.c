@@ -24,7 +24,7 @@
 #include <linux/err.h>
 #include <linux/slab.h>
 
-#if 1
+#if 0
 #define DEBUGP printk
 #else
 #define DEBUGP(fmt, a...)

@@ -1,4 +1,4 @@
-/* linux/arch/arm/plat-s3c/include/plat/clock.h
+﻿/* linux/arch/arm/plat-s3c/include/plat/clock.h
  *
  * Copyright (c) 2004-2005 Simtec Electronics
  *	http://www.simtec.co.uk/products/SWLINUX/
@@ -12,12 +12,15 @@
 #include <linux/spinlock.h>
 
 struct clk {
+	/* 用于加入全局clocks链表 */
 	struct list_head      list;
 	struct module        *owner;
 	struct clk           *parent;
 	const char           *name;
 	int		      id;
+	/* 判断是否enable过,如果usage==0,在clk_enable中就调用clk的enable方法使能该clk */
 	int		      usage;
+	/* 时钟速率,单位频率HZ */
 	unsigned long         rate;
 	unsigned long         ctrlbit;
 

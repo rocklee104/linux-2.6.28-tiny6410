@@ -31,8 +31,10 @@
 #endif
 
 #define S3C_VA_IRQ	S3C_ADDR(0x00000000)	/* irq controller(s) */
+/* 对应物理地址0x7E00F000 */
 #define S3C_VA_SYS	S3C_ADDR(0x00100000)	/* system control */
 #define S3C_VA_MEM	S3C_ADDR(0x00200000)	/* system control */
+/* 对应物理地址为0x7F006000 */
 #define S3C_VA_TIMER	S3C_ADDR(0x00300000)	/* timer block */
 #define S3C_VA_WATCHDOG	S3C_ADDR(0x00400000)	/* watchdog */
 #define S3C_VA_LCD	S3C_ADDR(0x00600000)	/* LCD */
