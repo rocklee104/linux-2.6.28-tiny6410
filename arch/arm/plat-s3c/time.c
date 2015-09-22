@@ -42,12 +42,14 @@
 #include <plat/cpu.h>
 
 static unsigned long timer_startval;
+/* tick向微秒的转换,这个数是浮点数为了保证精度,放大后的数 */
 static unsigned long timer_usec_ticks;
 
 #ifndef TICK_MAX
 #define TICK_MAX (0xffff)
 #endif
 
+/* 为了保证浮点数的精度,用于放大 */
 #define TIMER_USEC_SHIFT 16
 
 /* we use the shifted arithmetic to work out the ratio of timer ticks
@@ -67,11 +69,13 @@ static unsigned long timer_usec_ticks;
  * to scale the ticks into usecs
 */
 
+/* 频率转微秒.为了保存更大的精度,对结果放大了2<<16.实际等价于 t = (10^6)*(2^16)/(pclk/scaler) */
 static inline unsigned long
 timer_mask_usec_ticks(unsigned long scaler, unsigned long pclk)
 {
 	unsigned long den = pclk / 1000;
 
+	/* + (den >> 1)是为了减少误差 */
 	return ((1000 << TIMER_USEC_SHIFT) * scaler + (den >> 1)) / den;
 }
 
@@ -183,19 +187,30 @@ static void s3c64xx_timer_setup (void)
 	pclk = clk_get_rate(clk);
 
 	/* configure clock tick */
-
+	/* 1微秒包含的TICK数目存入timer_usec_ticks, 这个tick数是PWM timer4的输出频率 */
 	timer_usec_ticks = timer_mask_usec_ticks(6, pclk);
 
+	/* 选择定时器4的MUX输入为0b0000,也即1/1分频 */
 	tcfg1 &= ~S3C2410_TCFG1_MUX4_MASK;
 	tcfg1 |= S3C2410_TCFG1_MUX4_DIV1;
 
+	/* 预分频器1的值为6,显然它控制定时器2,3和4 */
 	tcfg0 &= ~S3C2410_TCFG_PRESCALER1_MASK;
 	tcfg0 |= (6) << S3C2410_TCFG_PRESCALER1_SHIFT;
 
+	/* 
+	 * 根据公式Timer input clock Frequency = PCLK / ( {prescaler value + 1} ) / {divider value}
+	 * 计算得到input clock frequency, 我们这里设置1s产生HZ个中断,就需要将这个frequency再除以HZ
+	 * 得到每个中断需要的计数.(tcnt = 47500)
+	 */
 	tcnt = (pclk / 7) / HZ;
 
 	/* timers reload after counting zero, so reduce the count by 1 */
-
+	/* 
+	 * 假设我们需要3个计数产生一个次中断,如果设置tcnt = 3,一旦tcnt == 0,就产生中断,
+	 * 这里经过了3个计数3,2,1(0不包含在内),实际上由于自动装载时,计数器可以计数到0,
+	 * 所以本次中断到下次中断将会经历4个计数,所以需要将tcnt再减1
+	 */
 	tcnt--;
 
 	printk(KERN_DEBUG "timer tcon=%08lx, tcnt %04lx, tcfg %08lx,%08lx, usec %08lx\n",
@@ -211,24 +226,34 @@ static void s3c64xx_timer_setup (void)
 	__raw_writel(tcfg0, S3C2410_TCFG0);
 
 	timer_startval = tcnt;
+	/* 写入tcntb4 */
 	__raw_writel(tcnt, S3C2410_TCNTB(4));
 
 	/* ensure timer is stopped... */
 
 	tcon &= ~(7<<20);
+	/* 设置timer4 Auto-Reload */
 	tcon |= S3C2410_TCON_T4RELOAD;
+	/* 设置timer4 manual update = 1, TCNTB4中的数值将被加载到TCNT4 */
 	tcon |= S3C2410_TCON_T4MANUALUPD;
 
 	__raw_writel(tcon, S3C2410_TCON);
+	/* 寄存器TCNTB4,物理地址0x7F00603c */
 	__raw_writel(tcnt, S3C2410_TCNTB(4));
+	/* 寄存器TCNTO4(timer4没有TCNTP4寄存器),物理地址0x7F006040,TCNTO4是只读的寄存器,这条语句错误*/
 	__raw_writel(tcnt, S3C2410_TCMPB(4));
 
 	/* start the timer running */
 	tcon |= S3C2410_TCON_T4START;
+	/* 设置timer4 manual update = 0 */
 	tcon &= ~S3C2410_TCON_T4MANUALUPD;
 	__raw_writel(tcon, S3C2410_TCON);
 
 	/* Timer interrupt Enable */
+	/* 
+	 * 通过CSTAT寄存器使能Timer 4 Interrupt.注意,此时PWM时钟4已开始向中断控制器提交中断信号,
+	 * 中断控制器也已被初始化,但是此时是禁中断的
+	 */
 	__raw_writel(__raw_readl(S3C64XX_TINT_CSTAT) | S3C_TINT_CSTAT_T4INTEN , S3C64XX_TINT_CSTAT);
 }
 

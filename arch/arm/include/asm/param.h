@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  arch/arm/include/asm/param.h
  *
  *  Copyright (C) 1995-1999 Russell King
@@ -11,6 +11,7 @@
 #define __ASM_PARAM_H
 
 #ifdef __KERNEL__
+/* HZ是1秒内发生的时钟中断数 */
 # define HZ		CONFIG_HZ	/* Internal kernel timer frequency */
 # define USER_HZ	100		/* User interfaces are in "ticks" */
 # define CLOCKS_PER_SEC	(USER_HZ)	/* like times() */
