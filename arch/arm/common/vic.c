@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  linux/arch/arm/common/vic.c
  *
  *  Copyright (C) 1999 - 2003 ARM Limited
@@ -42,7 +42,9 @@ static void vic_unmask_irq(unsigned int irq)
 static struct irq_chip vic_chip = {
 	.name	= "VIC",
 	.ack	= vic_mask_irq,
+	/* 对中断禁止寄存器的操作 */
 	.mask	= vic_mask_irq,
+	/* 中断使能寄存器的操作 */
 	.unmask	= vic_unmask_irq,
 };
 
@@ -59,16 +61,26 @@ void __init vic_init(void __iomem *base, unsigned int irq_start,
 
 	/* Disable all interrupts initially. */
 
+	/* 中断类型选择irq */
 	writel(0, base + VIC_INT_SELECT);
+	/* 关闭VIC0INTENABLE */
 	writel(0, base + VIC_INT_ENABLE);
+	/* interrupt disabled in VICINTENABLE Register */
 	writel(~0, base + VIC_INT_ENABLE_CLEAR);
-	writel(0, base + VIC_IRQ_STATUS);
-	writel(0, base + VIC_ITCR);
+	/* 对于mini6410来说, VICxIRQSTATUS寄存器只能读 */
+	//writel(0, base + VIC_IRQ_STATUS);
+    //writel(0, base + VIC_ITCR);
+	//writel(0, base + VIC_IRQ_STATUS);
+	/* mini6410不存在VIC_ITCR */
+	//writel(0, base + VIC_ITCR);
+	/* software interrupt disabled in the VICSOFTINT Registe */
 	writel(~0, base + VIC_INT_SOFT_CLEAR);
 
 	/*
 	 * Make sure we clear all existing interrupts
 	 */
+	 /* mini6410使用的矢量中断控制器是PL192 */
+#if 0
 	writel(0, base + VIC_PL190_VECT_ADDR);
 	for (i = 0; i < 19; i++) {
 		unsigned int value;
@@ -76,18 +88,24 @@ void __init vic_init(void __iomem *base, unsigned int irq_start,
 		value = readl(base + VIC_PL190_VECT_ADDR);
 		writel(value, base + VIC_PL190_VECT_ADDR);
 	}
+#endif
 
+	/* mini6410没有VIC_VECT_CNTL0寄存器 */
+#if 0
 	for (i = 0; i < 16; i++) {
 		void __iomem *reg = base + VIC_VECT_CNTL0 + (i * 4);
 		writel(VIC_VECT_CNTL_ENABLE | i, reg);
 	}
+#endif
 
-	writel(32, base + VIC_PL190_DEF_VECT_ADDR);
+	/* mini6410使用的矢量中断控制器是PL192 */
+	//writel(32, base + VIC_PL190_DEF_VECT_ADDR);
 
 	for (i = 0; i < 32; i++) {
 		unsigned int irq = irq_start + i;
 
 		set_irq_chip(irq, &vic_chip);
+		/* 保存中断控制寄存器基址到中断描述符 */
 		set_irq_chip_data(irq, base);
 
 		if (vic_sources & (1 << i)) {

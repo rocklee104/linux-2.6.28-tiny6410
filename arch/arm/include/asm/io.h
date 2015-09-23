@@ -163,7 +163,6 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
  * Again, this are defined to perform little endian accesses.  See the
  * IO port primitives for more information.
  */
-#ifdef __mem_pci
 #define readb(c) ({ __u8  __v = __raw_readb(__mem_pci(c)); __v; })
 #define readw(c) ({ __u16 __v = le16_to_cpu((__force __le16) \
 					__raw_readw(__mem_pci(c))); __v; })
@@ -190,19 +189,6 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
 #define memset_io(c,v,l)	_memset_io(__mem_pci(c),(v),(l))
 #define memcpy_fromio(a,c,l)	_memcpy_fromio((a),__mem_pci(c),(l))
 #define memcpy_toio(c,a,l)	_memcpy_toio(__mem_pci(c),(a),(l))
-
-#elif !defined(readb)
-
-#define readb(c)			(__readwrite_bug("readb"),0)
-#define readw(c)			(__readwrite_bug("readw"),0)
-#define readl(c)			(__readwrite_bug("readl"),0)
-#define writeb(v,c)			__readwrite_bug("writeb")
-#define writew(v,c)			__readwrite_bug("writew")
-#define writel(v,c)			__readwrite_bug("writel")
-
-#define check_signature(io,sig,len)	(0)
-
-#endif	/* __mem_pci */
 
 /*
  * ioremap and friends.

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * linux/kernel/irq/handle.c
  *
  * Copyright (C) 1992, 1998-2006 Linus Torvalds, Ingo Molnar
@@ -45,6 +45,10 @@ void handle_bad_irq(unsigned int irq, struct irq_desc *desc)
  * having to touch the generic code.
  *
  * Controller mappings for all interrupt sources:
+ */
+/*
+ * Linux对中断处理进行了几个层次的抽象:芯片级中断处理器,中断处理器的电流处理和高层的ISR.
+ * 这样Linux就可以屏蔽不同体系架构的中断控制器芯片实现的不同,而提供统一的接口
  */
 int nr_irqs = NR_IRQS;
 EXPORT_SYMBOL_GPL(nr_irqs);

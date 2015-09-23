@@ -26,19 +26,29 @@
 	.macro	arch_ret_to_user, tmp1, tmp2
 	.endm
 
+	#通过读取VIC0IRQSTATUS来获取发生中断的中断号
 	.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
 
 	@ check the vic0
+	#获取中断号
 	mov	\irqnr, # S3C_IRQ_OFFSET + 31
+	#读取vic0的VIC_IRQ_STATUS
 	ldr	\irqstat, [ \base, # VIC_IRQ_STATUS ]
+	#测试vic0的irqstat是否为0
 	teq	\irqstat, #0
 
+	#如果vic0 的irqstat为0,需要检查vic1
 	@ otherwise try vic1
+	#tmp中保存vic的基址
 	addeq	\tmp, \base, #(S3C_VA_VIC1 - S3C_VA_VIC0)
+	#vic1中的中断号
 	addeq	\irqnr, \irqnr, #32
+	#读取vic1的VIC_IRQ_STATUS
 	ldreq	\irqstat, [ \tmp, # VIC_IRQ_STATUS ]
+	#测试vic1的irqstat是否为0
 	teqeq	\irqstat, #0
 
+	#如果vic0和vic1中的irqstat不为0,计算前导零的数目
 	clzne	\irqstat, \irqstat
 	subne	\irqnr, \irqnr, \irqstat
 	.endm

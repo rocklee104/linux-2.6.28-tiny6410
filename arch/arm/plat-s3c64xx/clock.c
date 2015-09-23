@@ -464,6 +464,7 @@ void __init s3c64xx_register_clocks(void)
 			       clkp->name, ret);
 		}
 
+		/* 关闭init_clocks_disable */
 		(clkp->enable)(clkp, 0);
 	}
 }

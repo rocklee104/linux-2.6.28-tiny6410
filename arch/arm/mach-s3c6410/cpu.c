@@ -117,6 +117,7 @@ void __init s3c6410_init_clocks(int xtal)
 void __init s3c6410_init_irq(void)
 {
 	/* VIC0 is missing IRQ7, VIC1 is fully populated. */
+	/* S3C6410的VIC0并没有提供IRQ7,所以s3c6410_init_irq在调用该函数时,传递的第一个参数屏蔽掉了第7位 */
 	s3c64xx_init_irq(~0 & ~(1 << 7), ~0);
 }
 

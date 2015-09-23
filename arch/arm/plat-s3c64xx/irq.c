@@ -58,6 +58,7 @@ static void s3c_irq_demux_timer3(unsigned int irq, struct irq_desc *desc)
 
 static void s3c_irq_demux_timer4(unsigned int irq, struct irq_desc *desc)
 {
+	/* IRQ_TIMER4是一个2级中断号 */
 	s3c_irq_demux_timer(irq, IRQ_TIMER4);
 }
 
@@ -307,6 +308,7 @@ void __init s3c64xx_init_irq(u32 vic0_valid, u32 vic1_valid)
 	set_irq_chained_handler(IRQ_TIMER1_VIC, s3c_irq_demux_timer1);
 	set_irq_chained_handler(IRQ_TIMER2_VIC, s3c_irq_demux_timer2);
 	set_irq_chained_handler(IRQ_TIMER3_VIC, s3c_irq_demux_timer3);
+	/* IRQ_TIMER4中断源设置为IRQ_TIMER4_VIC,处理函数s3c_irq_demux_timer4完成了跳转 */
 	set_irq_chained_handler(IRQ_TIMER4_VIC, s3c_irq_demux_timer4);
 
 	for (irq = IRQ_TIMER0; irq <= IRQ_TIMER4; irq++) {

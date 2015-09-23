@@ -92,7 +92,9 @@
 #define S3C64XX_PA_DMA		(0x75000000)
 
 /* place VICs close together */
+/* 物理地址0x71200000 */
 #define S3C_VA_VIC0		(S3C_VA_IRQ + 0x00)
+/* 物理地址0x71300000 */
 #define S3C_VA_VIC1		(S3C_VA_IRQ + 0x10000)
 
 /* Host I/F Indirect & Direct */

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * linux/kernel/irq/chip.c
  *
  * Copyright (C) 1992, 1998-2006 Linus Torvalds, Ingo Molnar
@@ -101,6 +101,7 @@ int set_irq_chip(unsigned int irq, struct irq_chip *chip)
 
 	spin_lock_irqsave(&desc->lock, flags);
 	irq_chip_set_defaults(chip);
+	/* 中断描述符和中断芯片关联 */
 	desc->chip = chip;
 	spin_unlock_irqrestore(&desc->lock, flags);
 

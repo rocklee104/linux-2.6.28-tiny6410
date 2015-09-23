@@ -1,4 +1,4 @@
-#ifndef _LINUX_IRQ_H
+﻿#ifndef _LINUX_IRQ_H
 #define _LINUX_IRQ_H
 
 /*
@@ -99,22 +99,36 @@ struct msi_desc;
  * @release:		release function solely used by UML
  * @typename:		obsoleted by name, kept as migration helper
  */
+/* 中断芯片抽象 */
 struct irq_chip {
+	/* 在/proc/interrupts显示的名称 */
 	const char	*name;
+	/*
+	 * startup指向一个函数,用于第一次使能参数指定的irq中断号对应的硬件寄存器.如果不提供,
+	 * 则系统直接安装默认函数default_startup,它直接调用enable函数指针指向的函数
+	 */
 	unsigned int	(*startup)(unsigned int irq);
 	void		(*shutdown)(unsigned int irq);
+	/* 禁止/使能中断,也即控制中断使能禁止寄存器 */
 	void		(*enable)(unsigned int irq);
 	void		(*disable)(unsigned int irq);
 
+	/* ack用于CPU对中断控制器的确认,通常直接调用mask函数禁止该中断即可 */
 	void		(*ack)(unsigned int irq);
+	/* mask用于设置屏蔽位,如果硬件没有屏蔽寄存器,那么就直接操作禁止寄存器 */
 	void		(*mask)(unsigned int irq);
 	void		(*mask_ack)(unsigned int irq);
+	/* 用于清除屏蔽位,如果硬件没有屏蔽寄存器,那么就直接操作禁止寄存器 */
 	void		(*unmask)(unsigned int irq);
 	void		(*eoi)(unsigned int irq);
 
 	void		(*end)(unsigned int irq);
 	void		(*set_affinity)(unsigned int irq, cpumask_t dest);
 	int		(*retrigger)(unsigned int irq);
+	/* 
+	 * set_type设置IRQ的电流类型.该方法主要在ARM,PowerPC等使用.通常只有irq_desc在注册action时,
+	 * 标记有IRQF_TRIGGER_MASK才会调用该函数重新设置触发类型 
+	 */
 	int		(*set_type)(unsigned int irq, unsigned int flow_type);
 	int		(*set_wake)(unsigned int irq, unsigned int on);
 
@@ -153,20 +167,33 @@ struct irq_chip {
  * @name:		flow handler name for /proc/interrupts output
  */
 struct irq_desc {
+	/* 中断号 */
 	unsigned int		irq;
+	/* 它用来实现中断处理器的电流处理,电流处理分为边沿跳变处理和电平处理 */
 	irq_flow_handler_t	handle_irq;
+	/* chip是对中断处理器芯片功能的封装:中断使能函数,屏蔽函数,确认函数等 */
 	struct irq_chip		*chip;
 	struct msi_desc		*msi_desc;
+	/* 指向ISR处理程序所需的任意数据结构体 */
 	void			*handler_data;
+	/* 指向与chip操作相关的任意结构体,比如中断处理器控制寄存器的基地址 */
 	void			*chip_data;
+	/* action提供了ISR需要操作的一个函数链表,中断发生的目的就是要执行这些动作链表中的函数 */
 	struct irqaction	*action;	/* IRQ action list */
+	/* 中断的状态:使能,禁止,设备共享等 */
 	unsigned int		status;		/* IRQ status */
 
+	/*
+	 * depth是一个内核中断指示计数器,被初始化为1,当内核调用setup_irq启用中断时减1,
+	 * 而调用disable_irq时被加1.通过该值处理中断禁用嵌套 
+	 */
 	unsigned int		depth;		/* nested irq disables */
 	unsigned int		wake_depth;	/* nested wake enables */
+	/* irq_count,irqs_unhandled和last_unhandled字段供统计信息.它们均在note_interrupt函数中被统计 */
 	unsigned int		irq_count;	/* For detecting broken IRQs */
 	unsigned int		irqs_unhandled;
 	unsigned long		last_unhandled;	/* Aging timer for unhandled count */
+	/* lock用来在SMP上进行对当前irq_desc的锁定 */
 	spinlock_t		lock;
 #ifdef CONFIG_SMP
 	cpumask_t		affinity;
@@ -178,12 +205,17 @@ struct irq_desc {
 #ifdef CONFIG_PROC_FS
 	struct proc_dir_entry	*dir;
 #endif
+	/*
+	 * 安装handle_irq时传递给__set_irq_handler的最后一个参数,可以为NULL.
+	 * 通过/proc/interrupts查看它.用来描述电流处理的名称 
+	 */
 	const char		*name;
 } ____cacheline_internodealigned_in_smp;
 
 
 extern struct irq_desc irq_desc[NR_IRQS];
 
+/* 通过irq获取irq描述符 */
 static inline struct irq_desc *irq_to_desc(unsigned int irq)
 {
 	return (irq < nr_irqs) ? irq_desc + irq : NULL;

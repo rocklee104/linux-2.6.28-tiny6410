@@ -19,12 +19,17 @@
  * note, since we're using the VICs, our start must be a
  * mulitple of 32 to allow the common code to work
  */
-
+/*
+ * S3C_IRQ_OFFSET被定义为32是为了给ISA设备预留中断号,该类设备的中断号要求总是从0开始,
+ * 尽管多数时候它们被淘汰不再使用.所以获取的中断号的范围在32~96之间
+ */
 #define S3C_IRQ_OFFSET	(32)
 
 #define S3C_IRQ(x)	((x) + S3C_IRQ_OFFSET)
 
+/* 32 */
 #define S3C_VIC0_BASE	S3C_IRQ(0)
+/* 64 */
 #define S3C_VIC1_BASE	S3C_IRQ(32)
 
 /* UART interrupts, each UART has 4 intterupts per channel so
@@ -170,6 +175,19 @@
  * machine specific support files.
  */
 
+/*
+ * 外部中断组	中断源数		对应引脚
+ *    0		   		28		GPN0-GPN15, GPL8-GPL14, GPM0-GPM4
+ *    1		   		15		GPA0-GPA7, GPB0-GPB6
+ *    2		    	8		GPC0-GPC7
+ *    3		    	5		GPD0-GPD4
+ *    4		   		14		GPF0-GPF13
+ *    5		    	7		GPG0-GPG6
+ *    6		   		10		GPH0-GPH9
+ *    7		   		16		GPO0-GPO15
+ *    8		   		15		GPP0-GPP14
+ *    9		    	9		GPQ0-GPQ8
+ */
 #define IRQ_EINT_GROUP1_NR	(15)
 #define IRQ_EINT_GROUP2_NR	(8)
 #define IRQ_EINT_GROUP3_NR	(5)
