@@ -720,10 +720,11 @@ void __init early_trap_init(void)
 	 * into the vector page, mapped at 0xffff0000, and ensure these
 	 * are visible to the instruction stream.
 	 */
+	/* 异常向量表拷贝到0xFFFF0000 */ 
 	memcpy((void *)vectors, __vectors_start, __vectors_end - __vectors_start);
 	/*
 	 * 把__stubs_start~__stubs_end之间的异常处理代码复制到了0xffff0200起始处,
-	 * 这里可直接用b指令跳转过去,这样比使用绝对跳转（ldr)效率高
+	 * 这里可直接用b指令跳转过去,这样比使用绝对跳转(ldr)效率高
 	 */
 	memcpy((void *)vectors + 0x200, __stubs_start, __stubs_end - __stubs_start);
 	memcpy((void *)vectors + 0x1000 - kuser_sz, __kuser_helper_start, kuser_sz);

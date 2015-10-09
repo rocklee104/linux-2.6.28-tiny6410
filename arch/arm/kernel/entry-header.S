@@ -36,6 +36,8 @@
 #endif
 	.endm
 
+	#get_thread_info宏用来根据当前的sp值,通过lsr和lsl分别右移左移13位,
+	#相当于对sp向下圆整到8K对齐.这里也就是thread_info所在的地址
 	.macro	get_thread_info, rd
 	mov	\rd, sp, lsr #13
 	mov	\rd, \rd, lsl #13

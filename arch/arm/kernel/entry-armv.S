@@ -27,7 +27,9 @@
  * Interrupt handling.  Preserves r7, r8, r9
  */
 	.macro	irq_handler
+	#get_irqnr_preamble用来获取中断状态寄存器基地址
 	get_irqnr_preamble r5, lr
+	#r0中保存中断号
 1:	get_irqnr_and_base r0, r6, r5, lr
 	movne	r1, sp
 	@
@@ -343,13 +345,20 @@ ENDPROC(__pabt_svc)
 #endif
 
 	.macro	usr_entry
+	#尝试在堆栈上分配一个struct pt_regs结构体的空间,用它存储发生中断时用户模式下的所有寄存器
 	sub	sp, sp, #S_FRAME_SIZE
+	#increase before,将r1-r12存入堆栈,sp后没加!所以sp指向的堆栈位置没有变,一直指向用于存储r0的存储空间
 	stmib	sp, {r1 - r12}
 
+	#将中断后r0,lr,spsr的值取出存放在r1-r3中,此时的r0保留了irq堆栈地址.
+	#它的值是指向中断前r0的值在堆栈中存放的位置,在寄存器结构体pt_regs在堆栈中的位置上面
 	ldmia	r0, {r1 - r3}
+	#在/arch/arm/kernel/asm-offsets.c中定义S_PC为offsetof(struct pt_regs, ARM_pc),让r0指向该位置.
 	add	r0, sp, #S_PC		@ here for interlock avoidance
+	#在r4中放入一个无效值
 	mov	r4, #-1			@  ""  ""     ""        ""
 
+	#将中断前的r0写入sp,此前sp留出了r0的位置
 	str	r1, [sp]		@ save the "real" r0 copied
 					@ from the exception stack
 
@@ -362,39 +371,30 @@ ENDPROC(__pabt_svc)
 	@
 	@ Also, separately save sp_usr and lr_usr
 	@
+	#此时r2-r4存放的是中断前的lr spsr的值和无效值.此时将这些值存入pt_regs中寄存器
+	#在堆栈中对应的位置,即此时将中断前的lr,spsr的值和无效之存入寄存器结构体pt_regs
+	#的ARM_pc,ARM_cpsr,ARM_ORIG_r0中.存储返回地址,现场状态等(被中断代码处的)
 	stmia	r0, {r2 - r4}
+	#stmdb是递减取值,存储用户模式下的sp,lr,将ARM_lr,ARM_sp存入lr,sp中.ARM体系结构中用户模式和系统模式共用同一个SP和LR
+	#^保存sp_usr和lr_usr分别到ARM_sp和ARM_lr
 	stmdb	r0, {sp, lr}^
 
 	@
 	@ Enable the alignment trap while in kernel mode
 	@
+	#alignment_trap在配置CONFIG_ALIGNMENT_TRAP时有效,如果开启了该选项,中断处理中将支持对齐跟踪
 	alignment_trap r0
 
 	@
 	@ Clear FP to mark the first stack frame
 	@
+	#zero_fp用来设置fp栈帧寄存器为0
 	zero_fp
-	.endm
-
-	.macro	kuser_cmpxchg_check
-#if __LINUX_ARM_ARCH__ < 6 && !defined(CONFIG_NEEDS_SYSCALL_FOR_CMPXCHG)
-#ifndef CONFIG_MMU
-#warning "NPTL on non MMU needs fixing"
-#else
-	@ Make sure our user space atomic helper is restarted
-	@ if it was interrupted in a critical region.  Here we
-	@ perform a quick test inline since it should be false
-	@ 99.9999% of the time.  The rest is done out of line.
-	cmp	r2, #TASK_SIZE
-	blhs	kuser_cmpxchg_fixup
-#endif
-#endif
 	.endm
 
 	.align	5
 __dabt_usr:
 	usr_entry
-	kuser_cmpxchg_check
 
 	@
 	@ Call the processor-specific abort handler:
@@ -423,32 +423,42 @@ __dabt_usr:
 ENDPROC(__dabt_usr)
 
 	.align	5
+#在vector_irq中,r0指向了irq模式下的sp
 __irq_usr:
+	#用于用户模式下发生中断时初始化中断处理堆栈,同时保存所有SVC态寄存器到堆栈
 	usr_entry
-	kuser_cmpxchg_check
-
 #ifdef CONFIG_TRACE_IRQFLAGS
 	bl	trace_hardirqs_off
 #endif
+	#根据当前sp指针,将该指针最右边13位清0,获得当前任务的thread_info
 	get_thread_info tsk
+	#如果可以抢占,递增任务的抢占计数
 #ifdef CONFIG_PREEMPT
+	#TI_PREEMPT被定义为offsetof(struct thread_info,preempt_count)
 	ldr	r8, [tsk, #TI_PREEMPT]		@ get preempt count
 	add	r7, r8, #1			@ increment it
 	str	r7, [tsk, #TI_PREEMPT]
 #endif
 
+	#中断服务例程
 	irq_handler
 #ifdef CONFIG_PREEMPT
+	#获得当前的抢占计数
 	ldr	r0, [tsk, #TI_PREEMPT]
+	#将前一步递增的抢占计数减回去了
 	str	r8, [tsk, #TI_PREEMPT]
+	#r0,r7是调用irq_handler前后的抢占计数,这里进行比较,是防止驱动的ISR程序没有配对操作抢占计数导致系统错误.
 	teq	r0, r7
+	#如果抢占计数被破坏,则强制写入0.
 	strne	r0, [r0, -r0]
 #endif
 #ifdef CONFIG_TRACE_IRQFLAGS
 	bl	trace_hardirqs_on
 #endif
 
+	#why在文件arch/arm/kernel/entry-header.S中被定义为r8,这里r8被清零
 	mov	why, #0
+	#返回到用户态
 	b	ret_to_user
 ENDPROC(__irq_usr)
 
@@ -1027,25 +1037,26 @@ vector_\name:
 	@ Save r0, lr_<exception> (parent PC) and spsr_<exception>
 	@ (parent CPSR)
 	@
-	# 为了处理异常后修复上下文,保存r0,lr,spsr.sp并没有改变
+	# 为了处理异常后修复上下文,保存r0,lr,spsr到当前模式的栈中.sp并没有改变
 	stmia	sp, {r0, lr}		@ save r0, lr
+	#将中断之前的cpsr保存到lr
 	mrs	lr, spsr
 	str	lr, [sp, #8]		@ save spsr
 
 	@
 	@ Prepare for SVC32 mode.  IRQs remain disabled.
 	@
-	#读出cpsr的值
+	#读出cpsr_mod的值
 	mrs	r0, cpsr
-	#将cpsr中的值和mode逻辑异或,实际上,当前cpsr中的模式和mode应该相等,这里运算结果就是SVC_MODE
+	#将cpsr_mod中的值和mode逻辑异或,实际上,当前cpsr中的模式和mode应该相等,这里运算结果就是SVC_MODE
 	eor	r0, r0, #(\mode ^ SVC_MODE)
-	#将修正模式后的cpsr保存到spsr,还未切换状态
+	#将修正模式后的cpsr_mod保存到spsr_mod,还未切换状态
 	msr	spsr_cxsf, r0
 
 	@
 	@ the branch table must immediately follow this code
 	@
-	#取出spsr中的[M3:M0],这里不用取M4,因为M4是表示26位还是32位寻址的,如果只想知道模式的话,取[M3:M0]就够了
+	#取出中断之前的cpsr中的[M3:M0],这里不用取M4,因为M4是表示26位还是32位寻址的,如果只想知道模式的话,取[M3:M0]就够了
 	and	lr, lr, #0x0f
 	#将irq模式的栈基地址填到r0,以后在svc_entry中可以通过r0去读取irq的栈
 	mov	r0, sp
@@ -1053,7 +1064,7 @@ vector_\name:
 	#直接将[M3:M0]乘以4再加上pc就可以计算出入口(因为一个entry占4个字节),
 	#结果为__irq_usr或__irq_svc,具体是usr还是svc要看发生中断之前是什么模式
 	ldr	lr, [pc, lr, lsl #2]
-	#跳进入口(__irq_usr或__irq_svc),同时做模式切换(mov带了s,就会给pc赋值的同时将用spsr去填cpsr)
+	#跳进入口(__irq_usr或__irq_svc,根据异常之前模式决定),同时做模式切换,切换到SVC(mov带了s,就会给pc赋值的同时将用spsr去填cpsr)
 	movs	pc, lr			@ branch to handler in SVC mode
 ENDPROC(vector_\name)
 	.endm
@@ -1066,6 +1077,7 @@ __stubs_start:
 	vector_stub	irq, IRQ_MODE, 4
 
 	#对应了[M3:M0]的所有可能取值,所以entry的地址就可以用[M3:M0]很快的算出来
+	#当执行ldr lr, [pc, lr, lsl #2],必须保证本条语句被预取到.
 	.long	__irq_usr			@  0  (USR_26 / USR_32)
 	.long	__irq_invalid			@  1  (FIQ_26 / FIQ_32)
 	.long	__irq_invalid			@  2  (IRQ_26 / IRQ_32)
@@ -1200,6 +1212,7 @@ __vectors_start:
 	ldr	pc, .LCvswi + stubs_offset
 	b	vector_pabt + stubs_offset
 	b	vector_dabt + stubs_offset
+	#地址异常
 	b	vector_addrexcptn + stubs_offset
 	b	vector_irq + stubs_offset
 	b	vector_fiq + stubs_offset
