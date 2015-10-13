@@ -27,14 +27,16 @@
  * Interrupt handling.  Preserves r7, r8, r9
  */
 	.macro	irq_handler
-	#get_irqnr_preamble用来获取中断状态寄存器基地址
+	#get_irqnr_preamble用来获取中断状态寄存器基地址,r5中保存了中断寄存器基址
 	get_irqnr_preamble r5, lr
-	#r0中保存中断号
+	#r0中保存中断号(硬件手册指定的中断号+31)
 1:	get_irqnr_and_base r0, r6, r5, lr
+	#当cpsr中的z位没有置位,表示函数get_irqnr_and_base结果有效
 	movne	r1, sp
 	@
 	@ routine called with r0 = irq number, r1 = struct pt_regs *
 	@
+	#将label 1的地址赋值给lr
 	adrne	lr, 1b
 	bne	asm_do_IRQ
 
@@ -350,7 +352,7 @@ ENDPROC(__pabt_svc)
 	#increase before,将r1-r12存入堆栈,sp后没加!所以sp指向的堆栈位置没有变,一直指向用于存储r0的存储空间
 	stmib	sp, {r1 - r12}
 
-	#将中断后r0,lr,spsr的值取出存放在r1-r3中,此时的r0保留了irq堆栈地址.
+	#将中断后r0(user mode),lr_irq,spsr_irq的值取出存放在r1-r3中,此时的r0保留了irq堆栈地址.
 	#它的值是指向中断前r0的值在堆栈中存放的位置,在寄存器结构体pt_regs在堆栈中的位置上面
 	ldmia	r0, {r1 - r3}
 	#在/arch/arm/kernel/asm-offsets.c中定义S_PC为offsetof(struct pt_regs, ARM_pc),让r0指向该位置.
@@ -428,9 +430,11 @@ __irq_usr:
 	#用于用户模式下发生中断时初始化中断处理堆栈,同时保存所有SVC态寄存器到堆栈
 	usr_entry
 #ifdef CONFIG_TRACE_IRQFLAGS
+	#mini6410,空函数
 	bl	trace_hardirqs_off
 #endif
 	#根据当前sp指针,将该指针最右边13位清0,获得当前任务的thread_info
+	#tsk在文件arch/arm/kernel/entry-header.S中被定义为r9
 	get_thread_info tsk
 	#如果可以抢占,递增任务的抢占计数
 #ifdef CONFIG_PREEMPT

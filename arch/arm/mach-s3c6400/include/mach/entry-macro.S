@@ -30,7 +30,7 @@
 	.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
 
 	@ check the vic0
-	#获取中断号
+	#获取中断号,这里的中断号和硬件芯片手册的有差别,当前的irqnr是在芯片手册上增加了31
 	mov	\irqnr, # S3C_IRQ_OFFSET + 31
 	#读取vic0的VIC_IRQ_STATUS
 	ldr	\irqstat, [ \base, # VIC_IRQ_STATUS ]
