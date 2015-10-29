@@ -746,6 +746,7 @@ void __init setup_arch(char **cmdline_p)
 	/*
 	 * Set up various architecture-specific pointers
 	 */
+	/* 指向s3c6410_init_irq */
 	init_arch_irq = mdesc->init_irq;
 	system_timer = mdesc->timer;
 	init_machine = mdesc->init_machine;

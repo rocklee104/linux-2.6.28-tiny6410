@@ -567,12 +567,16 @@ __set_irq_handler(unsigned int irq, irq_flow_handler_t handle, int is_chained,
 	spin_lock_irqsave(&desc->lock, flags);
 
 	/* Uninstall? */
+	/* irq描述符没有处理函数 */
 	if (handle == handle_bad_irq) {
 		if (desc->chip != &no_irq_chip)
+			/* 当前irq描述符无chip关联 */
 			mask_ack_irq(desc, irq);
+		/* irq描述符还没有绑定处理函数,irq还不能用 */
 		desc->status |= IRQ_DISABLED;
 		desc->depth = 1;
 	}
+	/* irq描述符绑定处理函数 */
 	desc->handle_irq = handle;
 	desc->name = name;
 

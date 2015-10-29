@@ -188,8 +188,16 @@ struct irq_desc {
 	 * 而调用disable_irq时被加1.通过该值处理中断禁用嵌套 
 	 */
 	unsigned int		depth;		/* nested irq disables */
+	/*
+	 * wake_depth是和电源管理中的wake up source相关.通过irq_set_irq_wake接口可以enable
+	 * 或者disable一个IRQ中断是否可以把系统从suspend状态唤醒,wake_depth是描述嵌套深度的信息
+	 */
 	unsigned int		wake_depth;	/* nested wake enables */
-	/* irq_count,irqs_unhandled和last_unhandled字段供统计信息.它们均在note_interrupt函数中被统计 */
+	/*
+	 * irq_count、last_unhandled和irqs_unhandled用于处理broken IRQ 的处理.所谓broken IRQ就是
+	 * 由于种种原因(例如错误firmware),IRQ handler没有定向到指定的IRQ上,当一个IRQ没有被处理的时候,
+	 * kernel可以为这个没有被处理的handler启动scan过程,让系统中所有的handler来认领该IRQ.
+	 */
 	unsigned int		irq_count;	/* For detecting broken IRQs */
 	unsigned int		irqs_unhandled;
 	unsigned long		last_unhandled;	/* Aging timer for unhandled count */
