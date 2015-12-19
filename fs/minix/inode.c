@@ -24,7 +24,9 @@ static int minix_remount (struct super_block * sb, int * flags, char * data);
 
 static void minix_delete_inode(struct inode *inode)
 {
+	/* 清除inode的address_space中的所有数据 */
 	truncate_inode_pages(&inode->i_data, 0);
+	/* inode表示的文件大小为0,之后minix_truncate由于inode->i_size = 0也不会做什么实际内容 */
 	inode->i_size = 0;
 	minix_truncate(inode);
 	minix_free_inode(inode);
@@ -36,15 +38,21 @@ static void minix_put_super(struct super_block *sb)
 	struct minix_sb_info *sbi = minix_sb(sb);
 
 	if (!(sb->s_flags & MS_RDONLY)) {
+		/* 如果文件系统可读写 */
 		if (sbi->s_version != MINIX_V3)	 /* s_state is now out from V3 sb */
+			/* v1/v2 super block才有s_state */
 			sbi->s_ms->s_state = sbi->s_mount_state;
+		/* buffer中super block内容被改变了,将buffer标记为dirty */
 		mark_buffer_dirty(sbi->s_sbh);
 	}
+	/* 减少map所在的buffer的引用计数,之后这些buffer就可能被释放 */
 	for (i = 0; i < sbi->s_imap_blocks; i++)
 		brelse(sbi->s_imap[i]);
 	for (i = 0; i < sbi->s_zmap_blocks; i++)
 		brelse(sbi->s_zmap[i]);
+	/* 减少sb buffer的引用计数 */
 	brelse (sbi->s_sbh);
+	/* 仅仅释放imap就行了,因为zmap不是单独分配的而是指向imap空间的一部分 */
 	kfree(sbi->s_imap);
 	sb->s_fs_info = NULL;
 	kfree(sbi);
@@ -54,6 +62,7 @@ static void minix_put_super(struct super_block *sb)
 
 static struct kmem_cache * minix_inode_cachep;
 
+/* 分配一个inode info,并将其中的vfs_inode返回 */
 static struct inode *minix_alloc_inode(struct super_block *sb)
 {
 	struct minix_inode_info *ei;
@@ -110,12 +119,15 @@ static int minix_remount (struct super_block * sb, int * flags, char * data)
 	ms = sbi->s_ms;
 	if ((*flags & MS_RDONLY) == (sb->s_flags & MS_RDONLY))
 		return 0;
+	/* 将之前rw的fs, remount为readonly */
 	if (*flags & MS_RDONLY) {
 		if (ms->s_state & MINIX_VALID_FS ||
 		    !(sbi->s_mount_state & MINIX_VALID_FS))
+		    /* 文件系统应该还没挂载起来 */
 			return 0;
 		/* Mounting a rw partition read-only. */
 		if (sbi->s_version != MINIX_V3)
+			/* v1/v2 */
 			ms->s_state = sbi->s_mount_state;
 		mark_buffer_dirty(sbi->s_sbh);
 	} else {
@@ -149,20 +161,25 @@ static int minix_fill_super(struct super_block *s, void *data, int silent)
 	struct minix_sb_info *sbi;
 	int ret = -EINVAL;
 
+	/* 在内存中建立一个sb信息表,查阅sb信息的时候就不需要读取minix sb */
 	sbi = kzalloc(sizeof(struct minix_sb_info), GFP_KERNEL);
 	if (!sbi)
 		return -ENOMEM;
+	/* vfs sb和minix sb info关联起来 */
 	s->s_fs_info = sbi;
 
 	BUILD_BUG_ON(32 != sizeof (struct minix_inode));
 	BUILD_BUG_ON(64 != sizeof(struct minix2_inode));
 
+	/* 给vfs sb设置块大小 */
 	if (!sb_set_blocksize(s, BLOCK_SIZE))
 		goto out_bad_hblock;
 
+	/* 从磁盘中读取含有sb的bh */
 	if (!(bh = sb_bread(s, 1)))
 		goto out_bad_sb;
 
+	/* 获取buffer中的minix sb部分 */
 	ms = (struct minix_super_block *) bh->b_data;
 	sbi->s_ms = ms;
 	sbi->s_sbh = bh;
@@ -177,6 +194,7 @@ static int minix_fill_super(struct super_block *s, void *data, int silent)
 	s->s_magic = ms->s_magic;
 	if (s->s_magic == MINIX_SUPER_MAGIC) {
 		sbi->s_version = MINIX_V1;
+		/* dirsize包含了2个字节的inode,和14个字节的name */
 		sbi->s_dirsize = 16;
 		sbi->s_namelen = 14;
 		sbi->s_link_max = MINIX_LINK_MAX;
@@ -193,10 +211,12 @@ static int minix_fill_super(struct super_block *s, void *data, int silent)
 		sbi->s_link_max = MINIX2_LINK_MAX;
 	} else if (s->s_magic == MINIX2_SUPER_MAGIC2) {
 		sbi->s_version = MINIX_V2;
+		/* v2 sb使用s_zones */
 		sbi->s_nzones = ms->s_zones;
 		sbi->s_dirsize = 32;
 		sbi->s_namelen = 30;
 		sbi->s_link_max = MINIX2_LINK_MAX;
+		/* v3中的magic位置和之前的sb不一样 */
 	} else if ( *(__u16 *)(bh->b_data + 24) == MINIX3_SUPER_MAGIC) {
 		m3s = (struct minix3_super_block *) bh->b_data;
 		s->s_magic = m3s->s_magic;
@@ -207,11 +227,15 @@ static int minix_fill_super(struct super_block *s, void *data, int silent)
 		sbi->s_max_size = m3s->s_max_size;
 		sbi->s_ninodes = m3s->s_ninodes;
 		sbi->s_nzones = m3s->s_zones;
+		/* inode占用4个字节 */
 		sbi->s_dirsize = 64;
+		/* 文件名支持60字节 */
 		sbi->s_namelen = 60;
 		sbi->s_version = MINIX_V3;
 		sbi->s_link_max = MINIX2_LINK_MAX;
+		/* v3只要一挂载,就必定是有效的 */
 		sbi->s_mount_state = MINIX_VALID_FS;
+		/* v3支持不同的block size */
 		sb_set_blocksize(s, m3s->s_blocksize);
 	} else
 		goto out_no_fs;
@@ -221,6 +245,7 @@ static int minix_fill_super(struct super_block *s, void *data, int silent)
 	 */
 	if (sbi->s_imap_blocks == 0 || sbi->s_zmap_blocks == 0)
 		goto out_illegal_sb;
+	/* 将bitmap读取到内存中 */
 	i = (sbi->s_imap_blocks + sbi->s_zmap_blocks) * sizeof(bh);
 	map = kzalloc(i, GFP_KERNEL);
 	if (!map)
@@ -245,6 +270,7 @@ static int minix_fill_super(struct super_block *s, void *data, int silent)
 
 	/* set up enough so that it can read an inode */
 	s->s_op = &minix_sops;
+	/* 构建root */
 	root_inode = minix_iget(s, MINIX_ROOT_INO);
 	if (IS_ERR(root_inode)) {
 		ret = PTR_ERR(root_inode);
@@ -256,11 +282,14 @@ static int minix_fill_super(struct super_block *s, void *data, int silent)
 	if (!s->s_root)
 		goto out_iput;
 
+	/* 文件系统可读写 */
 	if (!(s->s_flags & MS_RDONLY)) {
 		if (sbi->s_version != MINIX_V3) /* s_state is now out from V3 sb */
+			/* v1,v2需要标记文件系统无效,将无效标志写入磁盘 */
 			ms->s_state &= ~MINIX_VALID_FS;
 		mark_buffer_dirty(bh);
 	}
+	/* 判断从磁盘中读取的s_mount_state,正常状态sbi中MINIX_VALID_FS,ms中~MINIX_VALID_FS */
 	if (!(sbi->s_mount_state & MINIX_VALID_FS))
 		printk("MINIX-fs: mounting unchecked file system, "
 			"running fsck is recommended\n");
@@ -285,6 +314,7 @@ out_freemap:
 		brelse(sbi->s_imap[i]);
 	for (i = 0; i < sbi->s_zmap_blocks; i++)
 		brelse(sbi->s_zmap[i]);
+	/* 仅仅释放imap就行了,因为zmap不是单独分配的而是指向imap空间的一部分 */
 	kfree(sbi->s_imap);
 	goto out_release;
 
@@ -319,12 +349,15 @@ out:
 	return ret;
 }
 
+/* 列出文件或者目录的状态 */
 static int minix_statfs(struct dentry *dentry, struct kstatfs *buf)
 {
 	struct minix_sb_info *sbi = minix_sb(dentry->d_sb);
 	buf->f_type = dentry->d_sb->s_magic;
 	buf->f_bsize = dentry->d_sb->s_blocksize;
+	/* 文件系统中除元数据外的block总数 */
 	buf->f_blocks = (sbi->s_nzones - sbi->s_firstdatazone) << sbi->s_log_zone_size;
+	/* 除metadata和已经被使用的block,还有多少可用block */
 	buf->f_bfree = minix_count_free_blocks(sbi);
 	buf->f_bavail = buf->f_bfree;
 	buf->f_files = sbi->s_ninodes;
@@ -389,6 +422,7 @@ static const struct inode_operations minix_symlink_inode_operations = {
 	.getattr	= minix_getattr,
 };
 
+/* 给vfs inode一些操作函数集 */
 void minix_set_inode(struct inode *inode, dev_t rdev)
 {
 	if (S_ISREG(inode->i_mode)) {
@@ -403,6 +437,7 @@ void minix_set_inode(struct inode *inode, dev_t rdev)
 		inode->i_op = &minix_symlink_inode_operations;
 		inode->i_mapping->a_ops = &minix_aops;
 	} else
+		/* 特殊设备 */
 		init_special_inode(inode, inode->i_mode, rdev);
 }
 
@@ -413,6 +448,7 @@ static struct inode *V1_minix_iget(struct inode *inode)
 {
 	struct buffer_head * bh;
 	struct minix_inode * raw_inode;
+	/* 从vfs inode中获取minix inode info */
 	struct minix_inode_info *minix_inode = minix_i(inode);
 	int i;
 
@@ -433,8 +469,10 @@ static struct inode *V1_minix_iget(struct inode *inode)
 	inode->i_blocks = 0;
 	for (i = 0; i < 9; i++)
 		minix_inode->u.i1_data[i] = raw_inode->i_zone[i];
+	/* 给vfs inode设置minix相关的操作函数集 */
 	minix_set_inode(inode, old_decode_dev(raw_inode->i_zone[0]));
 	brelse(bh);
+	/* 激活inode */
 	unlock_new_inode(inode);
 	return inode;
 }
@@ -466,6 +504,7 @@ static struct inode *V2_minix_iget(struct inode *inode)
 	inode->i_atime.tv_nsec = 0;
 	inode->i_ctime.tv_nsec = 0;
 	inode->i_blocks = 0;
+	/* 相比v1,v2多了一个3级间接块 */
 	for (i = 0; i < 10; i++)
 		minix_inode->u.i2_data[i] = raw_inode->i_zone[i];
 	minix_set_inode(inode, old_decode_dev(raw_inode->i_zone[0]));
@@ -490,6 +529,7 @@ struct inode *minix_iget(struct super_block *sb, unsigned long ino)
 	if (INODE_VERSION(inode) == MINIX_V1)
 		return V1_minix_iget(inode);
 	else
+		/* v2/v3 */
 		return V2_minix_iget(inode);
 }
 
@@ -498,14 +538,17 @@ struct inode *minix_iget(struct super_block *sb, unsigned long ino)
  */
 static struct buffer_head * V1_minix_update_inode(struct inode * inode)
 {
+	/* 包含minix inode的buffer */
 	struct buffer_head * bh;
 	struct minix_inode * raw_inode;
 	struct minix_inode_info *minix_inode = minix_i(inode);
 	int i;
 
+	/* 从block layer获取minix inode */
 	raw_inode = minix_V1_raw_inode(inode->i_sb, inode->i_ino, &bh);
 	if (!raw_inode)
 		return NULL;
+	/* 将vfs inode中的数据更新到磁盘上去 */
 	raw_inode->i_mode = inode->i_mode;
 	raw_inode->i_uid = fs_high2lowuid(inode->i_uid);
 	raw_inode->i_gid = fs_high2lowgid(inode->i_gid);
@@ -513,6 +556,7 @@ static struct buffer_head * V1_minix_update_inode(struct inode * inode)
 	raw_inode->i_size = inode->i_size;
 	raw_inode->i_time = inode->i_mtime.tv_sec;
 	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
+		/* 对于字符设备和块设备来说,不存在数据块,i_zone[0]用于保存设备号 */
 		raw_inode->i_zone[0] = old_encode_dev(inode->i_rdev);
 	else for (i = 0; i < 9; i++)
 		raw_inode->i_zone[i] = minix_inode->u.i1_data[i];
@@ -554,11 +598,13 @@ static struct buffer_head *minix_update_inode(struct inode *inode)
 	if (INODE_VERSION(inode) == MINIX_V1)
 		return V1_minix_update_inode(inode);
 	else
+		/* v2/v3 */
 		return V2_minix_update_inode(inode);
 }
 
 static int minix_write_inode(struct inode * inode, int wait)
 {
+	/* 将vfs中inode数据更新到buffer,减少这个buffer的引用计数是因为在获取磁盘inode时候,sb_bread增加了计数*/
 	brelse(minix_update_inode(inode));
 	return 0;
 }
@@ -585,6 +631,7 @@ int minix_sync_inode(struct inode * inode)
 	return err;
 }
 
+/* ls命令最终会调用到这个函数 */
 int minix_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
 {
 	struct inode *dir = dentry->d_parent->d_inode;
@@ -601,8 +648,10 @@ int minix_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *sta
 /*
  * The function that is called for file truncation.
  */
+/* 进入这个函数之前,inode->i_zsize已经被改变 */
 void minix_truncate(struct inode * inode)
 {
+	/* 对于普通文件,目录及symbol link才需要truncate */
 	if (!(S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode) || S_ISLNK(inode->i_mode)))
 		return;
 	if (INODE_VERSION(inode) == MINIX_V1)
@@ -643,7 +692,7 @@ out1:
 
 static void __exit exit_minix_fs(void)
 {
-        unregister_filesystem(&minix_fs_type);
+	unregister_filesystem(&minix_fs_type);
 	destroy_inodecache();
 }
 

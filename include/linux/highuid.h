@@ -88,6 +88,7 @@ extern int fs_overflowgid;
  * Since these macros are used in architectures that only need limited
  * 16-bit UID back compatibility, we won't use old_uid_t and old_gid_t
  */
+/* uid&gid超过16bit后,可能会导致一些系统不兼容,将其限制在16bit内 */
 #define fs_high2lowuid(uid) ((uid) & ~0xFFFF ? (uid16_t)fs_overflowuid : (uid16_t)(uid))
 #define fs_high2lowgid(gid) ((gid) & ~0xFFFF ? (gid16_t)fs_overflowgid : (gid16_t)(gid))
 

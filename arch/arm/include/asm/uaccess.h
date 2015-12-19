@@ -277,6 +277,7 @@ do {									\
 	: "r" (addr), "i" (-EFAULT)				\
 	: "cc")
 
+/* Write a simple value into user space */
 #define __put_user(x,ptr)						\
 ({									\
 	long __pu_err = 0;						\

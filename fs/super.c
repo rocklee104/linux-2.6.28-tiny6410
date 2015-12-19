@@ -294,20 +294,20 @@ int fsync_super(struct super_block *sb)
  *	rearrange the set of dentries belonging to this super_block, nor may it
  *	change the attachments of dentries to inodes.
  */
- //generic_shutdown_super处理了在shutdown sb时所有的独立于特定文件系统的工作.
- //而典型的->kill_sb处理特定于文件系统的资源释放工作,不仅仅关于sb.
+ /* generic_shutdown_super处理了在shutdown sb时所有的独立于特定文件系统的工作. */
+ /* 而典型的->kill_sb处理特定于文件系统的资源释放工作,不仅仅关于sb. */
 void generic_shutdown_super(struct super_block *sb)
 {
 	const struct super_operations *sop = sb->s_op;
 
 	if (sb->s_root) {
-        //delete all the dentry attached to this sb
+        /* delete all the dentry attached to this sb */
 		shrink_dcache_for_umount(sb);
 		fsync_super(sb);
 		lock_super(sb);
 		sb->s_flags &= ~MS_ACTIVE;
 		/* bad name - it should be evict_inodes() */
-        //free the inode with 0 refcnt attached to the sb
+        /* free the inode with 0 refcnt attached to the sb */
 		invalidate_inodes(sb);
 		lock_kernel();
 
@@ -638,19 +638,19 @@ int do_remount_sb(struct super_block *sb, int flags, void *data, int force)
 	int remount_rw;
 	
 #ifdef CONFIG_BLOCK
-	//mountflag rw, 但是bdev只读
+	/* mountflag rw, 但是bdev只读 */
 	if (!(flags & MS_RDONLY) && bdev_read_only(sb->s_bdev))
 		return -EACCES;
 #endif
 	if (flags & MS_RDONLY)
 		acct_auto_close(sb);
-	//对于sysfs,因为在kernel启动过程中没有dentry_unused,这个函数没做什么事
+	/* 对于sysfs,因为在kernel启动过程中没有dentry_unused,这个函数没做什么事 */
 	shrink_dcache_sb(sb);
 	fsync_super(sb);
 
 	/* If we are remounting RDONLY and current sb is read/write,
 	   make sure there are no rw files opened */
-	//如果mount flag包含read only,但是sb不是read only的,就需要检查文件系统是否有文件被写入 
+	/* 如果mount flag包含read only,但是sb不是read only的,就需要检查文件系统是否有文件被写入 */
 	if ((flags & MS_RDONLY) && !(sb->s_flags & MS_RDONLY)) {
 		if (force)
 			mark_files_ro(sb);
@@ -669,7 +669,7 @@ int do_remount_sb(struct super_block *sb, int flags, void *data, int force)
 		if (retval)
 			return retval;
 	}
-	//在remount时候只能改变MS_RDONLY/MS_SYNCHRONOUS/MS_MANDLOCK这3个标志
+	/* 在remount时候只能改变MS_RDONLY/MS_SYNCHRONOUS/MS_MANDLOCK这3个标志 */
 	sb->s_flags = (sb->s_flags & ~MS_RMT_MASK) | (flags & MS_RMT_MASK);
 	if (remount_rw)
 		DQUOT_ON_REMOUNT(sb);
@@ -795,7 +795,7 @@ int get_sb_bdev(struct file_system_type *fs_type,
 	if (!(flags & MS_RDONLY))
 		mode |= FMODE_WRITE;
 
-	//打开dev_name块设备
+	/* 打开dev_name块设备 */
 	bdev = open_bdev_exclusive(dev_name, mode, fs_type);
 	if (IS_ERR(bdev))
 		return PTR_ERR(bdev);
@@ -817,7 +817,7 @@ int get_sb_bdev(struct file_system_type *fs_type,
 		goto error_s;
 
 	if (s->s_root) {
-        //如果为真,表示这个文件系统被挂载过了，需要调用一次close_bdev_excl，将第二次打开计数关闭。 
+        /* 如果为真,表示这个文件系统被挂载过了，需要调用一次close_bdev_excl，将第二次打开计数关闭。*/ 
 		if ((flags ^ s->s_flags) & MS_RDONLY) {
             /*
              *如果一个设备已经被打开过一次，这次打开的标志在MS_RDONLY上和上次的不同， 
@@ -831,16 +831,16 @@ int get_sb_bdev(struct file_system_type *fs_type,
 
 		close_bdev_exclusive(bdev, mode);
 	} else {
-	//否则,把参数flags中的值拷贝到超级块的s_flags字段
+	/* 否则,把参数flags中的值拷贝到超级块的s_flags字段 */
 		char b[BDEVNAME_SIZE];
 
 		s->s_flags = flags;
 		s->s_mode = mode;
-		//设置sb的s_id
+		/* 设置sb的s_id */
 		strlcpy(s->s_id, bdevname(bdev, b), sizeof(s->s_id));
-		//设置fs的block size
+		/* 设置fs的block size */
 		sb_set_blocksize(s, block_size(bdev));
-		//根据文件系统填充sb的其他字段
+		/* 根据文件系统填充sb的其他字段 */
 		error = fill_super(s, data, flags & MS_SILENT ? 1 : 0);
 		if (error) {
 			up_write(&s->s_umount);
@@ -967,7 +967,7 @@ vfs_kern_mount(struct file_system_type *type, int flags, const char *name, void 
 		return ERR_PTR(-ENODEV);
 
 	error = -ENOMEM;
-	//分配并初始化一个vfsmount
+	/* 分配并初始化一个vfsmount */
 	mnt = alloc_vfsmnt(name);
 	if (!mnt)
 		goto out;
@@ -982,8 +982,7 @@ vfs_kern_mount(struct file_system_type *type, int flags, const char *name, void 
 			goto out_free_secdata;
 	}
 
-	//读取super block
-	//对于rootfs来说,是rootfs_get_sb(type, flags, name, data, mnt);
+	/* 读取super block,并将其与vfsmount关联起来 */
 	error = type->get_sb(type, flags, name, data, mnt);
 	if (error < 0)
 		goto out_free_secdata;
@@ -993,9 +992,9 @@ vfs_kern_mount(struct file_system_type *type, int flags, const char *name, void 
  	if (error)
  		goto out_sb;
 
-	//fs挂载前的mountpoint就指向自己的根目录
+	/* fs挂载前的mountpoint就指向自己的根目录 */
 	mnt->mnt_mountpoint = mnt->mnt_root;
-	//fs挂载前parent指向自己
+	/* fs挂载前parent指向自己 */
 	mnt->mnt_parent = mnt;
 	up_write(&mnt->mnt_sb->s_umount);
 	free_secdata(secdata);
@@ -1040,7 +1039,7 @@ static struct vfsmount *fs_set_subtype(struct vfsmount *mnt, const char *fstype)
 struct vfsmount *
 do_kern_mount(const char *fstype, int flags, const char *name, void *data)
 {
-	//查找是否有匹配的文件系统,如果没有就加载相关模块
+	/* 查找是否有匹配的文件系统,如果没有就加载相关模块 */
 	struct file_system_type *type = get_fs_type(fstype);
 	struct vfsmount *mnt;
 	if (!type)

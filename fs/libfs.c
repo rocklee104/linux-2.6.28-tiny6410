@@ -176,6 +176,7 @@ int dcache_readdir(struct file * filp, void * dirent, filldir_t filldir)
 	return 0;
 }
 
+/* 目录是不能使用read系统调用读取的 */
 ssize_t generic_read_dir(struct file *filp, char __user *buf, size_t siz, loff_t *ppos)
 {
 	return -EISDIR;

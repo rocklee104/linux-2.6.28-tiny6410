@@ -29,25 +29,25 @@ static inline void __raw_spin_lock(raw_spinlock_t *lock)
 	unsigned long tmp;
 
 	__asm__ __volatile__(
-//从&lock->lock将值读取到tmp
+/* 从&lock->lock将值读取到tmp */
 "1:	ldrex	%0, [%1]\n"
-//测试tmp的值是否为0
+/* 测试tmp的值是否为0 */
 "	teq	%0, #0\n"
 #ifdef CONFIG_CPU_32v6K
 "	wfene\n"
 #endif
-//如果是0,将1写入&lock->lock这个地址中,tmp保存返回值
+/* 如果是0,将1写入&lock->lock这个地址中,tmp保存返回值 */
 "	strexeq	%0, %2, [%1]\n"
-//判断tmp中的值是否是0
+/* 判断tmp中的值是否是0 */
 "	teqeq	%0, #0\n"
-//如果是0,表示写入失败,从头开始
+/* 如果是0,表示写入失败,从头开始 */
 "	bne	1b"
 	: "=&r" (tmp)
 	: "r" (&lock->lock), "r" (1)
-	//状态寄存器可能会改变
+	/* 状态寄存器可能会改变 */
 	: "cc");
 
-	//保证屏障之后的代码已经被加了lock
+	/* 保证屏障之后的代码已经被加了lock */
 	smp_mb();
 }
 

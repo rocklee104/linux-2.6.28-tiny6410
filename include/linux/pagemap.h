@@ -271,7 +271,7 @@ static inline struct page *read_mapping_page_async(
 static inline struct page *read_mapping_page(struct address_space *mapping,
 					     pgoff_t index, void *data)
 {
-	//使用默认的blkdev_readpage
+	/* 使用默认的blkdev_readpage */
 	filler_t *filler = (filler_t *)mapping->a_ops->readpage;
 	return read_cache_page(mapping, index, filler, data);
 }

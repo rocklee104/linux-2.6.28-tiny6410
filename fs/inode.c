@@ -121,16 +121,16 @@ static struct inode *alloc_inode(struct super_block *sb)
 	struct inode *inode;
 
 	if (sb->s_op->alloc_inode)
-		//对于bdev伪文件系统来说,将会调用bdev_alloc_inode分配一个struct bdev_inode类型的对象
+		/* 对于bdev伪文件系统来说,将会调用bdev_alloc_inode分配一个struct bdev_inode类型的对象 */
 		inode = sb->s_op->alloc_inode(sb);
 	else
 		inode = (struct inode *) kmem_cache_alloc(inode_cachep, GFP_KERNEL);
 
 	if (inode) {
-		//inode->i_mapping最终会指向&inode->i_data
+		/* inode->i_mapping最终会指向&inode->i_data */
 		struct address_space * const mapping = &inode->i_data;
 
-		//inode的i_sb指向sb
+		/* inode的i_sb指向sb */
 		inode->i_sb = sb;
 		inode->i_blkbits = sb->s_blocksize_bits;
 		inode->i_flags = 0;
@@ -275,22 +275,22 @@ void __iget(struct inode * inode)
 void clear_inode(struct inode *inode)
 {
 	might_sleep();
-	//释放inode->i_data数据
+	/* 释放inode->i_data数据 */
 	invalidate_inode_buffers(inode);
        
 	BUG_ON(inode->i_data.nrpages);
 	BUG_ON(!(inode->i_state & I_FREEING));
 	BUG_ON(inode->i_state & I_CLEAR);
-	//如果有其他进程操作此inode,就等待其完成
+	/* 如果有其他进程操作此inode,就等待其完成 */
 	inode_sync_wait(inode);
 	DQUOT_DROP(inode);
-	//调用具体文件系统的clear_inode
+	/* 调用具体文件系统的clear_inode */
 	if (inode->i_sb->s_op->clear_inode)
 		inode->i_sb->s_op->clear_inode(inode);
-	//如果此inode是一个block device
+	/* 如果此inode是一个block device */
 	if (S_ISBLK(inode->i_mode) && inode->i_bdev)
 		bd_forget(inode);
-	//如果此inode是一个char device
+	/* 如果此inode是一个char device */
 	if (S_ISCHR(inode->i_mode) && inode->i_cdev)
 		cd_forget(inode);
 	inode->i_state = I_CLEAR;
@@ -601,10 +601,10 @@ repeat:
  *	newly created inode's mapping
  *
  */
-//多个文件系统都可能调用此函数
+/* 多个文件系统都可能调用此函数 */
 struct inode *new_inode(struct super_block *sb)
 {
-	//static 标记的局部变量会一直递增
+	/* static 标记的局部变量会一直递增 */
 	/*
 	 * On a 32bit, non LFS stat() call, glibc will generate an EOVERFLOW
 	 * error if st_ino won't fit in target struct field. Use 32bit counter
@@ -619,9 +619,9 @@ struct inode *new_inode(struct super_block *sb)
 	if (inode) {
 		spin_lock(&inode_lock);
 		inodes_stat.nr_inodes++;
-		//将刚刚分配的inode加入使用中的链表
+		/* 将刚刚分配的inode加入使用中的链表 */
 		list_add(&inode->i_list, &inode_in_use);
-		//将刚刚分配的inode加入sb的inode链表中
+		/* 将刚刚分配的inode加入sb的inode链表中 */
 		list_add(&inode->i_sb_list, &sb->s_inodes);
 		inode->i_ino = ++last_ino;
 		inode->i_state = 0;
@@ -1121,15 +1121,15 @@ void generic_delete_inode(struct inode *inode)
 {
 	const struct super_operations *op = inode->i_sb->s_op;
 
-	//从inode必定从属的状态链表(unused,in_use,dirty)中移除
-    //delete the inode from usage list
+	/* 从inode必定从属的状态链表(unused,in_use,dirty)中移除 */
+    /* delete the inode from usage list */
 	list_del_init(&inode->i_list);
-	//从sb管理的inode链表中移除
-    //delete the inode from sb->s_inodes
+	/* 从sb管理的inode链表中移除 */
+    /* delete the inode from sb->s_inodes */
 	list_del_init(&inode->i_sb_list);
-    //the state of this inode is freeing
+    /* the state of this inode is freeing */
 	inode->i_state |= I_FREEING;
-    //decrease the number of inodes in system 
+    /* decrease the number of inodes in system */
 	inodes_stat.nr_inodes--;
 	spin_unlock(&inode_lock);
 

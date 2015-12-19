@@ -1811,18 +1811,18 @@ out:
  * create a new mount for userspace and request it to be added into the
  * namespace's tree
  */
-//nd中保存了挂载点的名称,name是设备名称
+/* nd中保存了挂载点的名称,name是设备名称 */
 static int do_new_mount(struct path *path, char *type, int flags,
 			int mnt_flags, char *name, void *data)
 {
 	struct vfsmount *mnt;
 
-	//type为空,或者type超过page size
+	/* type为空,或者type超过page size */
 	if (!type || !memchr(type, 0, PAGE_SIZE))
 		return -EINVAL;
 
 	/* we need capabilities... */
-	//检查进程的权能,只有root能mount,如果将下面的snippet去掉,普通用户也能mount 
+	/* 检查进程的权能,只有root能mount,如果将下面的snippet去掉,普通用户也能mount */
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
 
@@ -2049,18 +2049,18 @@ int copy_mount_options(const void __user * data, unsigned long *where)
 	 * the remainder of the page.
 	 */
 	/* copy_from_user cannot cross TASK_SIZE ! */
-	//从data开始，拷贝一个page的数据。如果data+PAGE_SIZE超出TASK_SIZE,也就是到了内核空间,就不能拷贝
+	/* 从data开始，拷贝一个page的数据。如果data+PAGE_SIZE超出TASK_SIZE,也就是到了内核空间,就不能拷贝 */
 	size = TASK_SIZE - (unsigned long)data;
 	if (size > PAGE_SIZE)
 		size = PAGE_SIZE;
 
 	i = size - exact_copy_from_user((void *)page, data, size);
-	//如果一个字节都没copy
+	/* 如果一个字节都没copy */
 	if (!i) {
 		free_page(page);
 		return -EFAULT;
 	}
-	//如果不满一个page,将剩下的部分填0
+	/* 如果不满一个page,将剩下的部分填0 */
 	if (i != PAGE_SIZE)
 		memset((char *)page + i, 0, PAGE_SIZE - i);
 	*where = page;
@@ -2107,19 +2107,21 @@ long do_mount(char *dev_name, char *dir_name, char *type_page,
 
 
 	/* Discard magic */
-	//MS_MGC_VAL 和 MS_MGC_MSK是在以前的版本中定义的安装标志和掩码，现在的安装标志中已经不使用这些魔数了
-	//因此，当还有这个魔数时，则丢弃它。
+	/*
+	 * MS_MGC_VAL 和 MS_MGC_MSK是在以前的版本中定义的安装标志和掩码，
+	 * 现在的安装标志中已经不使用这些魔数了.因此，当还有这个魔数时，则丢弃它.
+	 */
 	if ((flags & MS_MGC_MSK) == MS_MGC_VAL)
 		flags &= ~MS_MGC_MSK;
 
 	/* Basic sanity checks */
-	//如果挂载字符串为空，或者字符串过长，超过PAGE_SIZE大小，则返回失败
+	/* 如果挂载字符串为空，或者字符串过长，超过PAGE_SIZE大小，则返回失败 */
 	if (!dir_name || !*dir_name || !memchr(dir_name, 0, PAGE_SIZE))
 		return -EINVAL;
-	//对于基于网络的文件系统dev_name可以为空
+	/* 对于基于网络的文件系统dev_name可以为空 */
 	if (dev_name && !memchr(dev_name, 0, PAGE_SIZE))
 		return -EINVAL;
-	//如果data_page超过PAGE_SIZE长度，将超出部分截断
+	/* 如果data_page超过PAGE_SIZE长度，将超出部分截断*/
 	if (data_page)
 		((char *)data_page)[PAGE_SIZE - 1] = 0;
 
@@ -2156,19 +2158,19 @@ long do_mount(char *dev_name, char *dir_name, char *type_page,
 	if (retval)
 		goto dput_out;
 
-	//如果MS_REMOUNT标志被指定，其目的通常是改变超级块对象s_flags字段的安装标志，
+	/* 如果MS_REMOUNT标志被指定，其目的通常是改变超级块对象s_flags字段的安装标志 */
 	if (flags & MS_REMOUNT)
-		//修改挂载选项
+		/* 修改挂载选项 */
 		retval = do_remount(&path, flags & ~MS_REMOUNT, mnt_flags,
 				    data_page);
 	else if (flags & MS_BIND)
-        //path中记录挂载点的路径信息
+        /* path中记录挂载点的路径信息 */
 		retval = do_loopback(&path, dev_name, flags & MS_REC);
 	else if (flags & (MS_SHARED | MS_PRIVATE | MS_SLAVE | MS_UNBINDABLE))
-		//改变挂载标志或涉及的各个vfsmount实例之间建立所需的数据结构的关联
+		/* 改变挂载标志或涉及的各个vfsmount实例之间建立所需的数据结构的关联 */
 		retval = do_change_type(&path, flags);
 	else if (flags & MS_MOVE)
-		//移动一个已经挂载的文件系统
+		/* 移动一个已经挂载的文件系统 */
 		retval = do_move_mount(&path, dev_name);
 	else
 		retval = do_new_mount(&path, type_page, flags, mnt_flags,
@@ -2263,7 +2265,7 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
 /*
  *data这个参数是具体文件系统在挂载时的特定选项，对于ext2来说有sb=n这个参数可以指定sb的位置， 
  *虽然sb的默认位置是1。 
-*/
+ */
 SYSCALL_DEFINE5(mount, char __user *, dev_name, char __user *, dir_name,
 		char __user *, type, unsigned long, flags, void __user *, data)
 {
@@ -2273,18 +2275,18 @@ SYSCALL_DEFINE5(mount, char __user *, dev_name, char __user *, dir_name,
 	unsigned long dev_page;
 	char *dir_page;
 
-	//复制挂载选项
+	/* 复制挂载选项 */
 	retval = copy_mount_options(type, &type_page);
 	if (retval < 0)
 		return retval;
 
-	//getname()在复制时遇到字符串结尾符“\0”就停止
+	/* getname()在复制时遇到字符串结尾符“\0”就停止 */
 	dir_page = getname(dir_name);
 	retval = PTR_ERR(dir_page);
 	if (IS_ERR(dir_page))
 		goto out1;
 
-	//copy_mount_option拷贝整个页面，并返回该页面的起始地址。 
+	/* copy_mount_option拷贝整个页面，并返回该页面的起始地址 */
 	retval = copy_mount_options(dev_name, &dev_page);
 	if (retval < 0)
 		goto out2;

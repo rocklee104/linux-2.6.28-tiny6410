@@ -1268,7 +1268,7 @@ void mark_buffer_dirty(struct buffer_head *bh)
 	}
 
 	if (!test_set_buffer_dirty(bh))
-		//buffer本身不dirty, 设置b_state dirty
+		/* buffer本身不dirty, 设置b_state dirty */
 		__set_page_dirty(bh->b_page, page_mapping(bh->b_page), 0);
 }
 
@@ -1650,28 +1650,28 @@ void create_empty_buffers(struct page *page,
 {
 	struct buffer_head *bh, *head, *tail;
 
-    //head是单向链表最头部成员
+    /* head是单向链表最头部成员 */
 	head = alloc_page_buffers(page, blocksize, 1);
 	bh = head;
 	do {
-        //将链表各成员设置b_state
+        /* 将链表各成员设置b_state */
 		bh->b_state |= b_state;
 		tail = bh;
 		bh = bh->b_this_page;
 	} while (bh);
-    //尾部成员的next指向头部，完成循环链表的连接
+    /* 尾部成员的next指向头部，完成循环链表的连接 */
 	tail->b_this_page = head;
 
 	spin_lock(&page->mapping->private_lock);
 	if (PageUptodate(page) || PageDirty(page)) {
-        //页中包含有效数据或者page被标记为dirty,需要将buffer_head设置成同样的状态
+        /* 页中包含有效数据或者page被标记为dirty,需要将buffer_head设置成同样的状态 */
 		bh = head;
 		do {
 			if (PageDirty(page))
-                //将bh->b_state设置成BH_Dirty
+                /* 将bh->b_state设置成BH_Dirty */
 				set_buffer_dirty(bh);
 			if (PageUptodate(page))
-                //将bh->b_state设置成BH_Uptodate
+                /* 将bh->b_state设置成BH_Uptodate */
 				set_buffer_uptodate(bh);
 			bh = bh->b_this_page;
 		} while (bh != head);
@@ -2903,10 +2903,13 @@ out:
 }
 EXPORT_SYMBOL(nobh_truncate_page);
 
+/* 清除buffer中文件结尾到buffer结尾的字节 */
 int block_truncate_page(struct address_space *mapping,
 			loff_t from, get_block_t *get_block)
 {
+	/* 页号 */
 	pgoff_t index = from >> PAGE_CACHE_SHIFT;
+	/* 页内偏移 */
 	unsigned offset = from & (PAGE_CACHE_SIZE-1);
 	unsigned blocksize;
 	sector_t iblock;
@@ -2917,6 +2920,7 @@ int block_truncate_page(struct address_space *mapping,
 	int err;
 
 	blocksize = 1 << inode->i_blkbits;
+	/* block偏移 */
 	length = offset & (blocksize - 1);
 
 	/* Block boundary? Nothing to do */
@@ -2924,6 +2928,7 @@ int block_truncate_page(struct address_space *mapping,
 		return 0;
 
 	length = blocksize - length;
+	/* 通过页号获取block number */
 	iblock = (sector_t)index << (PAGE_CACHE_SHIFT - inode->i_blkbits);
 	
 	page = grab_cache_page(mapping, index);
@@ -2967,6 +2972,7 @@ int block_truncate_page(struct address_space *mapping,
 			goto unlock;
 	}
 
+	/* 清除page中[offset,offset + length] */
 	zero_user(page, offset, length);
 	mark_buffer_dirty(bh);
 	err = 0;
@@ -3258,7 +3264,7 @@ failed:
 	return 0;
 }
 
-//return 1 succeed, return 0 failed
+/* return 1 succeed, return 0 failed */
 int try_to_free_buffers(struct page *page)
 {
 	struct address_space * const mapping = page->mapping;
@@ -3270,12 +3276,12 @@ int try_to_free_buffers(struct page *page)
 		return 0;
 
 	if (mapping == NULL) {		/* can this still happen? */
-        //如果mapping == NULL, 那就不需要清除page在radix tree中的tag
+        /* 如果mapping == NULL, 那就不需要清除page在radix tree中的tag */
 		ret = drop_buffers(page, &buffers_to_free);
 		goto out;
 	}
 
-    //因为要操作mapping不为空,就需要获取lock
+    /* 因为要操作mapping不为空,就需要获取lock */
 	spin_lock(&mapping->private_lock);
 	ret = drop_buffers(page, &buffers_to_free);
 
@@ -3297,7 +3303,7 @@ int try_to_free_buffers(struct page *page)
 		cancel_dirty_page(page, PAGE_CACHE_SIZE);
 	spin_unlock(&mapping->private_lock);
 out:
-    //释放bh
+    /* 释放bh */
 	if (buffers_to_free) {
 		struct buffer_head *bh = buffers_to_free;
 

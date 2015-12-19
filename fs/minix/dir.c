@@ -35,6 +35,7 @@ static inline void dir_put_page(struct page *page)
  * Return the offset into page `page_nr' of the last valid
  * byte in that page, plus one.
  */
+/* 返回第page_nr个page的最后一个有效的字节,page_nr从0开始 */
 static unsigned
 minix_last_byte(struct inode *inode, unsigned long page_nr)
 {
@@ -45,6 +46,7 @@ minix_last_byte(struct inode *inode, unsigned long page_nr)
 	return last_byte;
 }
 
+/* 目录占用多少个page */
 static inline unsigned long dir_pages(struct inode *inode)
 {
 	return (inode->i_size+PAGE_CACHE_SIZE-1)>>PAGE_CACHE_SHIFT;
@@ -89,34 +91,46 @@ static inline void *minix_next_entry(void *de, struct minix_sb_info *sbi)
 	return (void*)((char*)de + sbi->s_dirsize);
 }
 
+/* 目录inode的大小= 目录中的文件(或目录)个数 * 32(v1 filename 30) */
 static int minix_readdir(struct file * filp, void * dirent, filldir_t filldir)
 {
 	unsigned long pos = filp->f_pos;
+	/* 从filp中取出inode */
 	struct inode *inode = filp->f_path.dentry->d_inode;
 	struct super_block *sb = inode->i_sb;
+	/* 页内偏移 */
 	unsigned offset = pos & ~PAGE_CACHE_MASK;
+	/* 起始位置是从第几个page开始的 */
 	unsigned long n = pos >> PAGE_CACHE_SHIFT;
+	/* 目录占用的page个数 */
 	unsigned long npages = dir_pages(inode);
 	struct minix_sb_info *sbi = minix_sb(sb);
+	/* 磁盘上的目录项大小 */
 	unsigned chunk_size = sbi->s_dirsize;
 	char *name;
 	__u32 inumber;
 
 	lock_kernel();
 
+	/* pos以目录项大小对齐 */
 	pos = (pos + chunk_size-1) & ~(chunk_size-1);
+	/* 文件指针的位置不能超过目录大小 */
 	if (pos >= inode->i_size)
 		goto done;
 
+	/* 遍历所有page */
 	for ( ; n < npages; n++, offset = 0) {
 		char *p, *kaddr, *limit;
+		/* 从inode地址空间中获取第n个page */
 		struct page *page = dir_get_page(inode, n);
 
 		if (IS_ERR(page))
 			continue;
+		/* page转换成虚拟地址 */
 		kaddr = (char *)page_address(page);
 		p = kaddr+offset;
 		limit = kaddr + minix_last_byte(inode, n) - chunk_size;
+		/* 遍历page中所有的目录项 */
 		for ( ; p <= limit; p = minix_next_entry(p, sbi)) {
 			if (sbi->s_version == MINIX_V3) {
 				minix3_dirent *de3 = (minix3_dirent *)p;
@@ -127,11 +141,13 @@ static int minix_readdir(struct file * filp, void * dirent, filldir_t filldir)
 				name = de->name;
 				inumber = de->inode;
 			}
+			/* 有效的目录项 */
 			if (inumber) {
 				int over;
 
 				unsigned l = strnlen(name, sbi->s_namelen);
 				offset = p - kaddr;
+				/* 填充用户空间的linux_dirent数组,dirent在vfs_readdir中已经被赋值了,minix不支持file_type */
 				over = filldir(dirent, name, l,
 					(n << PAGE_CACHE_SHIFT) | offset,
 					inumber, DT_UNKNOWN);

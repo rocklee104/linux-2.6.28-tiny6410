@@ -44,6 +44,7 @@ static int block_to_path(struct inode * inode, long block, int offsets[DEPTH])
 		offsets[n++] = block>>8;
 		offsets[n++] = block & 255;
 	} else {
+		/* 需要使用3级间接块 */
 		block -= 256*256;
 		offsets[n++] = 9;
 		offsets[n++] = block>>16;

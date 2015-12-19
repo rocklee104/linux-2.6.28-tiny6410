@@ -18,6 +18,7 @@
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
 
+/* 将inode信息传递给stat */
 void generic_fillattr(struct inode *inode, struct kstat *stat)
 {
 	stat->dev = inode->i_sb->s_dev;
@@ -80,7 +81,7 @@ int vfs_lstat_fd(int dfd, char __user *name, struct kstat *stat)
 	struct path path;
 	int error;
 
-	//nd中保存了文件信息
+	/* nd中保存了文件信息 */
 	error = user_path_at(dfd, name, 0, &path);
 	if (!error) {
 		error = vfs_getattr(path.mnt, path.dentry, stat);

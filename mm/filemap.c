@@ -745,14 +745,14 @@ struct page *find_or_create_page(struct address_space *mapping,
 	struct page *page;
 	int err;
 repeat:
-	//在mapping中查找索引是index的页,并lock这个page
+	/* 在mapping中查找索引是index的页,并lock这个page */
 	page = find_lock_page(mapping, index);
 	if (!page) {
-		//没有找到就需要分配
+		/* 没有找到就需要分配 */
 		page = __page_cache_alloc(gfp_mask);
 		if (!page)
 			return NULL;
-		//分配完后,需要即将page加入mapping及zone的LRU中
+		/* 分配完后,需要即将page加入mapping及zone的LRU中 */
 		err = add_to_page_cache_lru(page, mapping, index, gfp_mask);
 		if (unlikely(err)) {
 			page_cache_release(page);

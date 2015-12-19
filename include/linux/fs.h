@@ -547,26 +547,40 @@ int pagecache_write_end(struct file *, struct address_space *mapping,
 
 struct backing_dev_info;
 struct address_space {
+	/* 指向拥有该对象的inode的指针 */
 	struct inode		*host;		/* owner: inode, block_device */
+	/* 拥有者页的radix tree root */
 	struct radix_tree_root	page_tree;	/* radix tree of all pages */
 	/* 
 	 * tree_lock is used to synchronise concurrent access and modification of the 
 	 * radix-tree, and to control access to the pagecache in general
 	 */
+	/* 保护radix tree的读写锁 */
 	spinlock_t		tree_lock;	/* and lock protecting it */
+	/* 地址空间中共享内存映射的个数 */
 	unsigned int		i_mmap_writable;/* count VM_SHARED mappings */
 	struct prio_tree_root	i_mmap;		/* tree of private and shared mappings */
+	/* 地址空间中非线性内存区的链表 */
 	struct list_head	i_mmap_nonlinear;/*list VM_NONLINEAR mappings */
+	/* 保护radix优先搜索树的自旋锁 */
 	spinlock_t		i_mmap_lock;	/* protect tree, count, list */
+	/* 截断文件时使用的顺序计数器 */
 	unsigned int		truncate_count;	/* Cover race condition with truncate */
-	//地址空间中有多少个page
+	/* 地址空间中有多少个page */
 	unsigned long		nrpages;	/* number of total pages */
+	/* 最后一次回写操作所作用的页的索引 */
 	pgoff_t			writeback_index;/* writeback starts here */
+	/* 对所有者页进行操作的方法 */
 	const struct address_space_operations *a_ops;	/* methods */
+	/* 错误位和内存分配器的标志 */
 	unsigned long		flags;		/* error bits/gfp mask */
+	/* 指向拥有所有者数据的块设备的backing_dev_info的指针 */
 	struct backing_dev_info *backing_dev_info; /* device readahead, etc */
+	/* 通常是管理private_list链表时使用的自旋锁 */
 	spinlock_t		private_lock;	/* for use by the address_space */
+	/* 链表头，通常连接与inode相关的间接块的脏缓冲区的链表，链表成员是bh->b_assoc_buffers */
 	struct list_head	private_list;	/* ditto */
+	/* 通常是指向间接块所在块设备的address_space对象的指针 */
 	struct address_space	*assoc_mapping;	/* ditto */
 } __attribute__((aligned(sizeof(long))));
 	/*
@@ -575,16 +589,16 @@ struct address_space {
 	 * of struct page's "mapping" pointer be used for PAGE_MAPPING_ANON.
 	 */
 
-//struct block_device可以表示一个完整的逻辑块设备,也可以表示逻辑块设备中的一个分区
+/* struct block_device可以表示一个完整的逻辑块设备,也可以表示逻辑块设备中的一个分区 */
 struct block_device {
 	dev_t			bd_dev;  /* not a kdev_t - it's a search key */
-    //bdevfs中的inode
+    /* bdevfs中的inode */
 	struct inode *		bd_inode;	/* will die */
-	//当前block_device被打开的次数
+	/* 当前block_device被打开的次数 */
 	int			bd_openers;
 	struct mutex		bd_mutex;	/* open/close mutex */
 	struct semaphore	bd_mount_sem;
-	//链表头,链表成员是inode->i_devices, 该链表包含了表示该设备的设备特殊文件的所有inode
+	/* 链表头,链表成员是inode->i_devices, 该链表包含了表示该设备的设备特殊文件的所有inode */
 	struct list_head	bd_inodes;
 	/*
 	 * 存放代表块设备持有者的线性地址。持有者并不是进行I/O数据传送的块设备驱动程序；
@@ -603,13 +617,13 @@ struct block_device {
 #ifdef CONFIG_SYSFS
 	struct list_head	bd_holder_list;
 #endif
-	//当block_device表示块设备中的某一分区时,bd_contains指向该分区所在的块设备
+	/* 当block_device表示块设备中的某一分区时,bd_contains指向该分区所在的块设备 */
 	struct block_device *	bd_contains;
 	unsigned		bd_block_size;
-	//当block_device表示一个完整的块设备时,bd_part指向该块设备的分区结构信息
+	/* 当block_device表示一个完整的块设备时,bd_part指向该块设备的分区结构信息 */
 	struct hd_struct *	bd_part;
 	/* number of times partitions within this device have been opened. */
-	//当前block_device代表一个磁盘时,这个磁盘中的分区被打开的次数
+	/* 当前block_device代表一个磁盘时,这个磁盘中的分区被打开的次数 */
 	unsigned		bd_part_count;
 	/* 
 	 * 设置为1时,表示该分区在内核中的信息无效,因为磁盘上的分区已经改变,
@@ -617,7 +631,7 @@ struct block_device {
 	 */
 	int			bd_invalidated;
 	struct gendisk *	bd_disk;
-	//链表元素,链表头是全局变量all_bdevs,用于记录所有的块设备
+	/* 链表元素,链表头是全局变量all_bdevs,用于记录所有的块设备 */
 	struct list_head	bd_list;
 	struct backing_dev_info *bd_inode_backing_dev_info;
 	/*
@@ -633,10 +647,10 @@ struct block_device {
  * Radix-tree tags, for tagging dirty and writeback pages within the pagecache
  * radix trees
  */
-//radix-tree 中radix_tree_node->tag两个64位的数组用于标记子节点的page状态
-//表示页是脏的
+/* radix-tree 中radix_tree_node->tag两个64位的数组用于标记子节点的page状态 */
+/* 表示页是脏的 */
 #define PAGECACHE_TAG_DIRTY	0
-//表示页正在被回写磁盘
+/* 表示页正在被回写磁盘 */
 #define PAGECACHE_TAG_WRITEBACK	1
 
 int mapping_tagged(struct address_space *mapping, int tag);
@@ -673,7 +687,7 @@ static inline int mapping_writably_mapped(struct address_space *mapping)
 #endif
 
 struct inode {
-	//用于将inode接入hash表中
+	/* 用于将inode接入hash表中 */
 	struct hlist_node	i_hash;
    /*
     * i_list用作连接一下3个链表中的一个： 
@@ -686,22 +700,22 @@ struct inode {
     * 就表示inode dirty
     */
 	struct list_head	i_list;
-    //链表元素,用于记录整个fs的inode,链表头是super_block->s_inodes
+    /* 链表元素,用于记录整个fs的inode,链表头是super_block->s_inodes */
 	struct list_head	i_sb_list;
-	//链表头,成员是struct dentry中的d_alias
+	/* 链表头,成员是struct dentry中的d_alias */
 	struct list_head	i_dentry;
-	//inode number
+	/* inode number */
 	unsigned long		i_ino;
-	//有多少进程访问此INODE
+	/* 有多少进程访问此INODE */
 	atomic_t		i_count;
-	//inode的硬连接引用计数
+	/* inode的硬连接引用计数 */
 	unsigned int		i_nlink;
 	uid_t			i_uid;
 	gid_t			i_gid;
-	//关联的设备号
+	/* 关联的设备号 */
 	dev_t			i_rdev;
 	u64			i_version;
-	//如果这个inode是bdev_inode的成员,i_size在bd_set_size中被设置成块设备的大小
+	/* 如果这个inode是bdev_inode的成员,i_size在bd_set_size中被设置成块设备的大小 */
 	loff_t			i_size;
 #ifdef __NEED_I_SIZE_ORDERED
 	seqcount_t		i_size_seqcount;
@@ -712,7 +726,7 @@ struct inode {
 	unsigned int		i_blkbits;
 	blkcnt_t		i_blocks;
 	unsigned short          i_bytes;
-	//文件的格式,权限等一些模式
+	/* 文件的格式,权限等一些模式 */
 	umode_t			i_mode;
 	spinlock_t		i_lock;	/* i_blocks, i_bytes, maybe i_size */
 	struct mutex		i_mutex;
@@ -721,9 +735,9 @@ struct inode {
 	const struct file_operations	*i_fop;	/* former ->i_op->default_file_ops */
 	struct super_block	*i_sb;
 	struct file_lock	*i_flock;
-	//指向address_space对象的指针
+	/* 指向address_space对象的指针 */
 	struct address_space	*i_mapping;
-	//文件的address_space对象
+	/* 文件的address_space对象 */
 	struct address_space	i_data;
 #ifdef CONFIG_QUOTA
 	struct dquot		*i_dquot[MAXQUOTAS];
@@ -734,16 +748,16 @@ struct inode {
 		struct block_device	*i_bdev;
 		struct cdev		*i_cdev;
 	};
-	//拥有一组次设备号的设备文件的索引
+	/* 拥有一组次设备号的设备文件的索引 */
 	int			i_cindex;
 
-	//inode版本号
+	/* inode版本号 */
 	__u32			i_generation;
 
 #ifdef CONFIG_DNOTIFY
-	//目录通知事件的位掩码
+	/* 目录通知事件的位掩码 */
 	unsigned long		i_dnotify_mask; /* Directory notify events */
-	//用于目录通知
+	/* 用于目录通知 */
 	struct dnotify_struct	*i_dnotify; /* for directory notifications */
 #endif
 
@@ -752,14 +766,14 @@ struct inode {
 	struct mutex		inotify_mutex;	/* protects the watches list */
 #endif
 
-	//inode的状态标志,比如I_NEW
+	/* inode的状态标志,比如I_NEW */
 	unsigned long		i_state;
 	unsigned long		dirtied_when;	/* jiffies of first dirtying */
 
-	//fs的安装标志
+	/* fs的安装标志 */
 	unsigned int		i_flags;
 
-	//写进程的引用计数
+	/* 写进程的引用计数 */
 	atomic_t		i_writecount;
 #ifdef CONFIG_SECURITY
 	void			*i_security;
@@ -898,32 +912,32 @@ struct file {
 		struct list_head	fu_list;
 		struct rcu_head 	fu_rcuhead;
 	} f_u;
-	//提供了文件名和inode之间的联系
+	/* 提供了文件名和inode之间的联系 */
 	struct path		f_path;
 #define f_dentry	f_path.dentry
 #define f_vfsmnt	f_path.mnt
-	//文件操作调用的各个函数
+	/* 文件操作调用的各个函数 */
 	const struct file_operations	*f_op;
-	//访问本文件的的进程数目的计数器
+	/* 访问本文件的的进程数目的计数器 */
 	atomic_long_t		f_count;
-	//open系统调用时传递的额外标志,如O_RDONLY,O_NONBLOCK和O_SYNC,为了检查用户请求是否是非阻塞式操作
+	/* open系统调用时传递的额外标志,如O_RDONLY,O_NONBLOCK和O_SYNC,为了检查用户请求是否是非阻塞式操作 */
 	unsigned int 		f_flags;
-	//打开文件时传递的模式参数,通过FMODE_READ和FMODE_WRITE位来标识文件是否可读可写
+	/* 打开文件时传递的模式参数,通过FMODE_READ和FMODE_WRITE位来标识文件是否可读可写 */
 	fmode_t			f_mode;
-	//文件位置指针
+	/* 文件位置指针 */
 	loff_t			f_pos;
 	struct fown_struct	f_owner;
 	unsigned int		f_uid, f_gid;
-	//是否预读数据,如何预读 
+	/* 是否预读数据,如何预读 */
 	struct file_ra_state	f_ra;
 
-	//检查file实例是否与相关inode兼容
+	/* 检查file实例是否与相关inode兼容 */
 	u64			f_version;
 #ifdef CONFIG_SECURITY
 	void			*f_security;
 #endif
 	/* needed for tty driver, and maybe others */
-	//对于sysfs来说,这个指针就指向了sysfs_buffer
+	/* 对于sysfs来说,这个指针就指向了sysfs_buffer */
 	void			*private_data;
 
 #ifdef CONFIG_EPOLL
@@ -931,7 +945,7 @@ struct file {
 	struct list_head	f_ep_links;
 	spinlock_t		f_ep_lock;
 #endif /* #ifdef CONFIG_EPOLL */
-	//指向文件相关inode实例的地址空间映射
+	/* 指向文件相关inode实例的地址空间映射 */
 	struct address_space	*f_mapping;
 #ifdef CONFIG_DEBUG_WRITECOUNT
 	unsigned long f_mnt_write_state;
@@ -1203,6 +1217,7 @@ struct super_block {
 	struct list_head	s_list;		/* Keep this first */
 	dev_t			s_dev;		/* search index; _not_ kdev_t */
 	unsigned long		s_blocksize;
+	/* 用2 << s_blocksize_bits表示block size  */
 	unsigned char		s_blocksize_bits;
 	/* 用于判断sb是否为dirty */
 	unsigned char		s_dirt;
@@ -1420,7 +1435,9 @@ struct inode_operations {
 	int (*mknod) (struct inode *,struct dentry *,int,dev_t);
 	int (*rename) (struct inode *, struct dentry *,
 			struct inode *, struct dentry *);
+	/* 将符号连接指向的路径返回用户空间 */
 	int (*readlink) (struct dentry *, char __user *,int);
+	/* 保存路径到nd->saved_names[nd->depth] */
 	void * (*follow_link) (struct dentry *, struct nameidata *);
 	void (*put_link) (struct dentry *, struct nameidata *, void *);
 	void (*truncate) (struct inode *);
