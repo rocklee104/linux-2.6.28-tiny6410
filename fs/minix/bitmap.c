@@ -248,6 +248,7 @@ void minix_free_inode(struct inode * inode)
 	clear_inode(inode);		/* clear in-memory copy */
 }
 
+/* 在dir(创建文件的父目录inode)下创建inode */
 struct inode * minix_new_inode(const struct inode * dir, int * error)
 {
 	struct super_block *sb = dir->i_sb;
@@ -296,6 +297,7 @@ struct inode * minix_new_inode(const struct inode * dir, int * error)
 		return NULL;
 	}
 	inode->i_uid = current->fsuid;
+	/* 如果父目录设置了sgid,那么创建的文件gid和父目录的gid相同 */
 	inode->i_gid = (dir->i_mode & S_ISGID) ? dir->i_gid : current->fsgid;
 	inode->i_ino = j;
 	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME_SEC;

@@ -101,7 +101,7 @@ struct dentry {
 		struct list_head d_child;	/* child of parent list */
 	 	struct rcu_head d_rcu;
 	} d_u;
-	//Á´±íÍ·, ×ÓÄ¿Â¼µÄÄ¿Â¼ÏîÁ´±íµÄd_child¶¼ÊÇ´ËÁ´±íµÄ³ÉÔ±
+	/* é“¾è¡¨å¤´, å­ç›®å½•çš„ç›®å½•é¡¹é“¾è¡¨çš„d_childéƒ½æ˜¯æ­¤é“¾è¡¨çš„æˆå‘˜ */
 	struct list_head d_subdirs;	/* our children */
 	struct list_head d_alias;	/* inode alias list */
 	unsigned long d_time;		/* used by d_revalidate */
@@ -111,7 +111,7 @@ struct dentry {
 #ifdef CONFIG_PROFILING
 	struct dcookie_struct *d_cookie; /* cookie, if any */
 #endif
-    //ÓÐ¶àÉÙmntµÄmount pointÖ¸ÏòÕâ¸ödentry
+    /* æœ‰å¤šå°‘mntçš„mount pointæŒ‡å‘è¿™ä¸ªdentry */
 	int d_mounted;
 	unsigned char d_iname[DNAME_INLINE_LEN_MIN];	/* small names */
 };
@@ -217,7 +217,7 @@ static inline void d_drop(struct dentry *dentry)
 
 static inline int dname_external(struct dentry *dentry)
 {
-	//ÕâÀï±È½ÏµÄ²»ÊÇnameºÍd_name×Ö·û´®,¶øÊÇÕâÁ½¸öÖ¸ÕëÊÇ·ñÖ¸ÏòÍ¬Ò»µØÖ·
+	//è¿™é‡Œæ¯”è¾ƒçš„ä¸æ˜¯nameå’Œd_nameå­—ç¬¦ä¸²,è€Œæ˜¯è¿™ä¸¤ä¸ªæŒ‡é’ˆæ˜¯å¦æŒ‡å‘åŒä¸€åœ°å€
 	return dentry->d_name.name != dentry->d_iname;
 }
 

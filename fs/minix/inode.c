@@ -444,6 +444,7 @@ void minix_set_inode(struct inode *inode, dev_t rdev)
 /*
  * The minix V1 function to read an inode.
  */
+/* 用磁盘inode填充vfs inode */
 static struct inode *V1_minix_iget(struct inode *inode)
 {
 	struct buffer_head * bh;
@@ -520,6 +521,7 @@ struct inode *minix_iget(struct super_block *sb, unsigned long ino)
 {
 	struct inode *inode;
 
+	/* 根据sb和ino获取inode */
 	inode = iget_locked(sb, ino);
 	if (!inode)
 		return ERR_PTR(-ENOMEM);
@@ -544,10 +546,11 @@ static struct buffer_head * V1_minix_update_inode(struct inode * inode)
 	struct minix_inode_info *minix_inode = minix_i(inode);
 	int i;
 
-	/* 从block layer获取minix inode */
+	/* 从block layer获取minix inode,raw_inode可能内容为空(创建inode的时候) */
 	raw_inode = minix_V1_raw_inode(inode->i_sb, inode->i_ino, &bh);
 	if (!raw_inode)
 		return NULL;
+
 	/* 将vfs inode中的数据更新到磁盘上去 */
 	raw_inode->i_mode = inode->i_mode;
 	raw_inode->i_uid = fs_high2lowuid(inode->i_uid);

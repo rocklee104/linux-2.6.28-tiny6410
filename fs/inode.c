@@ -249,7 +249,7 @@ static void init_once(void *foo)
  */
 void __iget(struct inode * inode)
 {
-	//如果已经有进程引用了此inode, 仅仅对计数器加1
+	/* 如果已经有进程引用了此inode, 仅仅对计数器加1 */
 	if (atomic_read(&inode->i_count)) {
 		atomic_inc(&inode->i_count);
 		return;
@@ -578,6 +578,7 @@ repeat:
 	hlist_for_each_entry(inode, node, head, i_hash) {
 		if (inode->i_ino != ino)
 			continue;
+		/* 不同文件系统的inode->i_ino可能会相同,还需要判断sb */
 		if (inode->i_sb != sb)
 			continue;
 		if (inode->i_state & (I_FREEING|I_CLEAR|I_WILL_FREE)) {
@@ -1082,6 +1083,7 @@ EXPORT_SYMBOL(iget_locked);
  */
 void __insert_inode_hash(struct inode *inode, unsigned long hashval)
 {
+	/* 很多情况hashval是ino,不同的文件系统中的ino会有相同的,故计算hash时,需要另外的变量,这里选取sb */
 	struct hlist_head *head = inode_hashtable + hash(inode->i_sb, hashval);
 	spin_lock(&inode_lock);
 	hlist_add_head(&inode->i_hash, head);

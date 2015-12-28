@@ -186,10 +186,12 @@ minix_dirent *minix_find_entry(struct dentry *dentry, struct page **res_page)
 {
 	const char * name = dentry->d_name.name;
 	int namelen = dentry->d_name.len;
+	/* 目标文件父目录的inode */
 	struct inode * dir = dentry->d_parent->d_inode;
 	struct super_block * sb = dir->i_sb;
 	struct minix_sb_info * sbi = minix_sb(sb);
 	unsigned long n;
+	/* 父目录的占用的page个数 */
 	unsigned long npages = dir_pages(dir);
 	struct page *page = NULL;
 	char *p;
@@ -198,6 +200,7 @@ minix_dirent *minix_find_entry(struct dentry *dentry, struct page **res_page)
 	__u32 inumber;
 	*res_page = NULL;
 
+	/* 遍历父目录的page */
 	for (n = 0; n < npages; n++) {
 		char *kaddr, *limit;
 
@@ -207,6 +210,7 @@ minix_dirent *minix_find_entry(struct dentry *dentry, struct page **res_page)
 
 		kaddr = (char*)page_address(page);
 		limit = kaddr + minix_last_byte(dir, n) - sbi->s_dirsize;
+		/* 遍历page中的每个目录项 */
 		for (p = kaddr; p <= limit; p = minix_next_entry(p, sbi)) {
 			if (sbi->s_version == MINIX_V3) {
 				minix3_dirent *de3 = (minix3_dirent *)p;
@@ -227,10 +231,13 @@ minix_dirent *minix_find_entry(struct dentry *dentry, struct page **res_page)
 	return NULL;
 
 found:
+	/* 获取到含有目标目录项的page */
 	*res_page = page;
+	/* 返回目标目录项 */
 	return (minix_dirent *)p;
 }
 
+/* 在目录中增加一个目录项,dentry和inode代表同一个文件,要插入dentry的parent下 */
 int minix_add_link(struct dentry *dentry, struct inode *inode)
 {
 	struct inode *dir = dentry->d_parent->d_inode;
@@ -254,6 +261,7 @@ int minix_add_link(struct dentry *dentry, struct inode *inode)
 	 * This code plays outside i_size, so it locks the page
 	 * to protect that region.
 	 */
+	/* 遍历dentry父目录地址空间中的所有page */
 	for (n = 0; n <= npages; n++) {
 		char *limit, *dir_end;
 
@@ -263,8 +271,11 @@ int minix_add_link(struct dentry *dentry, struct inode *inode)
 			goto out;
 		lock_page(page);
 		kaddr = (char*)page_address(page);
+		/* 每一个page中有效数据之后第一个无效数据 */
 		dir_end = kaddr + minix_last_byte(dir, n);
+		/* 每一个page最后一个目录项 */
 		limit = kaddr + PAGE_CACHE_SIZE - sbi->s_dirsize;
+		/* 遍历每个page中的目录项 */
 		for (p = kaddr; p <= limit; p = minix_next_entry(p, sbi)) {
 			de = (minix_dirent *)p;
 			de3 = (minix3_dirent *)p;
@@ -276,6 +287,10 @@ int minix_add_link(struct dentry *dentry, struct inode *inode)
 				inumber = de->inode;
 			}
 			if (p == dir_end) {
+				/*
+				 * 目录项的起始地址等于当前page中有效数据之后第一个无效数据,
+				 * 说明当前这个目录项是当前目录第一个无效的目录,也就是我们要插入的位置.
+				 */
 				/* We hit i_size */
 				if (sbi->s_version == MINIX_V3)
 					de3->inode = 0;
@@ -283,9 +298,11 @@ int minix_add_link(struct dentry *dentry, struct inode *inode)
 					de->inode = 0;
 				goto got_it;
 			}
+			/* ino为0表示这个目录项无效,可能之前这里有个目录项,但是被删除了，然后空出来的位置 */
 			if (!inumber)
 				goto got_it;
 			err = -EEXIST;
+			/* 判断要插入的文件是否已经在其父目录下 */
 			if (namecompare(namelen, sbi->s_namelen, name, namx))
 				goto out_unlock;
 		}
@@ -296,21 +313,32 @@ int minix_add_link(struct dentry *dentry, struct inode *inode)
 	return -EINVAL;
 
 got_it:
+	/*
+	 * page_offset(page)获取到page起始地址在地址空间的位置.
+	 * p - (char *)page_address(page)得到在page中的偏移.
+	 */
 	pos = page_offset(page) + p - (char *)page_address(page);
+	/* 没弄懂什么意思 */
 	err = __minix_write_begin(NULL, page->mapping, pos, sbi->s_dirsize,
 					AOP_FLAG_UNINTERRUPTIBLE, &page, NULL);
 	if (err)
 		goto out_unlock;
+	/* 相当于给de->name或者de3->name赋值 */
 	memcpy (namx, name, namelen);
 	if (sbi->s_version == MINIX_V3) {
+		/* 将de3->name之后的字符清除 */
 		memset (namx + namelen, 0, sbi->s_dirsize - namelen - 4);
 		de3->inode = inode->i_ino;
 	} else {
+		/* 将de->name之后的字符清除 */
 		memset (namx + namelen, 0, sbi->s_dirsize - namelen - 2);
 		de->inode = inode->i_ino;
 	}
+	/* 将目录项写入磁盘 */
 	err = dir_commit_chunk(page, pos, sbi->s_dirsize);
+	/* 更新父目录的时间戳 */
 	dir->i_mtime = dir->i_ctime = CURRENT_TIME_SEC;
+	/* 将父目录的inode标记为dirty */
 	mark_inode_dirty(dir);
 out_put:
 	dir_put_page(page);
@@ -326,6 +354,7 @@ int minix_delete_entry(struct minix_dir_entry *de, struct page *page)
 	struct address_space *mapping = page->mapping;
 	struct inode *inode = (struct inode*)mapping->host;
 	char *kaddr = page_address(page);
+	/* de在地址空间的相对位置 */
 	loff_t pos = page_offset(page) + (char*)de - kaddr;
 	unsigned len = minix_sb(inode->i_sb)->s_dirsize;
 	int err;
@@ -334,12 +363,14 @@ int minix_delete_entry(struct minix_dir_entry *de, struct page *page)
 	err = __minix_write_begin(NULL, mapping, pos, len,
 					AOP_FLAG_UNINTERRUPTIBLE, &page, NULL);
 	if (err == 0) {
+		/* 将inode number改为0后写入磁盘 */
 		de->inode = 0;
 		err = dir_commit_chunk(page, pos, len);
 	} else {
 		unlock_page(page);
 	}
 	dir_put_page(page);
+	/* 更新文件访问时间和修改时间 */
 	inode->i_ctime = inode->i_mtime = CURRENT_TIME_SEC;
 	mark_inode_dirty(inode);
 	return err;
@@ -348,6 +379,7 @@ int minix_delete_entry(struct minix_dir_entry *de, struct page *page)
 int minix_make_empty(struct inode *inode, struct inode *dir)
 {
 	struct address_space *mapping = inode->i_mapping;
+	/* 目录是空的,先获取一个page */
 	struct page *page = grab_cache_page(mapping, 0);
 	struct minix_sb_info *sbi = minix_sb(inode->i_sb);
 	char *kaddr;
@@ -355,6 +387,7 @@ int minix_make_empty(struct inode *inode, struct inode *dir)
 
 	if (!page)
 		return -ENOMEM;
+	/* 需要写入2个目录项,__minix_write_begin将会获取要写入的block */
 	err = __minix_write_begin(NULL, mapping, 0, 2 * sbi->s_dirsize,
 					AOP_FLAG_UNINTERRUPTIBLE, &page, NULL);
 	if (err) {
@@ -371,6 +404,7 @@ int minix_make_empty(struct inode *inode, struct inode *dir)
 		de3->inode = inode->i_ino;
 		strcpy(de3->name, ".");
 		de3 = minix_next_entry(de3, sbi);
+		/* 记录父目录的目录项 */
 		de3->inode = dir->i_ino;
 		strcpy(de3->name, "..");
 	} else {
@@ -384,6 +418,7 @@ int minix_make_empty(struct inode *inode, struct inode *dir)
 	}
 	kunmap_atomic(kaddr, KM_USER0);
 
+	/* 将写入的目录项提交给磁盘 */
 	err = dir_commit_chunk(page, 0, 2 * sbi->s_dirsize);
 fail:
 	page_cache_release(page);
@@ -393,6 +428,7 @@ fail:
 /*
  * routine to check that the specified directory is empty (for rmdir)
  */
+/* 检查目录是否为空,当目录数据块中只有".",".."的目录项时,目录为空 */
 int minix_empty_dir(struct inode * inode)
 {
 	struct page *page = NULL;
@@ -421,13 +457,17 @@ int minix_empty_dir(struct inode * inode)
 				inumber = de->inode;
 			}
 
+			/* 有效inode */
 			if (inumber != 0) {
 				/* check for . and .. */
 				if (name[0] != '.')
 					goto not_empty;
+
 				if (!name[1]) {
+					/* 当目录中存在".",但是这个目录(或者文件)的inode number和其父目录不同,父目录非空 */
 					if (inumber != inode->i_ino)
 						goto not_empty;
+				/* 当文件名以"."开头,但是文件名不是"..",目录非空 */
 				} else if (name[1] != '.')
 					goto not_empty;
 				else if (name[2])
@@ -469,6 +509,7 @@ void minix_set_link(struct minix_dir_entry *de, struct page *page,
 	mark_inode_dirty(dir);
 }
 
+/* 返回dir这个目录中的".."指向的目录项 */
 struct minix_dir_entry * minix_dotdot (struct inode *dir, struct page **p)
 {
 	struct page *page = dir_get_page(dir, 0);
@@ -482,13 +523,16 @@ struct minix_dir_entry * minix_dotdot (struct inode *dir, struct page **p)
 	return de;
 }
 
+/* 从vfs dentry找到minix dentry,最后获取到inode number */
 ino_t minix_inode_by_name(struct dentry *dentry)
 {
 	struct page *page;
+	/* 通过vfs dentry 获取到minix 目录项 */
 	struct minix_dir_entry *de = minix_find_entry(dentry, &page);
 	ino_t res = 0;
 
 	if (de) {
+		/* 从minix目录项中获取到inode number后就可以释放含有minix目录项的page了 */
 		res = de->inode;
 		dir_put_page(page);
 	}
