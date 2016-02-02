@@ -9,7 +9,7 @@
 /* dentry和inode指向同一个文件 */
 static int add_nondir(struct dentry *dentry, struct inode *inode)
 {
-	/* 在磁盘上插入一个目录项 */
+	/* 在dentry的父目录中插入一个目录项 */
 	int err = minix_add_link(dentry, inode);
 	if (!err) {
 		/* 将inode和dentry关联起来 */

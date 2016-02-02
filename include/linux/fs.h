@@ -112,36 +112,36 @@ extern int dir_notify_enable;
 /*
  * These are the fs-independent mount-flags: up to 32 flags are supported
  */
-//下面这些标志是用户空间传递下来的标志,不会写入mnt->mnt_flags
-//指定文件系统为只读
+/* 下面这些标志是用户空间传递下来的标志,不会写入mnt->mnt_flags */
+/* 指定文件系统为只读 */
 #define MS_RDONLY	 1	/* Mount read-only */
-//执行程序时，不遵照set-user-ID和set-group-ID位
+/* 执行程序时，不遵照set-user-ID和set-group-ID位 */
 #define MS_NOSUID	 2	/* Ignore suid and sgid bits */
-//不允许访问设备文件
+/* 不允许访问设备文件 */
 #define MS_NODEV	 4	/* Disallow access to device special files */
-//不允许在挂上的文件系统上执行程序
+/* 不允许在挂上的文件系统上执行程序 */
 #define MS_NOEXEC	 8	/* Disallow program execution */
-//同步文件的更新
+/* 同步文件的更新 */
 #define MS_SYNCHRONOUS	16	/* Writes are synced at once */
-//重新加载文件系统。这允许你改变现存文件系统的mountflag和数据，而无需使用先卸载，再挂上文件系统的方式
+/* 重新加载文件系统。这允许你改变现存文件系统的mountflag和数据，而无需使用先卸载，再挂上文件系统的方式 */
 #define MS_REMOUNT	32	/* Alter flags of a mounted FS */
-//允许在文件上执行强制锁
+/* 允许在文件上执行强制锁 */
 #define MS_MANDLOCK	64	/* Allow mandatory locks on an FS */
-//同步目录的更新
+/* 同步目录的更新 */
 #define MS_DIRSYNC	128	/* Directory modifications are synchronous */
-//不要更新文件上的访问时间
+/* 不要更新文件上的访问时间 */
 #define MS_NOATIME	1024	/* Do not update access times. */
-//不允许更新目录上的访问时间。
+/* 不允许更新目录上的访问时间。*/
 #define MS_NODIRATIME	2048	/* Do not update directory access times */
 //执行bind挂载，使文件或者子目录树在文件系统内的另一个点上可视。
-//1<<12
+/* 1<<12 */
 #define MS_BIND		4096
-//移动子目录树
-//1<<13
+/* 移动子目录树 */
+/* 1<<13 */
 #define MS_MOVE		8192
-//1<<14
+/* 1<<14 */
 #define MS_REC		16384
-//1<<15
+/* 1<<15 */
 #define MS_VERBOSE	32768	/* War is peace. Verbosity is silence.
 				   MS_VERBOSE is deprecated. */
 #define MS_SILENT	32768
@@ -578,9 +578,14 @@ struct address_space {
 	struct backing_dev_info *backing_dev_info; /* device readahead, etc */
 	/* 通常是管理private_list链表时使用的自旋锁 */
 	spinlock_t		private_lock;	/* for use by the address_space */
-	/* 链表头，通常连接与inode相关的间接块的脏缓冲区的链表，链表成员是bh->b_assoc_buffers */
+	/* 链表头,通常连接与inode相关的间接块的脏缓冲区的链表,链表成员是bh->b_assoc_buffers */
 	struct list_head	private_list;	/* ditto */
-	/* 通常是指向间接块所在块设备的address_space对象的指针 */
+	/*
+	 * 通常是指向间接块所在块设备的address_space对象的指针.每个inode代表一个文件,
+	 * 并且拥有一个地址空间,在地址空间的page中包含了这个文件所有的数据块数据.然而
+	 * 一些文件系统在访问文件的时候用到了间接块,这些间接块并不包含在数据块中.
+	 * assoc_mapping用于保存这些间接块.
+	*/
 	struct address_space	*assoc_mapping;	/* ditto */
 } __attribute__((aligned(sizeof(long))));
 	/*
@@ -737,7 +742,7 @@ struct inode {
 	struct file_lock	*i_flock;
 	/* 指向address_space对象的指针 */
 	struct address_space	*i_mapping;
-	/* 文件的address_space对象 */
+	/* 文件的address_space对象,省得每次分配inode的时候分配地址空间 */
 	struct address_space	i_data;
 #ifdef CONFIG_QUOTA
 	struct dquot		*i_dquot[MAXQUOTAS];

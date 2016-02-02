@@ -2453,10 +2453,12 @@ SYSCALL_DEFINE3(symlinkat, const char __user *, oldname,
 	if (IS_ERR(from))
 		return PTR_ERR(from);
 
+	/* 通过路径查询,找到符号链接父目录的nd */
 	error = user_path_parent(newdfd, newname, &nd, &to);
 	if (error)
 		goto out_putname;
 
+	/* 找到符号链接的dentry */
 	dentry = lookup_create(&nd, 0);
 	error = PTR_ERR(dentry);
 	if (IS_ERR(dentry))
@@ -2959,6 +2961,7 @@ retry:
 	memcpy(kaddr, symname, len-1);
 	kunmap_atomic(kaddr, KM_USER0);
 
+	/* 将对应的buffer标记为dirty,等待回写 */
 	err = pagecache_write_end(NULL, mapping, 0, len-1, len-1,
 							page, fsdata);
 	if (err < 0)

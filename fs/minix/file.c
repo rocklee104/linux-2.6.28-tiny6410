@@ -41,7 +41,7 @@ int minix_sync_file(struct file * file, struct dentry *dentry, int datasync)
 		return err;
 	if (datasync && !(inode->i_state & I_DIRTY_DATASYNC))
 		return err;
-	
+
 	err |= minix_sync_inode(inode);
 	return err ? -EIO : 0;
 }

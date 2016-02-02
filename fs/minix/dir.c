@@ -57,12 +57,22 @@ static int dir_commit_chunk(struct page *page, loff_t pos, unsigned len)
 	struct address_space *mapping = page->mapping;
 	struct inode *dir = mapping->host;
 	int err = 0;
+	/* 将page中包含[pos, pos+len]这段区域的buffer标记为dirty */
 	block_write_end(NULL, mapping, pos, len, len, page, NULL);
 
+	/*
+	 * 只有当写入的内容超出了dir的大小时,才会将dir标记为dirty.minix fs这个特点很有意思.
+	 * 目录初始大小为64字节(.和..两个目录项).如果在一个目录下不断的创建文件.这个目录的大小
+	 * 会一直增大.但是如果再删除部分文件,目录大小不变.
+	 *
+	 * 对于ext fs来说,目录的初始大小为block size.只有目录项总大小超过block size,目录大小
+	 * 才会改变.
+	 */
 	if (pos+len > dir->i_size) {
 		i_size_write(dir, pos+len);
 		mark_inode_dirty(dir);
 	}
+	/* 通过-o sync参数挂载的时候if就会成立 */
 	if (IS_DIRSYNC(dir))
 		err = write_one_page(page, 1);
 	else
@@ -265,6 +275,7 @@ int minix_add_link(struct dentry *dentry, struct inode *inode)
 	for (n = 0; n <= npages; n++) {
 		char *limit, *dir_end;
 
+		/* 通过dir_get_page获取到的page一定是uptodate */
 		page = dir_get_page(dir, n);
 		err = PTR_ERR(page);
 		if (IS_ERR(page))
@@ -318,7 +329,7 @@ got_it:
 	 * p - (char *)page_address(page)得到在page中的偏移.
 	 */
 	pos = page_offset(page) + p - (char *)page_address(page);
-	/* 没弄懂什么意思 */
+	/* 保证了目录项所在的buffer uptodate,没什么实际上的写入操作 */
 	err = __minix_write_begin(NULL, page->mapping, pos, sbi->s_dirsize,
 					AOP_FLAG_UNINTERRUPTIBLE, &page, NULL);
 	if (err)
@@ -334,7 +345,11 @@ got_it:
 		memset (namx + namelen, 0, sbi->s_dirsize - namelen - 2);
 		de->inode = inode->i_ino;
 	}
-	/* 将目录项写入磁盘 */
+	/*
+	 * 将包含目录项的buffer标记为dirty,一般情况下可以调用generic_write_end.
+	 * 但是minix挂载时需要支持-o sync选项.dir_commit_chunk和generic_write_end
+	 * 唯一的差别就是支持sync写入.
+	 */
 	err = dir_commit_chunk(page, pos, sbi->s_dirsize);
 	/* 更新父目录的时间戳 */
 	dir->i_mtime = dir->i_ctime = CURRENT_TIME_SEC;
@@ -484,6 +499,7 @@ not_empty:
 }
 
 /* Releases the page */
+/* 设置minix dentry中的ino为inode->i_ino */
 void minix_set_link(struct minix_dir_entry *de, struct page *page,
 	struct inode *inode)
 {
@@ -496,6 +512,7 @@ void minix_set_link(struct minix_dir_entry *de, struct page *page,
 
 	lock_page(page);
 
+	/* 保证位于pos的目录项所在的buffer mapped. */
 	err = __minix_write_begin(NULL, mapping, pos, sbi->s_dirsize,
 					AOP_FLAG_UNINTERRUPTIBLE, &page, NULL);
 	if (err == 0) {
@@ -505,6 +522,7 @@ void minix_set_link(struct minix_dir_entry *de, struct page *page,
 		unlock_page(page);
 	}
 	dir_put_page(page);
+	/* 更改de这个目录项所在的目录的修改时间,访问时间 */
 	dir->i_mtime = dir->i_ctime = CURRENT_TIME_SEC;
 	mark_inode_dirty(dir);
 }

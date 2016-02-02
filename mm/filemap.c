@@ -658,19 +658,19 @@ struct page *find_get_page(struct address_space *mapping, pgoff_t offset)
 	void **pagep;
 	struct page *page;
 
-	//标记reader进入临界区,实际上就是关闭抢占
+	/* 标记reader进入临界区,实际上就是关闭抢占 */
 	rcu_read_lock();
 repeat:
 	page = NULL;
-	//找到slot
+	/* 找到slot */
 	pagep = radix_tree_lookup_slot(&mapping->page_tree, offset);
 	if (pagep) {
-		//通过slot找到page
+		/* 通过slot找到page */
 		page = radix_tree_deref_slot(pagep);
 		if (unlikely(!page || page == RADIX_TREE_RETRY))
 			goto repeat;
 
-		//增加页的引用计数
+		/* 增加页的引用计数 */
 		if (!page_cache_get_speculative(page))
 			goto repeat;
 
@@ -680,12 +680,12 @@ repeat:
 		 * include/linux/pagemap.h for details.
 		 */
 		if (unlikely(page != *pagep)) {
-			//如果我们找到的page和slot中指向的不一致,就再找一次
+			/* 如果我们找到的page和slot中指向的不一致,就再找一次 */
 			page_cache_release(page);
 			goto repeat;
 		}
 	}
-	//reader退出临界区
+	/* reader退出临界区 */
 	rcu_read_unlock();
 
 	return page;
@@ -1661,7 +1661,7 @@ static struct page *__read_cache_page(struct address_space *mapping,
 repeat:
 	page = find_get_page(mapping, index);
 	if (!page) {
-		//在radix tree中没有找到对应于index的page
+		/* 在radix tree中没有找到对应于index的page */
 		page = page_cache_alloc_cold(mapping);
 		if (!page)
 			return ERR_PTR(-ENOMEM);

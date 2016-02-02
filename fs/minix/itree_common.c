@@ -1,6 +1,7 @@
 /* Generic part */
 
 typedef struct {
+	/* buffer中存放key的地址 */
 	block_t	*p;
 	block_t	key;
 	struct buffer_head *bh;
@@ -39,8 +40,9 @@ static inline Indirect *get_branch(struct inode *inode,
 
 	*err = 0;
 	/* i_data is not going away, no lock needed */
+	/* 根节点->p = minix_inode_info->u.i1_data + offsets[0] */
 	add_chain (chain, NULL, i_data(inode) + *offsets);
-	/* p->key记录一级间接块的块号,如果p->key == 0,表示这个文件只有直接块 */
+	/* 如果p->key == 0,表示这个branch中没有分配过任何的block */
 	if (!p->key)
 		goto no_block;
 	while (--depth) {
@@ -62,6 +64,10 @@ static inline Indirect *get_branch(struct inode *inode,
 		if (!p->key)
 			goto no_block;
 	}
+	/*
+	 * 当--depth == 0时,但是p->key存在有效的block no,这种情况会出现在truncate时.
+	 * 文件被截断时,p->key指向文件之前使用到的block.
+	 */
 	return NULL;
 
 changed:
@@ -76,6 +82,7 @@ no_block:
 	return p;
 }
 
+/* 分配了branch,同时也分配了该branch用到的数据块 */
 static int alloc_branch(struct inode *inode,
 			     int num,
 			     int *offsets,
@@ -85,7 +92,9 @@ static int alloc_branch(struct inode *inode,
 	int i;
 	int parent = minix_new_block(inode);
 
+	/* 对于brach的根节点,没有像其他节点一样对其p赋值,是因为其p没有指向buffer */
 	branch[0].key = cpu_to_block(parent);
+	/* 创建符号连接的时候,num == 1,不会执行循环中的内容 */
 	if (parent) for (n = 1; n < num; n++) {
 		struct buffer_head *bh;
 		/* Allocate the next block */
@@ -95,26 +104,31 @@ static int alloc_branch(struct inode *inode,
 		branch[n].key = cpu_to_block(nr);
 		bh = sb_getblk(inode->i_sb, parent);
 		lock_buffer(bh);
+		/* 先清空buffer中的数据,保证写入磁盘后,不会有一些杂乱数据干扰 */
 		memset(bh->b_data, 0, bh->b_size);
 		branch[n].bh = bh;
 		branch[n].p = (block_t*) bh->b_data + offsets[n];
 		*branch[n].p = branch[n].key;
 		set_buffer_uptodate(bh);
 		unlock_buffer(bh);
+		/* 间接块内容被改变,需要将容纳间接块的buffer标记为dirty */
 		mark_buffer_dirty_inode(bh, inode);
 		parent = nr;
 	}
 	if (n == num)
 		return 0;
 
+    /* 分配失败,需要清除之前分配的bh */
 	/* Allocation failed, free what we already allocated */
 	for (i = 1; i < n; i++)
 		bforget(branch[i].bh);
+	/* 释放之前通过minix_new_block获取到的block */
 	for (i = 0; i < n; i++)
 		minix_free_block(inode, block_to_cpu(branch[i].key));
 	return -ENOSPC;
 }
 
+/* 在调用alloc_branch之后,branch的where中并没有成员指向分配的第一个block */
 static inline int splice_branch(struct inode *inode,
 				     Indirect chain[DEPTH],
 				     Indirect *where,
@@ -124,10 +138,12 @@ static inline int splice_branch(struct inode *inode,
 
 	write_lock(&pointers_lock);
 
+	/* 当alloc_branch中只分配了父节点的时候*where->p == 0,但是where->key != 0 */
 	/* Verify that place we are splicing to is still there and vacant */
 	if (!verify_chain(chain, where-1) || *where->p)
 		goto changed;
 
+	/* 将block number写入上一级block */
 	*where->p = where->key;
 
 	write_unlock(&pointers_lock);
@@ -140,18 +156,22 @@ static inline int splice_branch(struct inode *inode,
 	if (where->bh)
 		mark_buffer_dirty_inode(where->bh, inode);
 
+	/* inode时间更新,需要将inode标记为dirty */
 	mark_inode_dirty(inode);
 	return 0;
 
 changed:
 	write_unlock(&pointers_lock);
+	/* i从1开始,以为branch根节点没有依赖buffer */
 	for (i = 1; i < num; i++)
 		bforget(where[i].bh);
+	/* 释放branch中包括根节点在内的所有block */
 	for (i = 0; i < num; i++)
 		minix_free_block(inode, block_to_cpu(where[i].key));
 	return -EAGAIN;
 }
 
+/* 参数中block是地址空间中的block number, map_bh后bh指向了磁盘上特定一个block */
 static inline int get_block(struct inode * inode, sector_t block,
 			struct buffer_head *bh, int create)
 {
@@ -166,13 +186,20 @@ static inline int get_block(struct inode * inode, sector_t block,
 		goto out;
 
 reread:
+	/* partial指向branch中最后一个节点,通常是接下来要操作的节点 */
 	partial = get_branch(inode, depth, offsets, chain, &err);
 
 	/* Simplest case - block found, no allocation needed */
+	/* partial == NULL表示文件结尾的p->key仍然指向有效的block,这种情况出现在文件截断时 */
 	if (!partial) {
 got_it:
+		/*
+		 * 仅仅是设置buffer对应的b_blocknr,并没有将数据块内容导入buffer中.
+		 * bh指向的是文件系统中的block,而不是地址空间的block
+		 */
 		map_bh(bh, inode->i_sb, block_to_cpu(chain[depth-1].key));
 		/* Clean up and exit */
+		/* 指向最后一个chain */
 		partial = chain+depth-1; /* the whole chain */
 		goto cleanup;
 	}
@@ -180,6 +207,10 @@ got_it:
 	/* Next simple case - plain lookup or failed read of indirect block */
 	if (!create || err == -EIO) {
 cleanup:
+		/*
+		 * 释放由get_branch获取到的buffer,这些buffer含有的是间接块块,不需要缓存.
+		 * 系统中需要缓存的是数据块的buffer,释放完毕,partial指向chain头部.
+		 */
 		while (partial > chain) {
 			brelse(partial->bh);
 			partial--;
@@ -196,7 +227,9 @@ out:
 	if (err == -EAGAIN)
 		goto changed;
 
+	/* 有多少个branch节点 */
 	left = (chain + depth) - partial;
+	/* offsets和partial要一一对应 */
 	err = alloc_branch(inode, left, offsets+(partial-chain), partial);
 	if (err)
 		goto cleanup;
@@ -204,6 +237,7 @@ out:
 	if (splice_branch(inode, chain, partial, left) < 0)
 		goto changed;
 
+	/* 标记buffer对应磁盘上分配的新的block */
 	set_buffer_new(bh);
 	goto got_it;
 
@@ -239,6 +273,7 @@ static Indirect *find_shared(struct inode *inode,
 	 */
 	for (k = depth; k > 1 && !offsets[k-1]; k--)
 		;
+	/* 当partial不等于NULL的时候,partial->p指向文件结尾第一个无效的block */
 	partial = get_branch(inode, k, offsets, chain, &err);
 
 	write_lock(&pointers_lock);
@@ -254,8 +289,8 @@ static Indirect *find_shared(struct inode *inode,
 	 */
 	for (p=partial;p>chain && all_zeroes((block_t*)p->bh->b_data,p->p);p--)
 		;
+	/* p->p指向文件有效数据的最后一个block */
 	if (p == chain + k - 1 && p > chain) {
-		/* p->p指向文件有效数据的最后一个block */
 		p->p--;
 	} else {
 		*top = *p->p;
@@ -356,11 +391,13 @@ static inline void truncate (struct inode * inode)
 
 	/* 需要几级间接块 */
 	first_whole = offsets[0] + 1 - DIRECT;
+	/* partial->p指向了文件最后一个有效的block */
 	partial = find_shared(inode, n, offsets, chain, &nr);
 	if (nr) {
 		if (partial == chain)
 			mark_inode_dirty(inode);
 		else
+			/* 如果文件使用了间接块 */
 			mark_buffer_dirty_inode(partial->bh, inode);
 		free_branches(inode, &nr, &nr+1, (chain+n-1) - partial);
 	}
@@ -381,6 +418,10 @@ static inline void truncate (struct inode * inode)
 	}
 do_indirects:
 	/* Kill the remaining (whole) subtrees */
+	/*
+	 * 如果文件只用到了直接块,那么释放一级间接块.
+	 * 如果文件只用到了直接块和一级间接块,那么释放二级间接块.
+	 */
 	while (first_whole < DEPTH-1) {
 		nr = idata[DIRECT+first_whole];
 		if (nr) {

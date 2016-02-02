@@ -172,6 +172,7 @@ static struct inode *alloc_inode(struct super_block *sb)
  		mapping->host = inode;
 		mapping->flags = 0;
 		mapping_set_gfp_mask(mapping, GFP_HIGHUSER_PAGECACHE);
+		/* inode间接块使用的mapping为NULL */
 		mapping->assoc_mapping = NULL;
 		mapping->backing_dev_info = &default_backing_dev_info;
 		mapping->writeback_index = 0;
@@ -224,6 +225,7 @@ void inode_init_once(struct inode *inode)
 	INIT_RADIX_TREE(&inode->i_data.page_tree, GFP_ATOMIC);
 	spin_lock_init(&inode->i_data.tree_lock);
 	spin_lock_init(&inode->i_data.i_mmap_lock);
+	/* private_list并不由private_lock保护,而是由其后备设备的地址空间中的private_lock保护 */
 	INIT_LIST_HEAD(&inode->i_data.private_list);
 	spin_lock_init(&inode->i_data.private_lock);
 	INIT_RAW_PRIO_TREE_ROOT(&inode->i_data.i_mmap);

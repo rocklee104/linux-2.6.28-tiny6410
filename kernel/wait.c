@@ -70,8 +70,8 @@ prepare_to_wait(wait_queue_head_t *q, wait_queue_t *wait, int state)
 
 	wait->flags &= ~WQ_FLAG_EXCLUSIVE;
 	spin_lock_irqsave(&q->lock, flags);
+	 /* 如果wait没有加入任何等待队列,就将其加入q */
 	if (list_empty(&wait->task_list))
-        //如果wait没有加入任何等待队列,就将其加入q
 		__add_wait_queue(q, wait);
 	set_current_state(state);
 	spin_unlock_irqrestore(&q->lock, flags);
@@ -198,8 +198,8 @@ __wait_on_bit(wait_queue_head_t *wq, struct wait_bit_queue *q,
 
 	do {
 		prepare_to_wait(wq, &q->wait, mode);
+		 /* 如果测试的bit被置位,就要执行action */
 		if (test_bit(q->key.bit_nr, q->key.flags))
-            //如果测试的bit被置位,就要执行action
 			ret = (*action)(q->key.flags);
 	} while (test_bit(q->key.bit_nr, q->key.flags) && !ret);
 	finish_wait(wq, &q->wait);
@@ -210,9 +210,9 @@ EXPORT_SYMBOL(__wait_on_bit);
 int __sched out_of_line_wait_on_bit(void *word, int bit,
 					int (*action)(void *), unsigned mode)
 {
-    //获取等待队列头
+    /* 获取等待队列头 */
 	wait_queue_head_t *wq = bit_waitqueue(word, bit);
-    //初始化名称为wait的struct wait_bit_queue
+    /* 初始化名称为wait的struct wait_bit_queue */
 	DEFINE_WAIT_BIT(wait, word, bit);
 
 	return __wait_on_bit(wq, &wait, action, mode);

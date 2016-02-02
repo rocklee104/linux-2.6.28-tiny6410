@@ -17,6 +17,7 @@
 #ifdef CONFIG_BLOCK
 
 enum bh_state_bits {
+	/* 表示buffer中的内容是最新的,也就是说磁盘上的数据不会比buffer新 */
 	BH_Uptodate,	/* Contains valid data */
 	BH_Dirty,	/* Is dirty */
 	BH_Lock,	/* Is locked */
@@ -26,7 +27,12 @@ enum bh_state_bits {
 			  */
 
 	BH_Mapped,	/* Has a disk mapping */
+	/*
+	 * 通过get_block在磁盘上分配了block,并将这个block映射到buffer,由于这个block可能之前也映射
+	 * 到其他的buffer,有了这个标志,内核就能在合适的时候,将这个block之前映射的buffer清除.
+	 */
 	BH_New,		/* Disk mapping was newly created by get_block */
+	/* 在读取数据到page的时候设置buffer,当page中所有的buffer从submit_bh返回并清除这个标志后,才能unlock_page */
 	BH_Async_Read,	/* Is under end_buffer_async_read I/O */
 	BH_Async_Write,	/* Is under end_buffer_async_write I/O */
 	BH_Delay,	/* Buffer is not yet allocated on disk */
@@ -58,16 +64,16 @@ typedef void (bh_end_io_t)(struct buffer_head *bh, int uptodate);
  * for backward compatibility reasons (e.g. submit_bh).
  */
 struct buffer_head {
-	//缓冲区状态标志
+	/* 缓冲区状态标志 */
 	unsigned long b_state;		/* buffer state bitmap (see above) */
-	//块缓冲区所在页框的页描述符地址,链表的下一个元素,这是一个单向循环链表
+	/* 块缓冲区所在页框的页描述符地址,链表的下一个元素,这是一个单向循环链表 */
 	struct buffer_head *b_this_page;/* circular list of page's buffers */
-	//指向拥有该块的缓冲区页的指针
+	/* 指向拥有该块的缓冲区页的指针 */
 	struct page *b_page;		/* the page this bh is mapped to */
 
-	//起始逻辑块号
+	/* 起始逻辑块号 */
 	sector_t b_blocknr;		/* start block number */
-	//块的大小,以byte为单位
+	/* 块的大小,以byte为单位 */
 	size_t b_size;			/* size of mapping */
     /* 
      * 如果页框位于高端内存中,那么b_data字段存放页中块缓冲区的偏移量
@@ -75,14 +81,15 @@ struct buffer_head {
      */
 	char *b_data;			/* pointer to data within the page */
 
-	//指向块设备描述符的指针
+	/* 指向块设备描述符的指针 */
 	struct block_device *b_bdev;
-	//io完成方法
+	/* io完成方法 */
 	bh_end_io_t *b_end_io;		/* I/O completion */
-	//指向io完成方法数据的指针
+	/* 指向io完成方法数据的指针 */
  	void *b_private;		/* reserved for b_end_io */
-	 //链表成员，链表头是(&inode->i_data)->private_list
+	/* 链表成员，链表头是(&inode->i_data)->private_list */
 	struct list_head b_assoc_buffers; /* associated with another mapping */
+	/* 和buffer关联的地址空间 */
 	struct address_space *b_assoc_map;	/* mapping this buffer is
 						   associated with */
 	atomic_t b_count;		/* users using this buffer_head */
@@ -251,7 +258,6 @@ int nobh_write_end(struct file *, struct address_space *,
 int nobh_truncate_page(struct address_space *, loff_t, get_block_t *);
 int nobh_writepage(struct page *page, get_block_t *get_block,
                         struct writeback_control *wbc);
-
 void buffer_init(void);
 
 /*
@@ -263,7 +269,7 @@ static inline void attach_page_buffers(struct page *page,
 {
 	page_cache_get(page);
 	SetPagePrivate(page);
-	//page->private指向bh链表的头
+	/* page->private指向bh链表的头 */
 	set_page_private(page, (unsigned long)head);
 }
 
@@ -335,6 +341,10 @@ static inline void wait_on_buffer(struct buffer_head *bh)
 		__wait_on_buffer(bh);
 }
 
+/*
+ * 如果已经locked返回0,表示lock失败;
+ * 如果还未locked,返回1,表示lock成功
+ */
 static inline int trylock_buffer(struct buffer_head *bh)
 {
 	return likely(!test_and_set_bit_lock(BH_Lock, &bh->b_state));
@@ -343,9 +353,9 @@ static inline int trylock_buffer(struct buffer_head *bh)
 static inline void lock_buffer(struct buffer_head *bh)
 {
 	might_sleep();
-    //尝试lock bh
+    /* 尝试lock bh */
 	if (!trylock_buffer(bh))
-        //如果lock bh失败,就等待bh unlock,再给去lock bh
+        /* 如果lock bh失败,就等待bh unlock,再给去lock bh */
 		__lock_buffer(bh);
 }
 

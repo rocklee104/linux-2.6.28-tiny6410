@@ -110,6 +110,7 @@ int minix_new_block(struct inode * inode)
 			minix_set_bit(j, bh->b_data);
 			unlock_kernel();
 			mark_buffer_dirty(bh);
+			/* s_firstdatazone不在位图管理范围之内 */
 			j += i * bits_per_zone + sbi->s_firstdatazone-1;
 			if (j < sbi->s_firstdatazone || j >= sbi->s_nzones)
 				break;
@@ -280,7 +281,7 @@ struct inode * minix_new_inode(const struct inode * dir, int * error)
 		iput(inode);
 		return NULL;
 	}
-	/* 之前在bitmap中搜索空闲bit,现在要占用它 */
+	/* 之前在bitmap中搜索空闲bit,现在要占用它,真正写入minix_inode是在回写的过程中完成的 */
 	if (minix_test_and_set_bit(j, bh->b_data)) {	/* shouldn't happen */
 		unlock_kernel();
 		printk("minix_new_inode: bit already set\n");

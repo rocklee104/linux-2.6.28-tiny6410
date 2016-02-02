@@ -18,6 +18,7 @@ static inline block_t cpu_to_block(unsigned long n)
 /* 返回inode指向的数据块 */
 static inline block_t *i_data(struct inode *inode)
 {
+	/* minix_i(inode)->u.i1_data本来是__u16 *类型的,每个成员是__u16类型 */
 	return (block_t *)minix_i(inode)->u.i1_data;
 }
 
@@ -41,16 +42,16 @@ static int block_to_path(struct inode * inode, long block, int offsets[DEPTH])
 		/* block - 1才是文件最后一个有效索引 */
 		offsets[n++] = block;
 	} else if ((block -= 7) < 512) {
-		/* 直接索引中,第一个无效的index是7,index 6是文件最后一个有效的index */
+		/* 直接索引中,最后一个有效的index是7 */
 		offsets[n++] = 7;
 		/* 一级间接块中的第一个无效的index */
 		offsets[n++] = block;
 	} else {
 		/* 上一个else if分支中已经将block减了7 */
 		block -= 512;
-		/* 直接索引中,第一个无效的index是8 */
+		/* 直接索引中,最后一个有效的index是8 */
 		offsets[n++] = 8;
-		/* 一级间接块中的第一个无效的index */
+		/* 一级间接块中的最后一个有效的index */
 		offsets[n++] = block>>9;
 		/* 二级间接块中的第一个无效的index */
 		offsets[n++] = block & 511;
