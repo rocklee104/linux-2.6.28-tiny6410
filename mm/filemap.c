@@ -1034,20 +1034,33 @@ static void do_generic_file_read(struct file *filp, loff_t *ppos,
 
 		cond_resched();
 find_page:
+		/* 检查页是否已经包含在页缓存中 */
 		page = find_get_page(mapping, index);
 		if (!page) {
+			/* 没有包含在页缓存中,发出一个同步预读请求 */
 			page_cache_sync_readahead(mapping,
 					ra, filp,
 					index, last_index - index);
+			/*
+			 * 由于预读机制在很大程度上能够保证数据现在已经进入缓存,再次调用find_get_page
+			 * 查找该页,这次仍然有一定几率(很小)失败,那么就必须直接进行读取操作.
+			 */
 			page = find_get_page(mapping, index);
+
 			if (unlikely(page == NULL))
 				goto no_cached_page;
 		}
+		/*
+		 * 如果设置了PG_readahead,内核就可以用PageReadahead检查---必须用page_cache_async_readahead
+		 * 启动一个异步预读操作,这里的异步读取操作和之前的同步预读操作不同.这里kernel并不等待预读
+		 * 操作结束,只要时间合适,就会执行读操作.
+		 */
 		if (PageReadahead(page)) {
 			page_cache_async_readahead(mapping,
 					ra, filp, page,
 					index, last_index - index);
 		}
+		/* 虽然page在页缓存中,但其数据未必最新,如果page不是最新的,必须调用mapping->a_ops->readpage再次读取 */
 		if (!PageUptodate(page)) {
 			if (inode->i_blkbits == PAGE_CACHE_SHIFT ||
 					!mapping->a_ops->is_partially_uptodate)
@@ -1097,6 +1110,10 @@ page_ok:
 		/*
 		 * When a sequential read accesses a page several times,
 		 * only mark it as accessed the first time.
+		 */
+		/*
+		 * 对页的访问必须用mark_page_accessed标记,在需要从物理内存换出数据时,
+		 * 需要判断页的活动程度,这个标记就很重要了.
 		 */
 		if (prev_index != index || offset != prev_offset)
 			mark_page_accessed(page);
@@ -1185,15 +1202,18 @@ readpage_error:
 		goto out;
 
 no_cached_page:
+		/* 如果预读机制尚未将所需的页读入内存,该函数必须自行完成页的读入 */
 		/*
 		 * Ok, it wasn't cached, so we need to create a new
 		 * page..
 		 */
+		/* 分配一个缓存冷页 */
 		page = page_cache_alloc_cold(mapping);
 		if (!page) {
 			desc->error = -ENOMEM;
 			goto out;
 		}
+		/* 将该page插入页缓存的LRU链表 */
 		error = add_to_page_cache_lru(page, mapping,
 						index, GFP_KERNEL);
 		if (error) {
@@ -1239,6 +1259,7 @@ int file_read_actor(read_descriptor_t *desc, struct page *page,
 
 	/* Do it the slow way */
 	kaddr = kmap(page);
+	/* 将page中的内容拷贝到用户buffer中去 */
 	left = __copy_to_user(desc->arg.buf, kaddr + offset, size);
 	kunmap(page);
 
@@ -1313,6 +1334,7 @@ generic_file_aio_read(struct kiocb *iocb, const struct iovec *iov,
 	loff_t *ppos = &iocb->ki_pos;
 
 	count = 0;
+	/* 确认读请求包含的参数有效 */
 	retval = generic_segment_checks(iov, &nr_segs, &count, VERIFY_WRITE);
 	if (retval)
 		return retval;
@@ -1347,6 +1369,7 @@ generic_file_aio_read(struct kiocb *iocb, const struct iovec *iov,
 	for (seg = 0; seg < nr_segs; seg++) {
 		read_descriptor_t desc;
 
+		/* buffer中的有效数据长度是0 */
 		desc.written = 0;
 		desc.arg.buf = iov[seg].iov_base;
 		desc.count = iov[seg].iov_len;

@@ -868,7 +868,8 @@ static int fsync_buffers_list(spinlock_t *lock, struct list_head *list)
 		/*
 		 * BH_Dirty和BH_Locked的buffer加入tmp链表,其他状态的buffer不予理会.
 		 * 实际上private_list中的buffer只能通过mark_buffer_dirty_inode添加,
-		 * 也只会有dirty及locked(正在写入)的buffer.
+		 * 也只会有dirty及locked(正在写入)的buffer,已经提交给块层,但是还没
+		 * 完全写入的buffer(BH_Req).
 		 */
 		if (buffer_dirty(bh) || buffer_locked(bh)) {
 			/* 将buffer头插加入tmp链表,造成tmp中成员顺序和buffer在list中的相反 */
@@ -3329,6 +3330,7 @@ int sync_dirty_buffer(struct buffer_head *bh)
 	WARN_ON(atomic_read(&bh->b_count) < 1);
 	lock_buffer(bh);
 	if (test_clear_buffer_dirty(bh)) {
+		/* 清除buffer的dirty位成功 */
 		get_bh(bh);
 		bh->b_end_io = end_buffer_write_sync;
 		ret = submit_bh(WRITE_SYNC, bh);

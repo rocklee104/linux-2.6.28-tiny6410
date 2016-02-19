@@ -83,6 +83,7 @@ struct kioctx;
  * once.  ki_retry must ensure forward progress, the AIO core will wait
  * indefinitely for kick_iocb() to be called.
  */
+/* kernel io control block */
 struct kiocb {
 	struct list_head	ki_run_list;
 	unsigned long		ki_flags;

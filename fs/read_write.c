@@ -236,17 +236,24 @@ static void wait_on_retry_sync_kiocb(struct kiocb *iocb)
 	__set_current_state(TASK_RUNNING);
 }
 
+/*
+ * 标准read例程,各个文件系统普通文件的file_operations的read都指向这个函数,
+ * 比如minix_file_operations.本函数同步读取数据,但在实现中调用异步读取,然后
+ * 等待该例程结束.
+ */
 ssize_t do_sync_read(struct file *filp, char __user *buf, size_t len, loff_t *ppos)
 {
 	struct iovec iov = { .iov_base = buf, .iov_len = len };
 	struct kiocb kiocb;
 	ssize_t ret;
 
+	/* 初始化一个kiocb实例,用于控制异步输入/输出操作 */
 	init_sync_kiocb(&kiocb, filp);
 	kiocb.ki_pos = *ppos;
 	kiocb.ki_left = len;
 
 	for (;;) {
+		/* 特定文件系统异步读取,一般指向generic_file_aio_read,例如minix_file_operations */
 		ret = filp->f_op->aio_read(&kiocb, &iov, 1, kiocb.ki_pos);
 		if (ret != -EIOCBRETRY)
 			break;
@@ -254,6 +261,7 @@ ssize_t do_sync_read(struct file *filp, char __user *buf, size_t len, loff_t *pp
 	}
 
 	if (-EIOCBQUEUED == ret)
+		/* 一直等待,直至数据进入内存,根据创建的控制块,来检查请求的完成情况 */
 		ret = wait_on_sync_kiocb(&kiocb);
 	*ppos = kiocb.ki_pos;
 	return ret;
@@ -276,6 +284,7 @@ ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 	if (ret >= 0) {
 		count = ret;
 		if (file->f_op->read)
+			/* 大部分文件系统普通文件的read指针指向do_sync_read,例如minix_file_operations */
 			ret = file->f_op->read(file, buf, count, pos);
 		else
 			ret = do_sync_read(file, buf, count, pos);
@@ -291,6 +300,11 @@ ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 
 EXPORT_SYMBOL(vfs_read);
 
+/*
+ * 标准write例程,各个文件系统普通文件的file_operations的write都指向这个函数,
+ * 比如minix_file_operations.本函数同步写入数据,但在实现中调用异步写入,然后
+ * 等待该例程结束.
+ */
 ssize_t do_sync_write(struct file *filp, const char __user *buf, size_t len, loff_t *ppos)
 {
 	struct iovec iov = { .iov_base = (void __user *)buf, .iov_len = len };

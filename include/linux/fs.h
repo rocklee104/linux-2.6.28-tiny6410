@@ -484,12 +484,16 @@ static inline size_t iov_iter_count(struct iov_iter *i)
  * mode.
  */
 typedef struct {
+	/* 写入用户buffer的长度 */
 	size_t written;
+	/* 读取后还剩余的长度 */
 	size_t count;
 	union {
+		/* 从内核将数据读取到的用户buffer */
 		char __user *buf;
 		void *data;
 	} arg;
+	/* 错误码 */
 	int error;
 } read_descriptor_t;
 
@@ -885,14 +889,20 @@ struct fown_struct {
 /*
  * Track a single file's readahead state
  */
+/* 文件预读状态 */
 struct file_ra_state {
+	/* 预读的起始位置 */
 	pgoff_t start;			/* where readahead started */
+	/* 预读的页数 */
 	unsigned int size;		/* # of readahead pages */
+	/* 阈值,在读取方向上剩余页数为该值时,启动异步预读 */
 	unsigned int async_size;	/* do asynchronous readahead when
 					   there are only # of pages ahead */
 
+	/* 预读的最大长度 */
 	unsigned int ra_pages;		/* Maximum readahead window */
 	int mmap_miss;			/* Cache miss stat for mmap accesses */
+	/* 缓存的上一次read()位置 */
 	loff_t prev_pos;		/* Cache last read() position */
 };
 

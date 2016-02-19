@@ -31,17 +31,20 @@ const struct inode_operations minix_file_inode_operations = {
 	.getattr	= minix_getattr,
 };
 
+/* 同步文件使用的间接块及文件inode所在的buffer */
 int minix_sync_file(struct file * file, struct dentry *dentry, int datasync)
 {
 	struct inode *inode = dentry->d_inode;
 	int err;
 
+	/* 同步文件所使用的间接块 */
 	err = sync_mapping_buffers(inode->i_mapping);
 	if (!(inode->i_state & I_DIRTY))
 		return err;
 	if (datasync && !(inode->i_state & I_DIRTY_DATASYNC))
 		return err;
 
+	/* 更新磁盘上inode */
 	err |= minix_sync_inode(inode);
 	return err ? -EIO : 0;
 }

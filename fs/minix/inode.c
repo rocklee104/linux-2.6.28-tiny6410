@@ -81,6 +81,7 @@ static void init_once(void *foo)
 {
 	struct minix_inode_info *ei = (struct minix_inode_info *) foo;
 
+	/* 初始化vfs inode */
 	inode_init_once(&ei->vfs_inode);
 }
 
@@ -397,6 +398,7 @@ static int minix_write_begin(struct file *file, struct address_space *mapping,
 			loff_t pos, unsigned len, unsigned flags,
 			struct page **pagep, void **fsdata)
 {
+	/* 当创建一个文件的时候,inode没有关联的page */
 	*pagep = NULL;
 	return __minix_write_begin(file, mapping, pos, len, flags, pagep, fsdata);
 }
@@ -563,6 +565,7 @@ static struct buffer_head * V1_minix_update_inode(struct inode * inode)
 		raw_inode->i_zone[0] = old_encode_dev(inode->i_rdev);
 	else for (i = 0; i < 9; i++)
 		raw_inode->i_zone[i] = minix_inode->u.i1_data[i];
+	/* bh中的minix inode被修改了 */
 	mark_buffer_dirty(bh);
 	return bh;
 }
@@ -617,9 +620,11 @@ int minix_sync_inode(struct inode * inode)
 	int err = 0;
 	struct buffer_head *bh;
 
+	/* 根据vfs inode更新buffer中的minix inode */
 	bh = minix_update_inode(inode);
 	if (bh && buffer_dirty(bh))
 	{
+		/* 如果minix inode被修改,就直接同步到磁盘上去 */
 		sync_dirty_buffer(bh);
 		if (buffer_req(bh) && !buffer_uptodate(bh))
 		{
@@ -680,6 +685,7 @@ static struct file_system_type minix_fs_type = {
 
 static int __init init_minix_fs(void)
 {
+	/* 初始化minix inode缓存池 */
 	int err = init_inodecache();
 	if (err)
 		goto out1;
@@ -688,6 +694,7 @@ static int __init init_minix_fs(void)
 		goto out;
 	return 0;
 out:
+	/* 销毁minix inode缓存池 */
 	destroy_inodecache();
 out1:
 	return err;

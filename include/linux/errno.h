@@ -26,6 +26,7 @@
 #define ESERVERFAULT	526	/* An untranslatable error occurred */
 #define EBADTYPE	527	/* Type not supported by server */
 #define EJUKEBOX	528	/* Request initiated, but will not complete before timeout */
+/* 表示读请求正在排队,尚未处理 */
 #define EIOCBQUEUED	529	/* iocb queued, will get completion event */
 #define EIOCBRETRY	530	/* iocb queued, will trigger a retry */
 
