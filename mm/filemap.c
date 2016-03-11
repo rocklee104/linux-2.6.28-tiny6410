@@ -1037,7 +1037,7 @@ find_page:
 		/* 检查页是否已经包含在页缓存中 */
 		page = find_get_page(mapping, index);
 		if (!page) {
-			/* 没有包含在页缓存中,发出一个同步预读请求 */
+			/* 没有包含在页缓存中,也就是页面缺失,发出一个同步预读请求 */
 			page_cache_sync_readahead(mapping,
 					ra, filp,
 					index, last_index - index);
