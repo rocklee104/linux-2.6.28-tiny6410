@@ -32,6 +32,7 @@ static void minix_delete_inode(struct inode *inode)
 	minix_free_inode(inode);
 }
 
+/* 销毁minix_fill_super分配的sb数据,剩下根目录使用的inode和dentry没有释放掉了 */
 static void minix_put_super(struct super_block *sb)
 {
 	int i;
@@ -66,6 +67,10 @@ static struct kmem_cache * minix_inode_cachep;
 static struct inode *minix_alloc_inode(struct super_block *sb)
 {
 	struct minix_inode_info *ei;
+	/*
+	 * 从minix_inode缓存池中获取一个inode_info,在分配这个inode_info过程中,
+	 * inode_info已经被init_once初始化过了.
+	 */
 	ei = (struct minix_inode_info *)kmem_cache_alloc(minix_inode_cachep, GFP_KERNEL);
 	if (!ei)
 		return NULL;
@@ -356,7 +361,10 @@ static int minix_statfs(struct dentry *dentry, struct kstatfs *buf)
 	struct minix_sb_info *sbi = minix_sb(dentry->d_sb);
 	buf->f_type = dentry->d_sb->s_magic;
 	buf->f_bsize = dentry->d_sb->s_blocksize;
-	/* 文件系统中除元数据外的block总数 */
+	/*
+	 * 文件系统中除元数据外的block总数.本来减去s_first_data_block后,可用block数还需要加1,
+	 * 但是rootdir占用1个block,这个时候,可用block数又需要减1,相互抵消.
+	 */
 	buf->f_blocks = (sbi->s_nzones - sbi->s_firstdatazone) << sbi->s_log_zone_size;
 	/* 除metadata和已经被使用的block,还有多少可用block */
 	buf->f_bfree = minix_count_free_blocks(sbi);
@@ -527,6 +535,7 @@ struct inode *minix_iget(struct super_block *sb, unsigned long ino)
 	inode = iget_locked(sb, ino);
 	if (!inode)
 		return ERR_PTR(-ENOMEM);
+	/* 如果inode不是新分配的,说明这个inode被初始化过了,就不需要再调用V1_minix_iget进行初始化了 */
 	if (!(inode->i_state & I_NEW))
 		return inode;
 
@@ -680,6 +689,7 @@ static struct file_system_type minix_fs_type = {
 	.name		= "minix",
 	.get_sb		= minix_get_sb,
 	.kill_sb	= kill_block_super,
+	/* 如果没有这个标志,/proc/filesystem中minix就会有nodev标记 */
 	.fs_flags	= FS_REQUIRES_DEV,
 };
 

@@ -1,6 +1,7 @@
 #include <linux/buffer_head.h>
 #include "minix.h"
 
+/* 7个直接块, 3级间接块 */
 enum {DIRECT = 7, DEPTH = 4};	/* Have triple indirect */
 
 typedef u32 block_t;	/* 32 bit, host order */

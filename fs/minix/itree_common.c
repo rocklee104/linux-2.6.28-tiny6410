@@ -190,7 +190,10 @@ reread:
 	partial = get_branch(inode, depth, offsets, chain, &err);
 
 	/* Simplest case - block found, no allocation needed */
-	/* partial == NULL表示文件结尾的p->key仍然指向有效的block,这种情况出现在文件截断时 */
+	/*
+	 * partial == NULL表示文件结尾的p->key仍然指向有效的block,
+	 * 不需要分配block,这种情况出现在文件截断或者读取文件内容时.
+	 */
 	if (!partial) {
 got_it:
 		/*
@@ -199,17 +202,23 @@ got_it:
 		 */
 		map_bh(bh, inode->i_sb, block_to_cpu(chain[depth-1].key));
 		/* Clean up and exit */
-		/* 指向最后一个chain */
+		/* 指向最后一个chain,为了释放chain上所有的bh */
 		partial = chain+depth-1; /* the whole chain */
 		goto cleanup;
 	}
 
 	/* Next simple case - plain lookup or failed read of indirect block */
+	/*
+	 * 当partial不为NULL, 也就是还未达到depth的节点的key==0, 并且在读取过程中.
+	 * 或者是写入过程中get_branch获取bh出错.
+	 */
 	if (!create || err == -EIO) {
 cleanup:
 		/*
-		 * 释放由get_branch获取到的buffer,这些buffer含有的是间接块块,不需要缓存.
-		 * 系统中需要缓存的是数据块的buffer,释放完毕,partial指向chain头部.
+		 * 1.当读取block过程中,这些间接块的bh不会被改变,可以直接释放.
+		 * 2.当在get_branch获取bh失败,也需要将所有间接块bh释放.
+		 * 3.当不断给文件写入数据,间接块的bh会被改变,暂时不能释放.
+		 *   当写入过成完成后,方能将间接块的bh释放.
 		 */
 		while (partial > chain) {
 			brelse(partial->bh);
@@ -346,6 +355,11 @@ static void free_branches(struct inode *inode, block_t *p, block_t *q, int depth
 			/* 释放整块间接块中的所有索引 */
 			free_branches(inode, (block_t*)bh->b_data,
 				      block_end(bh), depth);
+			/*
+			 * free_branches也只是将间接块中的block索引清0,并没有真正写入磁盘,
+			 * bforget清除buffer的dirty状态,再减少buffer的引用计数.抛弃这个buffer,
+			 * 也就是不会清除间接块中的索引.
+			 */
 			bforget(bh);
 			/* 在zmap中清除一级间接索引块的bit */
 			minix_free_block(inode, nr);
@@ -427,6 +441,7 @@ do_indirects:
 		if (nr) {
 			idata[DIRECT+first_whole] = 0;
 			mark_inode_dirty(inode);
+			/* 注意:这里的&nr是临时变量nr的地址,和idata没关系 */
 			free_branches(inode, &nr, &nr+1, first_whole+1);
 		}
 		first_whole++;

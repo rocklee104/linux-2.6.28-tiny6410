@@ -91,7 +91,7 @@ static void writeback_release(struct backing_dev_info *bdi)
  * page->mapping->host, so the page-dirtying time is recorded in the internal
  * blockdev inode.
  */
-/* 在把inode标记为dirty之前，需要将inode放入hash表中 */
+/* 在把inode标记为dirty之前,需要将inode放入hash表中 */
 void __mark_inode_dirty(struct inode *inode, int flags)
 {
 	struct super_block *sb = inode->i_sb;

@@ -30,6 +30,7 @@ static unsigned long count_free(struct buffer_head *map[], unsigned numblocks, _
 		if (!(bh=map[i]))
 			return(0);
 		for (j=0; j<bh->b_size; j++)
+			/* 将一个字节拆成2部分计算 */
 			sum += nibblemap[bh->b_data[j] & 0xf]
 				+ nibblemap[(bh->b_data[j]>>4) & 0xf];
 	}
@@ -50,7 +51,9 @@ static unsigned long count_free(struct buffer_head *map[], unsigned numblocks, _
 	/* 处理numbits中未以16bits对齐的部分 */
 	i = numbits%16;
 	if (i!=0) {
+		/* 将超出numberbits的部分全部置1 */
 		i = *(__u16 *)(&bh->b_data[j]) | ~((1<<i) - 1);
+		/* 处理剩下的16字节 */
 		sum += nibblemap[i & 0xf] + nibblemap[(i>>4) & 0xf];
 		sum += nibblemap[(i>>8) & 0xf] + nibblemap[(i>>12) & 0xf];
 	}

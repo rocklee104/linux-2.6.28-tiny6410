@@ -101,6 +101,7 @@ extern int dir_notify_enable;
 #define SEL_EX		4
 
 /* public flags for file_system_type */
+/* 对于需要磁盘的文件系统,需要在file_system_type.flag中赋值FS_REQUIRES_DEV */
 #define FS_REQUIRES_DEV 1 
 #define FS_BINARY_MOUNTDATA 2
 #define FS_HAS_SUBTYPE 4
@@ -724,7 +725,7 @@ struct inode {
 	/* 关联的设备号 */
 	dev_t			i_rdev;
 	u64			i_version;
-	/* 如果这个inode是bdev_inode的成员,i_size在bd_set_size中被设置成块设备的大小 */
+	/* 文件大小,如果这个inode是bdev_inode的成员,i_size在bd_set_size中被设置成块设备的大小 */
 	loff_t			i_size;
 #ifdef __NEED_I_SIZE_ORDERED
 	seqcount_t		i_size_seqcount;
@@ -1242,6 +1243,7 @@ struct super_block {
 	struct dquot_operations	*dq_op;
  	struct quotactl_ops	*s_qcop;
 	const struct export_operations *s_export_op;
+	/* 挂载文件系统的标志,如MS_RDONLY(只读) */
 	unsigned long		s_flags;
 	unsigned long		s_magic;
 	struct dentry		*s_root;
