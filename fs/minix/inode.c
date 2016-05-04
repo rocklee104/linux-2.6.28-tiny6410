@@ -123,6 +123,7 @@ static int minix_remount (struct super_block * sb, int * flags, char * data)
 	struct minix_super_block * ms;
 
 	ms = sbi->s_ms;
+	/* 当通过命令mount -o remount,ro执行remount的时候,ro以MS_RDONLY标记 */
 	if ((*flags & MS_RDONLY) == (sb->s_flags & MS_RDONLY))
 		return 0;
 	/* 将之前rw的fs, remount为readonly */
@@ -140,6 +141,7 @@ static int minix_remount (struct super_block * sb, int * flags, char * data)
 	  	/* Mount a partition which is read-only, read-write. */
 		if (sbi->s_version != MINIX_V3) {
 			sbi->s_mount_state = ms->s_state;
+			/* 用于判断文件系统是否经历过突然断电 */
 			ms->s_state &= ~MINIX_VALID_FS;
 		} else {
 			sbi->s_mount_state = MINIX_VALID_FS;
@@ -288,7 +290,7 @@ static int minix_fill_super(struct super_block *s, void *data, int silent)
 	if (!s->s_root)
 		goto out_iput;
 
-	/* 文件系统可读写 */
+	/* 文件系统可读写,就要考虑突然断电的情况 */
 	if (!(s->s_flags & MS_RDONLY)) {
 		if (sbi->s_version != MINIX_V3) /* s_state is now out from V3 sb */
 			/* v1,v2需要标记文件系统无效,将无效标志写入磁盘 */

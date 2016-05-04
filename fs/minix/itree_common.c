@@ -28,6 +28,7 @@ static inline block_t *block_end(struct buffer_head *bh)
 	return (block_t *)((char*)bh->b_data + bh->b_size);
 }
 
+/* 找齐depth个chain成员,如果其中有索引为0,返回这个chain成员,方便对这个成员进行处理.否则返回NULL */
 static inline Indirect *get_branch(struct inode *inode,
 					int depth,
 					int *offsets,
@@ -45,6 +46,7 @@ static inline Indirect *get_branch(struct inode *inode,
 	/* 如果p->key == 0,表示这个branch中没有分配过任何的block */
 	if (!p->key)
 		goto no_block;
+	/* i_data中已经处理掉一个depth */
 	while (--depth) {
 		/* 读取一级间接块 */
 		bh = sb_bread(sb, block_to_cpu(p->key));
@@ -171,7 +173,10 @@ changed:
 	return -EAGAIN;
 }
 
-/* 参数中block是地址空间中的block number, map_bh后bh指向了磁盘上特定一个block */
+/*
+ * 参数中block是地址空间中的block number, map_bh后bh指向了磁盘上特定一个block(从0开始)
+ * 并不是文件大小block的个数(从1开始).
+ */
 static inline int get_block(struct inode * inode, sector_t block,
 			struct buffer_head *bh, int create)
 {
@@ -288,6 +293,7 @@ static Indirect *find_shared(struct inode *inode,
 	write_lock(&pointers_lock);
 	if (!partial)
 		partial = chain + k-1;
+	/* 如果在get_branch过程中遇到key == 0,但是其partial指向的地址数据不为0 */
 	if (!partial->key && *partial->p) {
 		write_unlock(&pointers_lock);
 		goto no_top;
@@ -307,9 +313,10 @@ static Indirect *find_shared(struct inode *inode,
 	}
 	write_unlock(&pointers_lock);
 
-	/* 目前貌似不会走到下面这个循环 */
+	/* 如果all_zeroes成立的话才会走到下面循环中 */
 	while(partial > p)
 	{
+		/* partial大于p的bh不需要回写,只需要回写p->bh */
 		brelse(partial->bh);
 		partial--;
 	}
@@ -387,7 +394,7 @@ static inline void truncate (struct inode * inode)
 	iblock = (inode->i_size + sb->s_blocksize -1) >> sb->s_blocksize_bits;
 	/*
 	 * 清除文件最后一个buffer中, i_size%buffer_size 到buffer结尾的字节,
-	 * 其他的buffer在调用truncate之前已经清除完成
+	 * 其他的buffer在调用truncate之前已经清除完成.
 	 */
 	block_truncate_page(inode->i_mapping, inode->i_size, get_block);
 
@@ -397,9 +404,10 @@ static inline void truncate (struct inode * inode)
 		return;
 
 	if (n == 1) {
-		/* 将minix_inode_info中直接块索引清除,并且zmap中清除块索引指向的block bit */
+		/* 将minix_inode_info中文件没有用到的直接块索引清除,并且zmap中清除块索引指向的block bit */
 		free_data(inode, idata+offsets[0], idata + DIRECT);
 		first_whole = 0;
+		/* 间接块由do_indirects处理 */
 		goto do_indirects;
 	}
 
@@ -416,18 +424,18 @@ static inline void truncate (struct inode * inode)
 		free_branches(inode, &nr, &nr+1, (chain+n-1) - partial);
 	}
 	/* Clear the ends of indirect blocks on the shared branch */
-	/*
-	 * 对于有2级间接块的chain,二级间接块只需要释放掉block中不属于当前inode的block索引.
-	 * 其一级间接块,需要释放掉一级间接块中不属于当前inode的block索引,以及这些一级索引
-	 * 指向block中的二级间接索引.
-	 */
 	while (partial > chain) {
-		/* partial->p + 1指向文件末尾无效数据第一个block */
+		/*
+		 * partial->p + 1真是神来之笔,和find_shared中p->p--前后呼应.整条chain中,(chain+n-1)->key
+		 * 指向的是需要释放的数据,但是之前的节点->key均指向文件需要保留的数据.在find_shared中将
+		 * p--,这样(chain+n-1)->key指向的是文件的保留数据.这样在整条chain中,partial->p + 1就指向
+		 * 每个节点需要释放的起始地址.
+		 */
 		free_branches(inode, partial->p + 1, block_end(partial->bh),
 				(chain+n-1) - partial);
+		/* 只有直接调用free_branches的partial->bh才有回写的必要 */
 		mark_buffer_dirty_inode(partial->bh, inode);
 		brelse (partial->bh);
-		/* 指向上一级索引 */
 		partial--;
 	}
 do_indirects:
@@ -439,6 +447,7 @@ do_indirects:
 	while (first_whole < DEPTH-1) {
 		nr = idata[DIRECT+first_whole];
 		if (nr) {
+			/* 如果idata指向了有效数据块号,释放整条branch */
 			idata[DIRECT+first_whole] = 0;
 			mark_inode_dirty(inode);
 			/* 注意:这里的&nr是临时变量nr的地址,和idata没关系 */
