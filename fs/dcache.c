@@ -1194,14 +1194,16 @@ struct dentry * d_alloc_root(struct inode * root_inode)
 	return res;
 }
 
-//d_hash(dentry,hash) 为散列函数 , 它将 dentry 地址和 hash 值相组合 , 
-//映射到 dentry_hashtable 表中 , 返回相应的散列链 
+/*
+ * d_hash(dentry,hash) 为散列函数,它将dentry地址和hash值相组合,
+ * 映射到 dentry_hashtable 表中,返回相应的散列链.
+ */
 static inline struct hlist_head *d_hash(struct dentry *parent,
 					unsigned long hash)
 {
 	hash += ((unsigned long) parent ^ GOLDEN_RATIO_PRIME) / L1_CACHE_BYTES;
 	hash = hash ^ ((hash ^ GOLDEN_RATIO_PRIME) >> D_HASHBITS);
-	//保证hash值在hashtable中
+	/* 保证hash值在hashtable中 */
 	return dentry_hashtable + (hash & D_HASHMASK);
 }
 
@@ -1474,7 +1476,7 @@ struct dentry * __d_lookup(struct dentry * parent, struct qstr * name)
 	struct hlist_node *node;
 	struct dentry *dentry;
 
-	//进行rcu之前, 必须rcu_read_lock,实际上就是关闭抢占
+	/* 进行rcu之前, 必须rcu_read_lock,实际上就是关闭抢占 */
 	rcu_read_lock();
 	
 	/* 
@@ -1484,7 +1486,7 @@ struct dentry * __d_lookup(struct dentry * parent, struct qstr * name)
 	hlist_for_each_entry_rcu(dentry, node, head, d_hash) {
 		struct qstr *qstr;
 
-		//寻找hash值和name传进来的hash值一样的子目录
+		/* 寻找hash值和name传进来的hash值一样的子目录 */
 		if (dentry->d_name.hash != hash)
 			continue;
 		if (dentry->d_parent != parent)
@@ -1509,10 +1511,10 @@ struct dentry * __d_lookup(struct dentry * parent, struct qstr * name)
 		 * change the qstr (protected by d_lock).
 		 */
 		qstr = &dentry->d_name;
-		//如果父目录有比较函数
+		/* 如果父目录有比较函数 */
 		if (parent->d_op && parent->d_op->d_compare) {
 			if (parent->d_op->d_compare(parent, qstr, name))
-				//一致返回0, 不一致返回非0
+				/* 一致返回0, 不一致返回非0 */
 				goto next;
 		} else {
 			if (qstr->len != len)
@@ -1528,7 +1530,7 @@ struct dentry * __d_lookup(struct dentry * parent, struct qstr * name)
 next:
 		spin_unlock(&dentry->d_lock);
  	}
-	//结束rcu保护
+	/* 结束rcu保护 */
  	rcu_read_unlock();
 
  	return found;
@@ -1674,7 +1676,7 @@ static void _d_rehash(struct dentry * entry)
  * Adds a dentry to the hash according to its name.
  */
 
-//将 dentry 加入散列表
+/* 将 dentry 加入散列表 */
 void d_rehash(struct dentry * entry)
 {
 	spin_lock(&dcache_lock);

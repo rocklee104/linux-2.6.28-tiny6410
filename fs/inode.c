@@ -1149,7 +1149,7 @@ void generic_delete_inode(struct inode *inode)
 		 * internally */
 		delete(inode);
 	} else {
-		//释放inode的页面资源
+		/* 释放inode的页面资源 */
 		truncate_inode_pages(&inode->i_data, 0);
 		clear_inode(inode);
 	}
@@ -1158,7 +1158,7 @@ void generic_delete_inode(struct inode *inode)
 	spin_unlock(&inode_lock);
 	wake_up_inode(inode);
 	BUG_ON(inode->i_state != I_CLEAR);
-	//完全删除了一个inode 
+	/* 将inode从inode_cachep中删除 */
 	destroy_inode(inode);
 }
 
@@ -1204,10 +1204,10 @@ static void generic_forget_inode(struct inode *inode)
 void generic_drop_inode(struct inode *inode)
 {
 	if (!inode->i_nlink)
-		//如果硬链接数为0
+		/* 如果硬链接数为0 */
 		generic_delete_inode(inode);
 	else
-		//如果硬链接数不为0
+		/* 如果硬链接数不为0 */
 		generic_forget_inode(inode);
 }
 
@@ -1248,7 +1248,7 @@ void iput(struct inode *inode)
 	if (inode) {
 		BUG_ON(inode->i_state == I_CLEAR);
 
-		//如果没有其他地方引用这个inode,就释放inode资源
+		/* 如果没有其他地方引用这个inode,就释放inode资源 */
 		if (atomic_dec_and_lock(&inode->i_count, &inode_lock))
 			iput_final(inode);
 	}

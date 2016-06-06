@@ -6,7 +6,11 @@
 
 #include "minix.h"
 
-/* dentry和inode指向同一个文件 */
+/*
+ * 在dentry->d_parent下插入一个目录项. 插入的这个目录项不能是目录.
+ * 对于目录,如果minix_add_link失败,需要调用2次inode_dec_link_count(inode).
+ * 并且需要inode_dec_link_count(dir);
+ */
 static int add_nondir(struct dentry *dentry, struct inode *inode)
 {
 	/* 在dentry的父目录中插入一个目录项 */
@@ -16,8 +20,14 @@ static int add_nondir(struct dentry *dentry, struct inode *inode)
 		d_instantiate(dentry, inode);
 		return 0;
 	}
-	/* 如果出错的话才会减少inode的硬链接数量 */
+	/*
+	 * 1.如果minix_mknod,minix_symlink调用,link == 1
+	 *		完全将inode删除
+	 * 2.如果minix_unlink调用,link > 1
+	 * 		减少link,并且减少i_count
+	 */
 	inode_dec_link_count(inode);
+	/* iput中会进行atomit_dec(&inode->i_count)操作 */
 	iput(inode);
 	return err;
 }
@@ -44,10 +54,15 @@ static struct dentry *minix_lookup(struct inode * dir, struct dentry *dentry, st
 		if (IS_ERR(inode))
 			return ERR_CAST(inode);
 	}
+	/*
+	 * 在创建文件或者其他一些操作前,lookup最先执行,这时候dentry是刚创建出来的,
+	 * 还没有加入hashtable,所以使用d_add而非d_instantiate.
+	 */
 	d_add(dentry, inode);
 	return NULL;
 }
 
+/* 创建文件,不需要增加父目录的硬链接数量 */
 static int minix_mknod(struct inode * dir, struct dentry *dentry, int mode, dev_t rdev)
 {
 	int error;
@@ -61,6 +76,7 @@ static int minix_mknod(struct inode * dir, struct dentry *dentry, int mode, dev_
 	if (inode) {
 		inode->i_mode = mode;
 		minix_set_inode(inode, rdev);
+		/* init_special_inode中可能会改变inode的i_rdev */
 		mark_inode_dirty(inode);
 		error = add_nondir(dentry, inode);
 	}
@@ -94,6 +110,7 @@ static int minix_symlink(struct inode * dir, struct dentry *dentry,
 
 	inode->i_mode = S_IFLNK | 0777;
 	minix_set_inode(inode, 0);
+	/* 将文件名写入符号链接的地址空间中 */
 	err = page_symlink(inode, symname, i);
 	if (err)
 		goto out_fail;
@@ -108,7 +125,7 @@ out_fail:
 	goto out;
 }
 
-/* old_dentry和dentry指向同一个inode */
+/* 添加一个硬链接,old_dentry和dentry指向同一个inode */
 static int minix_link(struct dentry * old_dentry, struct inode * dir,
 	struct dentry *dentry)
 {
@@ -119,11 +136,15 @@ static int minix_link(struct dentry * old_dentry, struct inode * dir,
 	if (inode->i_nlink >= minix_sb(inode->i_sb)->s_link_max)
 		return -EMLINK;
 
+	/* inode的硬链接数量改变,但内容不改变,所以只需要更新ctime */
 	inode->i_ctime = CURRENT_TIME_SEC;
-	/* 增加inode的硬链接数量 */
+	/*
+	 * 增加inode的硬链接数量,已经将inode标记为dirty了,
+	 * 所以在修改了inode->ctime之后不需要再显式调用mark_inode_dirty(inode);
+	 */
 	inode_inc_link_count(inode);
 	atomic_inc(&inode->i_count);
-	/* 将目录项和inode关联起来 */
+	/* 在dentry的父目录中添加一个目录项,并将目录项和inode关联起来 */
 	err = add_nondir(dentry, inode);
 	return err;
 }
@@ -136,7 +157,7 @@ static int minix_mkdir(struct inode * dir, struct dentry *dentry, int mode)
 	if (dir->i_nlink >= minix_sb(dir->i_sb)->s_link_max)
 		goto out;
 
-	/* 增加父目录的硬链接数量 */
+	/* 增加父目录的硬链接数量,因为子目录中存在'..'的硬链接 */
 	inode_inc_link_count(dir);
 
 	inode = minix_new_inode(dir, &err);
@@ -144,12 +165,15 @@ static int minix_mkdir(struct inode * dir, struct dentry *dentry, int mode)
 		goto out_dir;
 
 	inode->i_mode = S_IFDIR | mode;
+	/* 继承父目录的SGID */
 	if (dir->i_mode & S_ISGID)
 		inode->i_mode |= S_ISGID;
 	minix_set_inode(inode, 0);
 
+	/* 目录的初始link为2 */
 	inode_inc_link_count(inode);
 
+	/* 为空目录写入'.'及'..'这两个目录项,其中的dir_commit_chunk会将inode标记为dirty */
 	err = minix_make_empty(inode, dir);
 	if (err)
 		goto out_fail;
@@ -216,24 +240,6 @@ static int minix_rmdir(struct inode * dir, struct dentry *dentry)
 	return err;
 }
 
-/*
- * old_dir:将要被改名的文件父目录的inode
- * old_dentry:要被改名的文件dentry
- * new_dir:新名称文件父目录的inode
- * new_dentry:新名称文件的dentry
- *
- * rename一个文件:
- * 1.如果新文件不存在inode,那么就将新文件父目录中插入新文件的目录项,
- *   inode number为旧文件inode,同时删除旧文件在其父目录中的目录项.
- * 2.如果新文件存在inode,那么就将新文件目录项指向旧文件inode.inode number为旧文件inode,
- *   同时删除旧文件在其父目录中的目录项,减少新文件的inode硬链接计数.
- *
- * rename 一个目录:
- * 1.如果新目录不存在inode,那么就将新目录父目录中插入新目录的目录项,
- *   inode number为旧目录inode,同时删除旧目录在其父目录中的目录项.
- * 2.如果新目录存在inode,那么就将在新目录下创建一个指向旧目录的dentry.
- *   同时删除旧文件在其父目录中的目录项.
- */
 static int minix_rename(struct inode * old_dir, struct dentry *old_dentry,
 			   struct inode * new_dir, struct dentry *new_dentry)
 {
@@ -274,16 +280,22 @@ static int minix_rename(struct inode * old_dir, struct dentry *old_dentry,
 		new_de = minix_find_entry(new_dentry, &new_page);
 		if (!new_de)
 			goto out_dir;
-		/* 新文件的dentry指向旧文件的inode */
+		/*
+		 * 新文件的dentry指向旧文件的inode,对于目录来说还需要增加link一次,
+		 * 但是在之后删除inode条目时,只减少了link一次,所以对于目录来说,
+		 * 这里不需要再增加link.
+		 */
 		inode_inc_link_count(old_inode);
-		/* 新文件的目录项中记录旧文件的inode */
+		/* 新文件的目录项中记录旧文件的inode,不需要再dir下插入目录项 */
 		minix_set_link(new_de, new_page, old_inode);
+		/* nlink的变化也会改变ctime */
 		new_inode->i_ctime = CURRENT_TIME_SEC;
+		/* new_inode表示一个目录的时候 */
 		if (dir_de)
 			drop_nlink(new_inode);
-		/* 新文件的dentry将不会指向新文件的inode */
 		inode_dec_link_count(new_inode);
 	} else {
+		/* 新文件不存在,需要创建 */
 		if (dir_de) {
 			err = -EMLINK;
 			if (new_dir->i_nlink >= info->s_link_max)

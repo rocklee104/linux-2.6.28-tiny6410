@@ -88,7 +88,7 @@ static unsigned long last_empty_jifs;
  * state information between pdflush threads.  Protected by pdflush_lock.
  */
 struct pdflush_work {
-	//指向所属pdflush线程
+	/* 指向所属pdflush线程 */
 	struct task_struct *who;	/* The thread */
 	void (*fn)(unsigned long);	/* A callback function */
 	unsigned long arg0;		/* An argument to the callback */
@@ -97,7 +97,7 @@ struct pdflush_work {
 	unsigned long when_i_went_to_sleep;
 };
 
-//一个pdflush对应了一个pdflush_work
+/* 一个pdflush对应了一个pdflush_work */
 static int __pdflush(struct pdflush_work *my_work)
 {
 	current->flags |= PF_FLUSHER | PF_SWAPWRITE;
@@ -112,12 +112,12 @@ static int __pdflush(struct pdflush_work *my_work)
 		struct pdflush_work *pdf;
 
 		set_current_state(TASK_INTERRUPTIBLE);
-		//将my_work从之前的链表中取出来,头插到pdflush_list链表中
+		/* 将my_work从之前的链表中取出来,头插到pdflush_list链表中 */
 		list_move(&my_work->list, &pdflush_list);
-		//记录my_work开始睡眠的时间
+		/* 记录my_work开始睡眠的时间 */
 		my_work->when_i_went_to_sleep = jiffies;
 		spin_unlock_irq(&pdflush_lock);
-		//pdflush在pdflush_list上睡眠
+		/* pdflush在pdflush_list上睡眠 */
 		schedule();
 		try_to_freeze();
 		spin_lock_irq(&pdflush_lock);
@@ -131,21 +131,21 @@ static int __pdflush(struct pdflush_work *my_work)
 			my_work->fn = NULL;
 			continue;
 		}
-		//若pdflush被唤醒,但是my_work没有回调函数,那么本次唤醒也是无效的
+		/* 若pdflush被唤醒,但是my_work没有回调函数,那么本次唤醒也是无效的 */
 		if (my_work->fn == NULL) {
 			printk("pdflush: bogus wakeup\n");
 			continue;
 		}
 		spin_unlock_irq(&pdflush_lock);
 
-		//有效唤醒,执行回调函数
+		/* 有效唤醒,执行回调函数 */
 		(*my_work->fn)(my_work->arg0);
 
 		/*
 		 * Thread creation: For how long have there been zero
 		 * available threads?
 		 */
-		//当前jiffies如果大于last_empty_jifs + 1 * HZ,表示距上次pdflush_list链表空闲的时间超过了1s.
+		/* 当前jiffies如果大于last_empty_jifs + 1 * HZ,表示距上次pdflush_list链表空闲的时间超过了1s. */
 		if (time_after(jiffies, last_empty_jifs + 1 * HZ)) {
 			/* unlocked list_empty() test is OK here */
 			if (list_empty(&pdflush_list)) {
@@ -169,7 +169,7 @@ static int __pdflush(struct pdflush_work *my_work)
 		/* 确保系统中至少有MIN_PDFLUSH_THREADS个pdflush */
 		if (nr_pdflush_threads <= MIN_PDFLUSH_THREADS)
 			continue;
-		//取pdflush_list睡眠时间最长的pdflush_work
+		/* 取pdflush_list睡眠时间最长的pdflush_work */
 		pdf = list_entry(pdflush_list.prev, struct pdflush_work, list);
 		if (time_after(jiffies, pdf->when_i_went_to_sleep + 1 * HZ)) {
 			//判断睡眠时间最长的pdflush_work睡眠已经超过1s,当前pdflush线程就会退出

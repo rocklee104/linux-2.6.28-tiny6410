@@ -142,7 +142,7 @@ char * getname(const char __user * filename)
 	char *tmp, *result;
 
 	result = ERR_PTR(-ENOMEM);
-	//分配一段内存空间
+	/* 分配一段内存空间 */
 	tmp = __getname();
 	if (tmp)  {
 		int retval = do_getname(filename, tmp);
@@ -1129,13 +1129,13 @@ static int do_path_lookup(int dfd, const char *name,
 		path_get(&fs->root);
 		read_unlock(&fs->lock);
 	} else if (dfd == AT_FDCWD) {
-	//相对路径
+	/* 相对路径 */
 		read_lock(&fs->lock);
 		nd->path = fs->pwd;
 		path_get(&fs->pwd);
 		read_unlock(&fs->lock);
 	} else {
-	//path_lookup不会走到下面来
+	/* path_lookup不会走到下面来 */
 		struct dentry *dentry;
 
 		file = fget_light(dfd, &fput_needed);
@@ -1493,7 +1493,7 @@ static int may_delete(struct inode *dir,struct dentry *victim,int isdir)
  */
 static inline int may_create(struct inode *dir, struct dentry *child)
 {
-	//child的d_inode目前还没创建,不应该存在
+	/* child的d_inode目前还没创建,不应该存在 */
 	if (child->d_inode)
 		return -EEXIST;
 	/* dir 不应该是 removed, but still open directory */
@@ -2024,6 +2024,7 @@ struct dentry *lookup_create(struct nameidata *nd, int is_dir)
 	if (IS_ERR(dentry))
 		goto fail;
 
+	/* 判断是否有同名文件 */
 	if (dentry->d_inode)
 		goto eexist;
 	/*

@@ -199,12 +199,12 @@ EXPORT_SYMBOL(mark_page_accessed);
 
 void __lru_cache_add(struct page *page, enum lru_list lru)
 {
-	//找到对应LRU的搬运工--pagevec
+	/* 找到对应LRU的搬运工--pagevec */
 	struct pagevec *pvec = &get_cpu_var(lru_add_pvecs)[lru];
 
 	page_cache_get(page);
 	if (!pagevec_add(pvec, page))
-		//如果pagevec中的slot完全满了,就将pagevec中的page加入lru
+		/* 如果pagevec中的slot完全满了,就将pagevec中的page加入lru */
 		____pagevec_lru_add(pvec, lru);
 	put_cpu_var(lru_add_pvecs);
 }

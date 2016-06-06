@@ -83,8 +83,10 @@ static int dir_commit_chunk(struct page *page, loff_t pos, unsigned len)
 static struct page * dir_get_page(struct inode *dir, unsigned long n)
 {
 	struct address_space *mapping = dir->i_mapping;
+	/* 如果n不在mapping中,也会分配一个page插入mapping中 */
 	struct page *page = read_mapping_page(mapping, n, NULL);
 	if (!IS_ERR(page)) {
+		/* 没看懂什么意思,不使用kmap返回的虚拟地址 */
 		kmap(page);
 		if (!PageUptodate(page))
 			goto fail;
@@ -120,6 +122,7 @@ static int minix_readdir(struct file * filp, void * dirent, filldir_t filldir)
 	char *name;
 	__u32 inumber;
 
+	/* cc46759a8c中已经将bkl去掉了 */
 	lock_kernel();
 
 	/* pos以目录项大小对齐 */
@@ -134,6 +137,7 @@ static int minix_readdir(struct file * filp, void * dirent, filldir_t filldir)
 		/* 从inode地址空间中获取第n个page */
 		struct page *page = dir_get_page(inode, n);
 
+		/* 获取不到page也可以继续 */
 		if (IS_ERR(page))
 			continue;
 		/* page转换成虚拟地址 */
@@ -157,10 +161,15 @@ static int minix_readdir(struct file * filp, void * dirent, filldir_t filldir)
 
 				unsigned l = strnlen(name, sbi->s_namelen);
 				offset = p - kaddr;
-				/* 填充用户空间的linux_dirent数组,dirent在vfs_readdir中已经被赋值了,minix不支持file_type */
+				/*
+				 * 填充用户空间的linux_dirent数组,dirent在vfs_readdir中已经被赋值了,minix不支持file_type.
+				 * int filldir(void * __buf, const char * name, int namlen, loff_t offset, u64 ino, unsigned int d_type)
+				 */
+
 				over = filldir(dirent, name, l,
 					(n << PAGE_CACHE_SHIFT) | offset,
 					inumber, DT_UNKNOWN);
+				/* 如果在filldir过程中遇到错误,表示目录项遍历过程完毕 */
 				if (over) {
 					dir_put_page(page);
 					goto done;
@@ -176,9 +185,14 @@ done:
 	return 0;
 }
 
+/* name和buffer如果相等返回1,不相等返回0 */
 static inline int namecompare(int len, int maxlen,
 	const char * name, const char * buffer)
 {
+	/*
+	 * len是name的长度,如果buffer的长度大于len,memcmp只能比较buffer的前len个字节.
+	 * buffer[len] != NULL,表示bffer的长度大于len.这种情况buffer和name一定不相同.
+	 */
 	if (len < maxlen && buffer[len])
 		return 0;
 	return !memcmp(name, buffer, len);
@@ -271,7 +285,11 @@ int minix_add_link(struct dentry *dentry, struct inode *inode)
 	 * This code plays outside i_size, so it locks the page
 	 * to protect that region.
 	 */
-	/* 遍历dentry父目录地址空间中的所有page */
+	/*
+	 * 遍历dentry父目录地址空间中的所有page,注意这里n <= npages,也就是如果dir->i_size以page对齐,
+	 * 如果需要插入的entry在遍历完所有的page之后,还没有找到可以插入的位置,那么dir的mapping中就
+	 * 会再分配一个page.
+	 */
 	for (n = 0; n <= npages; n++) {
 		char *limit, *dir_end;
 
@@ -284,7 +302,11 @@ int minix_add_link(struct dentry *dentry, struct inode *inode)
 		kaddr = (char*)page_address(page);
 		/* 每一个page中有效数据之后第一个无效数据 */
 		dir_end = kaddr + minix_last_byte(dir, n);
-		/* 每一个page最后一个目录项 */
+		/*
+		 * 每一个page最后一个目录项,如果像minix_find_entry一样,
+		 * limit = kaddr + minix_last_byte(dir, n) - sbi->s_dirsize;
+		 * 这样的话,没办法找到所有目录项最后的插入点.
+		 */
 		limit = kaddr + PAGE_CACHE_SIZE - sbi->s_dirsize;
 		/* 遍历每个page中的目录项 */
 		for (p = kaddr; p <= limit; p = minix_next_entry(p, sbi)) {
@@ -318,6 +340,7 @@ int minix_add_link(struct dentry *dentry, struct inode *inode)
 				goto out_unlock;
 		}
 		unlock_page(page);
+		/* 和dir_get_page对应 */
 		dir_put_page(page);
 	}
 	BUG();
@@ -349,6 +372,8 @@ got_it:
 	 * 将包含目录项的buffer标记为dirty,一般情况下可以调用generic_write_end.
 	 * 但是minix挂载时需要支持-o sync选项.dir_commit_chunk和generic_write_end
 	 * 唯一的差别就是支持sync写入.
+	 *
+	 * dir_commit_chunk中会调用unlock_page
 	 */
 	err = dir_commit_chunk(page, pos, sbi->s_dirsize);
 	/* 更新父目录的时间戳 */
@@ -380,6 +405,7 @@ int minix_delete_entry(struct minix_dir_entry *de, struct page *page)
 	if (err == 0) {
 		/* 将inode number改为0后写入磁盘 */
 		de->inode = 0;
+		/* dir_commit_chunk中会调用unlock_page */
 		err = dir_commit_chunk(page, pos, len);
 	} else {
 		unlock_page(page);
@@ -391,10 +417,11 @@ int minix_delete_entry(struct minix_dir_entry *de, struct page *page)
 	return err;
 }
 
+/* 创建目录的时间使用minix_new_inode的时间,而非minix_make_empty的时间 */
 int minix_make_empty(struct inode *inode, struct inode *dir)
 {
 	struct address_space *mapping = inode->i_mapping;
-	/* 目录是空的,先获取一个page */
+	/* 目录是空的,先获取一个page,这个page是被锁住的 */
 	struct page *page = grab_cache_page(mapping, 0);
 	struct minix_sb_info *sbi = minix_sb(inode->i_sb);
 	char *kaddr;
@@ -433,7 +460,7 @@ int minix_make_empty(struct inode *inode, struct inode *dir)
 	}
 	kunmap_atomic(kaddr, KM_USER0);
 
-	/* 将写入的目录项提交给磁盘 */
+	/* 将写入的目录项提交给磁盘, dir_commit_chunk中会调用unlock_page */
 	err = dir_commit_chunk(page, 0, 2 * sbi->s_dirsize);
 fail:
 	page_cache_release(page);
@@ -510,6 +537,7 @@ void minix_set_link(struct minix_dir_entry *de, struct page *page,
 			(char *)de-(char*)page_address(page);
 	int err;
 
+	/* 写之前都需要lock_page */
 	lock_page(page);
 
 	/* 保证位于pos的目录项所在的buffer mapped. */
@@ -521,6 +549,7 @@ void minix_set_link(struct minix_dir_entry *de, struct page *page,
 	} else {
 		unlock_page(page);
 	}
+	/* 释放由minix_find_link获取的page */
 	dir_put_page(page);
 	/* 更改de这个目录项所在的目录的修改时间,访问时间 */
 	dir->i_mtime = dir->i_ctime = CURRENT_TIME_SEC;

@@ -600,7 +600,7 @@ void page_address_init(void);
 #endif
 
 #if !defined(HASHED_PAGE_VIRTUAL) && !defined(WANT_PAGE_VIRTUAL)
-//6410使用这个page_address
+/* 6410使用这个page_address */
 #define page_address(page) lowmem_page_address(page)
 #define set_page_address(page, address)  do { } while(0)
 #define page_address_init()  do { } while(0)

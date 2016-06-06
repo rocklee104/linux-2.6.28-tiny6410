@@ -24,6 +24,7 @@
 #include <linux/backing-dev.h>
 #include <linux/buffer_head.h>
 #include "internal.h"
+#include <linux/magic.h>
 
 
 /**
@@ -295,7 +296,6 @@ __sync_single_inode(struct inode *inode, struct writeback_control *wbc)
 	spin_unlock(&inode_lock);
 
 	ret = do_writepages(mapping, wbc);
-
 	/* Don't write the inode if only I_DIRTY_PAGES was set */
 	if (dirty & (I_DIRTY_SYNC | I_DIRTY_DATASYNC)) {
 		/* 调用sb write_inode方法写入inode */
@@ -452,7 +452,7 @@ __writeback_single_inode(struct inode *inode, struct writeback_control *wbc)
  * on the writer throttling path, and we get decent balancing between many
  * throttled threads: we don't want them all piling up on inode_sync_wait.
  */
-//inode从sb->io移动到sb->dirty上
+/* inode从sb->io移动到sb->dirty上 */
 void generic_sync_sb_inodes(struct super_block *sb,
 				struct writeback_control *wbc)
 {

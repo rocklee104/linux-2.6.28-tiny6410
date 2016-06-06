@@ -322,13 +322,13 @@ int radix_tree_insert(struct radix_tree_root *root,
 
 	/* Make sure the tree is high enough.  */
 	if (index > radix_tree_maxindex(root->height)) {
-		//如果index超过当前高度的树的索引范围,就对radix tree扩容
+		/* 如果index超过当前高度的树的索引范围,就对radix tree扩容 */
 		error = radix_tree_extend(root, index);
 		if (error)
 			return error;
 	}
 
-	//slot实际的地址可能是root->rnode最低位清0的结果
+	/* slot实际的地址可能是root->rnode最低位清0的结果 */
 	slot = radix_tree_indirect_to_ptr(root->rnode);
 
 	height = root->height;
@@ -337,14 +337,14 @@ int radix_tree_insert(struct radix_tree_root *root,
 	offset = 0;			/* uninitialised var warning */
 	while (height > 0) {
 		if (slot == NULL) {
-			//没有子节点
+			/* 没有子节点 */
 			/* Have to add a child node.  */
 			if (!(slot = radix_tree_node_alloc(root)))
 				return -ENOMEM;
 			slot->height = height;
 			if (node) {
 				rcu_assign_pointer(node->slots[offset], slot);
-				//node中使用的count数量要++
+				/* node中使用的count数量要++ */
 				node->count++;
 			} else
 			   /* 
@@ -369,12 +369,12 @@ int radix_tree_insert(struct radix_tree_root *root,
 
 	if (node) {
 		node->count++;
-		//item & RADIX_TREE_INDIRECT_PTR == 0
+		/* item & RADIX_TREE_INDIRECT_PTR == 0 */
 		rcu_assign_pointer(node->slots[offset], item);
 		BUG_ON(tag_get(node, 0, offset));
 		BUG_ON(tag_get(node, 1, offset));
 	} else {
-		//当height == 0,这时候就将item作为radix tree的root
+		/* 当height == 0,这时候就将item作为radix tree的root */
 		rcu_assign_pointer(root->rnode, item);
 		BUG_ON(root_tag_get(root, 0));
 		BUG_ON(root_tag_get(root, 1));
@@ -403,20 +403,20 @@ void **radix_tree_lookup_slot(struct radix_tree_root *root, unsigned long index)
 	unsigned int height, shift;
 	struct radix_tree_node *node, **slot;
 
-	//仅仅是加了内存栅
+	/* 仅仅是加了内存栅 */
 	node = rcu_dereference(root->rnode);
 	if (node == NULL)
 		return NULL;
 
 	if (!radix_tree_is_indirect_ptr(node)) {
-		//如果root->rnode指向了data item.这种情况下index只能为0.
+		/* 如果root->rnode指向了data item.这种情况下index只能为0. */
 		if (index > 0)
-			//如果要求搜索的index > 0,这种情况是不存在的,返回null
+			/* 如果要求搜索的index > 0,这种情况是不存在的,返回null */
 			return NULL;
-		//如果要求搜索的index == 0,返回指向data item的指针的地址
+		/* 如果要求搜索的index == 0,返回指向data item的指针的地址 */
 		return (void **)&root->rnode;
 	}
-	//获取间接node
+	/* 获取间接node */
 	node = radix_tree_indirect_to_ptr(node);
 
 	height = node->height;

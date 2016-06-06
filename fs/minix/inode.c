@@ -650,7 +650,7 @@ int minix_sync_inode(struct inode * inode)
 	return err;
 }
 
-/* ls命令最终会调用到这个函数 */
+/* ls命令最终会调用到这个函数,显示的block数量是以512为单位的 */
 int minix_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
 {
 	struct inode *dir = dentry->d_parent->d_inode;

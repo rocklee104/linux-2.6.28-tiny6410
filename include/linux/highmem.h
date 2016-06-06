@@ -33,7 +33,7 @@ void kmap_flush_unused(void);
 
 static inline unsigned int nr_free_highpages(void) { return 0; }
 
-//内核非直接映射的页框的总数(高地址内存)
+/* 内核非直接映射的页框的总数(高地址内存) */
 #define totalhigh_pages 0
 
 #ifndef ARCH_HAS_KMAP

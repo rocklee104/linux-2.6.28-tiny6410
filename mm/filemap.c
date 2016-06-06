@@ -452,7 +452,7 @@ int filemap_write_and_wait_range(struct address_space *mapping,
  * This function is used to add a page to the pagecache. It must be locked.
  * This function does not add the page to the LRU.  The caller must do that.
  */
-//在调用这个函数之前,page must be locked
+/* 在调用这个函数之前,page must be locked */
 int add_to_page_cache_locked(struct page *page, struct address_space *mapping,
 		pgoff_t offset, gfp_t gfp_mask)
 {
@@ -460,7 +460,7 @@ int add_to_page_cache_locked(struct page *page, struct address_space *mapping,
 
 	VM_BUG_ON(!PageLocked(page));
 
-	//在没有定义CONFIG_CGROUP_MEM_RES_CTLR的情况下是空函数
+	/* 在没有定义CONFIG_CGROUP_MEM_RES_CTLR的情况下是空函数 */
 	error = mem_cgroup_cache_charge(page, current->mm,
 					gfp_mask & ~__GFP_HIGHMEM);
 	if (error)
@@ -468,7 +468,7 @@ int add_to_page_cache_locked(struct page *page, struct address_space *mapping,
 
 	error = radix_tree_preload(gfp_mask & ~__GFP_HIGHMEM);
 	if (error == 0) {
-		//radix_tree_preload分配成功,page引用计数++
+		/* radix_tree_preload分配成功,page引用计数++ */
 		page_cache_get(page);
 		page->mapping = mapping;
 		page->index = offset;
@@ -476,14 +476,14 @@ int add_to_page_cache_locked(struct page *page, struct address_space *mapping,
 		spin_lock_irq(&mapping->tree_lock);
 		error = radix_tree_insert(&mapping->page_tree, offset, page);
 		if (likely(!error)) {
-			//地址空间中page的数量++
+			/* 地址空间中page的数量++ */
 			mapping->nrpages++;
 			__inc_zone_page_state(page, NR_FILE_PAGES);
 		} else {
 			page->mapping = NULL;
-			//在没有定义CONFIG_CGROUP_MEM_RES_CTLR的情况下是空函数
+			/* 在没有定义CONFIG_CGROUP_MEM_RES_CTLR的情况下是空函数 */
 			mem_cgroup_uncharge_cache_page(page);
-			//释放page
+			/* 释放page */
 			page_cache_release(page);
 		}
 
@@ -513,17 +513,17 @@ int add_to_page_cache_lru(struct page *page, struct address_space *mapping,
 	 * (called in add_to_page_cache) needs to know where they're going too.
 	 */
 	if (mapping_cap_swap_backed(mapping))
-		//如果mapping的back device info有BDI_CAP_SWAP_BACKED标志,将page也设置成swap backed
+		/* 如果mapping的back device info有BDI_CAP_SWAP_BACKED标志,将page也设置成swap backed */
 		SetPageSwapBacked(page);
 
-	//add_to_page_cache成功返回0
+	/* add_to_page_cache成功返回0 */
 	ret = add_to_page_cache(page, mapping, offset, gfp_mask);
 	if (ret == 0) {
 		if (page_is_file_cache(page))
-			//如果page属于普通文件系统
+			/* 如果page属于普通文件系统 */
 			lru_cache_add_file(page);
 		else
-			//如果page的back device info是内存文件系统或内存设备
+			/* 如果page的back device info是内存文件系统或内存设备 */
 			lru_cache_add_active_anon(page);
 	}
 	return ret;
@@ -1684,7 +1684,7 @@ static struct page *__read_cache_page(struct address_space *mapping,
 repeat:
 	page = find_get_page(mapping, index);
 	if (!page) {
-		/* 在radix tree中没有找到对应于index的page */
+		/* 在radix tree中没有找到对应于index的page,就分配一个page */
 		page = page_cache_alloc_cold(mapping);
 		if (!page)
 			return ERR_PTR(-ENOMEM);
@@ -1778,6 +1778,7 @@ struct page *read_cache_page(struct address_space *mapping,
 	page = read_cache_page_async(mapping, index, filler, data);
 	if (IS_ERR(page))
 		goto out;
+	/* 等待一个page unlock */
 	wait_on_page_locked(page);
 	if (!PageUptodate(page)) {
 		page_cache_release(page);

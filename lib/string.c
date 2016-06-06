@@ -602,6 +602,7 @@ EXPORT_SYMBOL(memmove);
  * @count: The size of the area.
  */
 #undef memcmp
+/* 如果ct和cs相同,返回0 */
 int memcmp(const void *cs, const void *ct, size_t count)
 {
 	const unsigned char *su1, *su2;
