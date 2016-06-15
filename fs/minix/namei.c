@@ -288,7 +288,7 @@ static int minix_rename(struct inode * old_dir, struct dentry *old_dentry,
 		inode_inc_link_count(old_inode);
 		/* 新文件的目录项中记录旧文件的inode,不需要再dir下插入目录项 */
 		minix_set_link(new_de, new_page, old_inode);
-		/* nlink的变化也会改变ctime */
+		/* new inode的nlink的变化也会改变ctime */
 		new_inode->i_ctime = CURRENT_TIME_SEC;
 		/* new_inode表示一个目录的时候 */
 		if (dir_de)

@@ -40,6 +40,7 @@ int ext2_sync_file(struct file *file, struct dentry *dentry, int datasync)
 	ret = sync_mapping_buffers(inode->i_mapping);
 	if (!(inode->i_state & I_DIRTY))
 		return ret;
+	/* 仅仅需要同步数据,不需要同步metadata.并且inode没有需要马上回写的metadata */
 	if (datasync && !(inode->i_state & I_DIRTY_DATASYNC))
 		return ret;
 

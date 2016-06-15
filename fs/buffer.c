@@ -677,10 +677,13 @@ repeat:
 /* mapping一般是inode->i_mapping */
 int sync_mapping_buffers(struct address_space *mapping)
 {
-	/* 获取间接块所在的地址空间 */
+	/* 获取被操作过的间接块所在的地址空间 */
 	struct address_space *buffer_mapping = mapping->assoc_mapping;
 
-	/* 当inode没有与其关联的间接块地址空间,或者其地址空间管理间接块的链表为NULL */
+	/*
+	 * 当inode没有与其关联的间接块地址空间,或者其地址空间管理间接块的链表为NULL.
+	 * 通常出现在文件没有间接块被修改的情况下.
+	 */
 	if (buffer_mapping == NULL || list_empty(&mapping->private_list))
 		return 0;
 
@@ -849,7 +852,6 @@ static int fsync_buffers_list(spinlock_t *lock, struct list_head *list)
 	struct list_head tmp;
 	struct address_space *mapping;
 	int err = 0, err2;
-
 	INIT_LIST_HEAD(&tmp);
 
 	/* 间接块地址空间上锁,保护inode地址空间知道private_list */

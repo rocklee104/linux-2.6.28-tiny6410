@@ -87,6 +87,7 @@ long do_fsync(struct file *file, int datasync)
 		goto out;
 	}
 
+	/* 同步mapping中所有dirty的page */
 	ret = filemap_fdatawrite(mapping);
 
 	/*
@@ -94,6 +95,7 @@ long do_fsync(struct file *file, int datasync)
 	 * livelocks in fsync_buffers_list().
 	 */
 	mutex_lock(&mapping->host->i_mutex);
+	/* 将dirty的间接块以及inode信息同步到磁盘 */
 	err = file->f_op->fsync(file, file->f_path.dentry, datasync);
 	if (!ret)
 		ret = err;

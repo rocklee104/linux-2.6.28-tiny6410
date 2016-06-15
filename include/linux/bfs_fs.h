@@ -6,11 +6,13 @@
 #ifndef _LINUX_BFS_FS_H
 #define _LINUX_BFS_FS_H
 
+/* 512byte一个block */
 #define BFS_BSIZE_BITS		9
 #define BFS_BSIZE		(1<<BFS_BSIZE_BITS)
 
 #define BFS_MAGIC		0x1BADFACE
 #define BFS_ROOT_INO		2
+/* 每个block只有8个inode */
 #define BFS_INODES_PER_BLOCK	8
 
 /* SVR4 vnode type values (bfs_inode->i_vtype) */
@@ -19,6 +21,7 @@
 
 
 /* BFS inode layout on disk */
+/* inode大小为64byte */
 struct bfs_inode {
 	__le16 i_ino;
 	__u16 i_unused;
@@ -36,8 +39,11 @@ struct bfs_inode {
 	__u32 i_padding[4];
 };
 
-#define BFS_NAMELEN		14	
+/* bfs的文件名长度 */
+#define BFS_NAMELEN		14
+/* bfs目录项长度 */
 #define BFS_DIRENT_SIZE		16
+/* 每个block存放32个目录项 */
 #define BFS_DIRS_PER_BLOCK	32
 
 struct bfs_dirent {

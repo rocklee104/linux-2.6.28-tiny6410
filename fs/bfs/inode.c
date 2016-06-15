@@ -62,6 +62,7 @@ struct inode *bfs_iget(struct super_block *sb, unsigned long ino)
 	di = (struct bfs_inode *)bh->b_data + off;
 
 	inode->i_mode = 0x0000FFFF & le32_to_cpu(di->i_mode);
+	/* 只支持普通文件和目录2中类型 */
 	if (le32_to_cpu(di->i_vtype) == BFS_VDIR) {
 		inode->i_mode |= S_IFDIR;
 		inode->i_op = &bfs_dir_inops;

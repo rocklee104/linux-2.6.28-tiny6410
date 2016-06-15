@@ -589,7 +589,7 @@ struct address_space {
 	 * 通常是指向间接块所在块设备的address_space对象的指针.每个inode代表一个文件,
 	 * 并且拥有一个地址空间,在地址空间的page中包含了这个文件所有的数据块数据.然而
 	 * 一些文件系统在访问文件的时候用到了间接块,这些间接块并不包含在数据块中.
-	 * assoc_mapping用于保存这些间接块.
+	 * assoc_mapping用于保存这些被操作过的间接块.
 	*/
 	struct address_space	*assoc_mapping;	/* ditto */
 } __attribute__((aligned(sizeof(long))));
@@ -1566,8 +1566,18 @@ struct super_operations {
  * Q: igrab() only checks on (I_FREEING|I_WILL_FREE).  Should it also check on
  *    I_CLEAR?  If not, why?
  */
+/*
+ * I_DIRTY_SYNC和I_DIRTY_DATASYNC共同标记inode metadata dirty.
+ * I_DIRTY_SYNC标记inode中不用马上回写的metadata dirty
+ * I_DIRTY_DATASYNC标记inode中需要马上回写的metadata dirty
+ */
 #define I_DIRTY_SYNC		1
+/*
+ * fdatasync一般只同步文件数据,必要的时候才会同步inode metadata.
+ * 这个必要性就是通过I_DIRTY_DATASYNC标记的.
+ */
 #define I_DIRTY_DATASYNC	2
+/* 地址空间中有page是dirty的 */
 #define I_DIRTY_PAGES		4
 #define I_NEW			8
 #define I_WILL_FREE		16

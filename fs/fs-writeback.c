@@ -102,7 +102,6 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 	 * dirty the inode itself
 	 */
 	if (flags & (I_DIRTY_SYNC | I_DIRTY_DATASYNC)) {
-		/* 更新日志 */
 		if (sb->s_op->dirty_inode)
 			sb->s_op->dirty_inode(inode);
 	}
