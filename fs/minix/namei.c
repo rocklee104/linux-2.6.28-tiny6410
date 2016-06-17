@@ -78,6 +78,7 @@ static int minix_mknod(struct inode * dir, struct dentry *dentry, int mode, dev_
 		minix_set_inode(inode, rdev);
 		/* init_special_inode中可能会改变inode的i_rdev */
 		mark_inode_dirty(inode);
+		/* 如果add_nondir中出现失败,会调用iput将之前分配的inode释放 */
 		error = add_nondir(dentry, inode);
 	}
 	return error;
@@ -286,7 +287,11 @@ static int minix_rename(struct inode * old_dir, struct dentry *old_dentry,
 		 * 这里不需要再增加link.
 		 */
 		inode_inc_link_count(old_inode);
-		/* 新文件的目录项中记录旧文件的inode,不需要再dir下插入目录项 */
+		/*
+		 * 新文件的目录项中记录旧文件的inode,不需要再dir下插入目录项.
+		 * vfs层, olde_dentry仍然指向old_inode, new_dentry指向new_inode.
+		 * vfs_rename会将调用d_move处理old_dentry和new_dentry.
+		 */
 		minix_set_link(new_de, new_page, old_inode);
 		/* new inode的nlink的变化也会改变ctime */
 		new_inode->i_ctime = CURRENT_TIME_SEC;

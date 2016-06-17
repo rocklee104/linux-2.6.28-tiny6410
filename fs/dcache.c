@@ -1704,7 +1704,7 @@ void d_rehash(struct dentry * entry)
 /*dentry有ext name的时候,文件名以ext name为准,没有ext name的时候,ext name指向其int name*/
 static void switch_names(struct dentry *dentry, struct dentry *target)
 {
-	//通过d_alloc分配的dentry,其d_iname和dname.name是一样的
+	/* 通过d_alloc分配的dentry,其d_iname和dname.name是一样的 */
 	if (dname_external(target)) {
 		/* 
 		 * 如果target的external name和internal name指向的空间不一致,
@@ -1809,26 +1809,26 @@ static void d_move_locked(struct dentry * dentry, struct dentry * target)
 	if (d_unhashed(dentry))
 		goto already_unhashed;
 
-	//将dentry重其hash table中取下来
+	/* 将dentry重其hash table中取下来 */
 	hlist_del_rcu(&dentry->d_hash);
 
 already_unhashed:
-	//获取target的hlist链表头
+	/* 获取target的hlist链表头 */
 	list = d_hash(target->d_parent, target->d_name.hash);
-	//将dentry头插到target的hlist
+	/* 将dentry头插到target的hlist */
 	__d_rehash(dentry, list);
 
 	/* Unhash the target: dput() will then get rid of it */
-	//将target从hlist中取下来
+	/* 将target从hlist中取下来 */
 	__d_drop(target);
 
-	//将dentry从其父目录的链表中取下来
+	/* 将dentry从其父目录的链表中取下来 */
 	list_del(&dentry->d_u.d_child);
-	//将target从其父目录的链表中取下来
+	/* 将target从其父目录的链表中取下来 */
 	list_del(&target->d_u.d_child);
 
 	/* Switch the names.. */
-	//交换dentry和target的name string
+	/* 交换dentry和target的name string */
 	switch_names(dentry, target);
 	/* 
 	 * 交换dentry和target的name hash,不管dentry是否有ext name,
@@ -1846,14 +1846,14 @@ already_unhashed:
 		target->d_parent = target;
 		INIT_LIST_HEAD(&target->d_u.d_child);
 	} else {
-		//交换dentry和target的parent
+		/* 交换dentry和target的parent */
 		do_switch(dentry->d_parent, target->d_parent);
 
 		/* And add them back to the (new) parent lists */
 		list_add(&target->d_u.d_child, &target->d_parent->d_subdirs);
 	}
 
-	//将dentry加入target原来的parent的子文件链表中
+	/* 将dentry加入target原来的parent的子文件链表中 */
 	list_add(&dentry->d_u.d_child, &dentry->d_parent->d_subdirs);
 	spin_unlock(&target->d_lock);
 	fsnotify_d_move(dentry);

@@ -103,6 +103,7 @@ struct kiocb {
 
 	__u64			ki_user_data;	/* user's data for completion */
 	wait_queue_t		ki_wait;
+	/* 文件传输开始的位置 */
 	loff_t			ki_pos;
 
 	void			*private;
@@ -110,6 +111,7 @@ struct kiocb {
 	unsigned short		ki_opcode;
 	size_t			ki_nbytes; 	/* copy of iocb->aio_nbytes */
 	char 			__user *ki_buf;	/* remaining iocb->aio_buf */
+	/* 传输的字节数 */
 	size_t			ki_left; 	/* remaining bytes */
 	struct iovec		ki_inline_vec;	/* inline vector */
  	struct iovec		*ki_iovec;

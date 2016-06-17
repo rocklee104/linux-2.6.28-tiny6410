@@ -1023,6 +1023,7 @@ static void do_generic_file_read(struct file *filp, loff_t *ppos,
 	index = *ppos >> PAGE_CACHE_SHIFT;
 	prev_index = ra->prev_pos >> PAGE_CACHE_SHIFT;
 	prev_offset = ra->prev_pos & (PAGE_CACHE_SIZE-1);
+	/* 最后一个page的index */
 	last_index = (*ppos + desc->count + PAGE_CACHE_SIZE-1) >> PAGE_CACHE_SHIFT;
 	offset = *ppos & ~PAGE_CACHE_MASK;
 
@@ -1232,6 +1233,7 @@ out:
 	ra->prev_pos |= prev_offset;
 
 	*ppos = ((loff_t)index << PAGE_CACHE_SHIFT) + offset;
+	/* 修改文件访问时间 */
 	file_accessed(filp);
 }
 
@@ -1327,10 +1329,12 @@ ssize_t
 generic_file_aio_read(struct kiocb *iocb, const struct iovec *iov,
 		unsigned long nr_segs, loff_t pos)
 {
+	/* 从kernel io contrl block中获取filp */
 	struct file *filp = iocb->ki_filp;
 	ssize_t retval;
 	unsigned long seg;
 	size_t count;
+	/* 从kernel io contrl block中获取read从文件哪个位置开始 */
 	loff_t *ppos = &iocb->ki_pos;
 
 	count = 0;
@@ -1369,7 +1373,7 @@ generic_file_aio_read(struct kiocb *iocb, const struct iovec *iov,
 	for (seg = 0; seg < nr_segs; seg++) {
 		read_descriptor_t desc;
 
-		/* buffer中的有效数据长度是0 */
+		/* 目前还没有往用户的buffer中写入任何数据 */
 		desc.written = 0;
 		desc.arg.buf = iov[seg].iov_base;
 		desc.count = iov[seg].iov_len;

@@ -635,7 +635,7 @@ int minix_sync_inode(struct inode * inode)
 	bh = minix_update_inode(inode);
 	if (bh && buffer_dirty(bh))
 	{
-		/* 如果minix inode被修改,就直接同步到磁盘上去 */
+		/* 如果minix inode被修改,就直接同步到磁盘上去,sync_dirty_buffer会set_buffer_uptodate */
 		sync_dirty_buffer(bh);
 		if (buffer_req(bh) && !buffer_uptodate(bh))
 		{
@@ -643,7 +643,7 @@ int minix_sync_inode(struct inode * inode)
 				inode->i_sb->s_id, inode->i_ino);
 			err = -1;
 		}
-	}
+	} /* 当buffer clean的时候直接返回0 */
 	else if (!bh)
 		err = -1;
 	brelse (bh);
