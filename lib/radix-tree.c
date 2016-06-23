@@ -47,9 +47,9 @@
 	((RADIX_TREE_MAP_SIZE + BITS_PER_LONG - 1) / BITS_PER_LONG)
 
 struct radix_tree_node {
-	//以当前node为root的树的高度
+	/*　以当前node为root的树的高度 */
 	unsigned int	height;		/* Height from the bottom */
-	//有几个slot中保存了有效数据
+	/* 有几个slot中保存了有效数据 */
 	unsigned int	count;
 	struct rcu_head	rcu_head;
 	void		*slots[RADIX_TREE_MAP_SIZE];
@@ -62,6 +62,7 @@ struct radix_tree_path {
 };
 
 #define RADIX_TREE_INDEX_BITS  (8 /* CHAR_BIT */ * sizeof(unsigned long))
+/* 高度根据宽度RADIX_TREE_MAP_SIZE调节.32位机中,高度*宽度=36 */
 #define RADIX_TREE_MAX_PATH (DIV_ROUND_UP(RADIX_TREE_INDEX_BITS, \
 					  RADIX_TREE_MAP_SHIFT))
 

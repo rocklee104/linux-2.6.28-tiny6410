@@ -54,6 +54,7 @@ struct page {
 	};
 	union {
 	    struct {
+		/* 指向页面关联的第一个缓冲头指针 */
 		unsigned long private;		/* Mapping-private opaque data:
 					 	 * usually used for buffer_heads
 						 * if PagePrivate set; used for
@@ -62,8 +63,8 @@ struct page {
 						 * system if PG_buddy is set.
 						 */
 		/* 
-		 * 如果mapping最低位是1,则该指针并不指向address_space,而是指向
-		 * anon_vma,该结构对实现匿名映射很重要.
+		 * 如果mmaping最低为是0,mapping指向所属地址空间
+		 * 如果mapping最低位是1,则该指针指向anon_vma,该结构对实现匿名映射很重要.
 		 */
 		struct address_space *mapping;	/* If low bit clear, points to
 						 * inode address_space, or NULL.
@@ -85,6 +86,7 @@ struct page {
 	    struct page *first_page;	/* Compound tail pages */
 	};
 	union {
+		/* 页面在地址空间中的偏移 */
 		pgoff_t index;		/* Our offset within mapping. */
 		void *freelist;		/* SLUB: freelist req. slab lock */
 	};
@@ -106,7 +108,7 @@ struct page {
 	 * WANT_PAGE_VIRTUAL in asm/page.h
 	 */
 #if defined(WANT_PAGE_VIRTUAL)
-	//无法映射到内核内存中的页(高端内存页)的虚拟地址
+	/* 内核虚拟地址(NULL if not kmapped) */
 	void *virtual;			/* Kernel virtual address (NULL if
 					   not kmapped, ie. highmem) */
 #endif /* WANT_PAGE_VIRTUAL */

@@ -408,11 +408,12 @@ static int minix_write_begin(struct file *file, struct address_space *mapping,
 			loff_t pos, unsigned len, unsigned flags,
 			struct page **pagep, void **fsdata)
 {
-	/* 当创建一个文件的时候,inode没有关联的page */
+	/* 当创建一个文件的时候,inode没有关联的page.当*pagep == NULL,就需要minix分配一个locked的page */
 	*pagep = NULL;
 	return __minix_write_begin(file, mapping, pos, len, flags, pagep, fsdata);
 }
 
+/* 通过文件块号获取设备的块号 */
 static sector_t minix_bmap(struct address_space *mapping, sector_t block)
 {
 	return generic_block_bmap(mapping,block,minix_get_block);

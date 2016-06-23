@@ -484,14 +484,16 @@ static inline size_t iov_iter_count(struct iov_iter *i)
  * The simplest case just copies the data to user
  * mode.
  */
+/* 引入这个数据结构是为了代码重用,对于普通读取,套接字读取都适用 */
 typedef struct {
-	/* 写入用户buffer的长度 */
+	/* 已经写入用户buffer的长度 */
 	size_t written;
 	/* 读取后还剩余的长度 */
 	size_t count;
 	union {
-		/* 从内核将数据读取到的用户buffer */
+		/* 用户空间缓冲区指针 */
 		char __user *buf;
+		/* 被其他用户,如socket,自己定义和解释 */
 		void *data;
 	} arg;
 	/* 错误码 */
@@ -502,38 +504,117 @@ typedef int (*read_actor_t)(read_descriptor_t *, struct page *,
 		unsigned long, unsigned long);
 
 struct address_space_operations {
+	/* 在调用这个函数之前,内存页面中已经包含了文件的最新数据 */
 	int (*writepage)(struct page *page, struct writeback_control *wbc);
+	/* 具体文件系统在该函数的实现中通常调用mpage_readpage或者block_read_full_page */
 	int (*readpage)(struct file *, struct page *);
+	/*
+	 * 这个函数是可选的,只在等待回写完成时.对于设置了PG_Writeback标记的页面调用.
+	 * 它一般"泄流"设备.让I/O数据传输尽快完成.
+	 */
 	void (*sync_page)(struct page *);
 
 	/* Write back some dirty pages from this mapping. */
+	/*
+	 * 如果同步模式为WBC_SYNC_ALL,则回写控制会指定要写出页面的范围.
+	 * 否则.如果是WBC_SYNC_NONE.那么回写控制会给定要尽量写出的页面数目.
+	 */
 	int (*writepages)(struct address_space *, struct writeback_control *);
 
 	/* Set a page dirty.  Return true if this dirtied it */
+	/*
+	 * 设置页面为脏,特别用在具体文件系统的地址空间页面中有关联的私有数据,
+	 * 并且这些数据在页面"弄脏"的同时被更新的场合
+	 */
 	int (*set_page_dirty)(struct page *page);
 
+	/* 一般用在预读的场合,所以读取错误可以被忽略 */
 	int (*readpages)(struct file *filp, struct address_space *mapping,
 			struct list_head *pages, unsigned nr_pages);
 
+	/*
+	 * 具体文件系统要负责确保本次写操作能够完成,包括必要时分配空间,在非覆写时先从磁盘读取数据到页面等.
+	 *
+	 * pagep是输入/输出参数,如果输入为NULL,则需要有具体文件系统分配页面,并通过它返回加过锁的页面.
+	 * 以便调用者安全写入数据.
+	 *
+	 * fsdata参数为返回指向由具体文件系统解释的数据结构.它被传递给write_end函数.
+	 * 例如,reiserfs文件系统使用它传递特定的标志,表示是否在cont_expand(expanding truncate)
+	 * 环境下被调用,如果是这样,则用它通知write_end做协调处理.这个函数在成功时返回0;否则返回负的错误码.
+	 * 如果出错,write_end函数不会被调用.
+	 */
 	int (*write_begin)(struct file *, struct address_space *mapping,
 				loff_t pos, unsigned len, unsigned flags,
 				struct page **pagep, void **fsdata);
+	/*
+	 * VFS通过调用write_end告诉具体文件系统,数据已经被复制到页面,现在可以被提交到磁盘上了.
+	 * len为要写的字节数,即最初传递给write_begin的长度.
+	 * copied为已写的字节数,即已从用户缓冲区复制到页面的字节数.
+	 *
+	 * 具体文件系统需要负责解锁页面,释放它的引用计数.并更新i_size.失败返回负的错误码;
+	 * 否则返回能够被复制到页面缓存页面的字节数(<= copied)
+	 */
 	int (*write_end)(struct file *, struct address_space *mapping,
 				loff_t pos, unsigned len, unsigned copied,
 				struct page *page, void *fsdata);
 
 	/* Unfortunately this kludge is needed for FIBMAP. Don't use it */
+	/*
+ 	 * 将文件中的逻辑块扇区编号映射为对应设备上的物理块扇区编号.这个回调函数被用于
+ 	 * FIBMAP ioctl和交换文件(swap file)一起工作。要交换到一个文件,文件必须在块设备上
+ 	 * 有稳定的映射.交换系统并不通过文件系统,而是直接使用bmap找到并使用文件数据块在
+ 	 * 设备上的地址.
+	 */
 	sector_t (*bmap)(struct address_space *, sector_t);
+	/*
+	 * 使某个页面全部或部分失效,被用在截断文件时.
+	 * 第一个参数为指向页面描述符的指针;
+	 * 第二个参数为要使之失效的起始字节偏移,为0表示使整个页面失效.
+	 */
 	void (*invalidatepage) (struct page *, unsigned long);
+	/* 被日志文件系统使用以准备释放页面 */
 	int (*releasepage) (struct page *, gfp_t);
+	/*
+	 * 被通用read/write函数调用执行direct_IO,即I/O请求会绕过页面缓存(PageCache),
+	 * 在磁盘与应用程序缓冲区之间进行直接数据传输.
+	 * 第一个参数为读/写标志
+	 * 第二个参数是指向内核I/O控制块的指针;
+	 * 第三个参数是指向用户空间I/O数组的指针;
+	 * 第四个参数为I/O起始偏移位置;
+	 * 第五个参数为用户空间I/O数组的项数.
+	 * 返回读到的字节数,或者负的错误码.
+	 */
 	ssize_t (*direct_IO)(int, struct kiocb *, const struct iovec *iov,
 			loff_t offset, unsigned long nr_segs);
+	/*
+	 * 需要使用文件就地执行(eXecute In Place)的文件系统需要实现这个函数.
+	 * 第一个参数为指向地址空间描述符的指针;
+	 * 第二个参数为包含数据的页面在页面缓存中的索引;
+	 * 第三个参数表示是否需要创建文件逻辑块到磁盘逻辑块的映射;
+	 * 第四个和第五个参数均为输出参数,分别返回被映射到的页面指针,以及其页帧编号.
+	 */
 	int (*get_xip_mem)(struct address_space *, pgoff_t, int,
 						void **, unsigned long *);
 	/* migrate the contents of a page to the specified target */
+	/*
+	 * 将页面的内容移动到指定的目标
+	 * 第一个参数为指向地址空间的指针;
+	 * 第二个参数为指向新页面的指针;
+	 * 第三个参数为指向旧页面的指针.这个函数被用于compact物理内存使用.如果需要重新定位一个页面
+	 * (比如接收到信号表明内存卡即将出错),会换入一个新页面和一个旧页面到这个函数.而它要负责转移
+	 * 所有的私有数据,以及更新引用计数.
+	 */
 	int (*migratepage) (struct address_space *,
 			struct page *, struct page *);
+	/* 在释放一个页面之前被调用,回写一个dirty页面 */
 	int (*launder_page) (struct page *);
+	/*
+	 * 在处理缓冲读I/O请求时,被调用以判断要读取的这部分数据在页面中是否为最新.
+	 * 第一个参数为指向页面描述符的指针;
+	 * 第二个参数为指向读描述符结构的指针；
+	 * 第三个参数为文件数据在页面中的起始偏移;
+	 * 函数返回1表明页面相关数据已经被更新,否则返回0
+	 */
 	int (*is_partially_uptodate) (struct page *, read_descriptor_t *,
 					unsigned long);
 };
@@ -554,7 +635,7 @@ struct backing_dev_info;
 struct address_space {
 	/* 指向拥有该对象的inode的指针 */
 	struct inode		*host;		/* owner: inode, block_device */
-	/* 拥有者页的radix tree root */
+	/* 地址空间页面组织成radix树的形式,page_tree为树根 */
 	struct radix_tree_root	page_tree;	/* radix tree of all pages */
 	/* 
 	 * tree_lock is used to synchronise concurrent access and modification of the 
@@ -564,26 +645,46 @@ struct address_space {
 	spinlock_t		tree_lock;	/* and lock protecting it */
 	/* 地址空间中共享内存映射的个数 */
 	unsigned int		i_mmap_writable;/* count VM_SHARED mappings */
+	/*
+	 * 为方便查找,一个共享映射文件的所有虚拟内存区间或私有映射文件的写时复制(COW)
+	 * 虚拟内存空间被组织成一个radix优先查找树(priority search tree),文件地址空间的
+	 * i_mmap域成为树根.
+	 *
+	 * 为方便页面回收.内核采用逆向映射技术,将内存区间(vm_area_struct)组织成radix
+	 * 优先查找树形式,该域为树根,vm_area_struct结构的prio_tree_node为连入此树的连接件.
+	 */
 	struct prio_tree_root	i_mmap;		/* tree of private and shared mappings */
-	/* 地址空间中非线性内存区的链表 */
+	/*
+	 * 如果映射为非线性的,即文件页面在内存中并非顺序,则将内存区间(vm_area_struct)
+	 * 组织成链表的形式,该域为表头,vm_area_struct结构的list为链入此表的连接件
+	 */
 	struct list_head	i_mmap_nonlinear;/*list VM_NONLINEAR mappings */
-	/* 保护radix优先搜索树的自旋锁 */
+	/* 保护radix优先搜索树,非线性链表等的自旋锁 */
 	spinlock_t		i_mmap_lock;	/* protect tree, count, list */
 	/* 截断文件时使用的顺序计数器 */
 	unsigned int		truncate_count;	/* Cover race condition with truncate */
 	/* 地址空间中有多少个page */
 	unsigned long		nrpages;	/* number of total pages */
-	/* 最后一次回写操作所作用的页的索引 */
+	/*
+	 * 为了不占用过多资源,linux内核将地址空间中页面回写的行为分为若干轮次,writeback_index
+	 * 记录了上次回写操作的最后页面索引,下一次回写操作将从该位置开始.
+	 */
 	pgoff_t			writeback_index;/* writeback starts here */
-	/* 对所有者页进行操作的方法 */
+	/* 地址空间(页面)的操作函数 */
 	const struct address_space_operations *a_ops;	/* methods */
 	/* 错误位和内存分配器的标志 */
 	unsigned long		flags;		/* error bits/gfp mask */
-	/* 指向拥有所有者数据的块设备的backing_dev_info的指针 */
+	/*
+	 * 指向这个地址空间的后备设备信息描述符,对于块设备主inode,指向块设备请求队列的内嵌
+	 * 后备设备信息,某些磁盘文件系统的文件inode可能使用前者,而其他的可能自行定义.
+	 */
 	struct backing_dev_info *backing_dev_info; /* device readahead, etc */
-	/* 通常是管理private_list链表时使用的自旋锁 */
+	/* 用于保护地址空间私有链表的自旋锁 */
 	spinlock_t		private_lock;	/* for use by the address_space */
-	/* 链表头,通常连接与inode相关的间接块的脏缓冲区的链表,链表成员是bh->b_assoc_buffers */
+	/*
+	 * 地址空间私有链表的链表头,通常连接与inode相关的间接块的脏缓冲区的链表,
+	 * 链表成员是bh->b_assoc_buffers.
+	 */
 	struct list_head	private_list;	/* ditto */
 	/*
 	 * 通常是指向间接块所在块设备的address_space对象的指针.每个inode代表一个文件,
@@ -1563,7 +1664,7 @@ struct super_operations {
  *			specific deadlocks.
  *
  * Q: What is the difference between I_WILL_FREE and I_FREEING?
- * Q: igrab() only checks on (I_FREEING|I_WILL_FREE).  Should it also check on
+ * Q: igrab() only checks on (I_FREEING|I_WILL_FREE).  Should it also checks on
  *    I_CLEAR?  If not, why?
  */
 /*

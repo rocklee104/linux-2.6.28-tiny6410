@@ -346,8 +346,10 @@ static void dispose_list(struct list_head *head)
 /*
  * Invalidate all inodes for a device.
  */
- //返回正在使用的inode的个数, 为使用的inode保存在dispose为head的链表中
- //并将inode->i_state置为I_FREEING
+ /*
+  * 返回正在使用的inode的个数,为使用的inode保存在dispose为head的链表中.
+  * 并将inode->i_state置为I_FREEING.
+  */
 static int invalidate_list(struct list_head *head, struct list_head *dispose)
 {
 	struct list_head *next;
@@ -364,15 +366,14 @@ static int invalidate_list(struct list_head *head, struct list_head *dispose)
 		 * change during umount anymore, and because iprune_mutex keeps
 		 * shrink_icache_memory() away.
 		 */
-		//i don't understand
 		cond_resched_lock(&inode_lock);
 
 		next = next->next;
-		//if there is no node in the list
+		/* 如果链表中有没inode了 */
 		if (tmp == head)
 			break;
 		inode = list_entry(tmp, struct inode, i_sb_list);
-		//回收inode的buffer
+		/* 回收inode的buffer */
 		invalidate_inode_buffers(inode);
 		//if there is no refcount in inode
 		if (!atomic_read(&inode->i_count)) {
@@ -405,7 +406,7 @@ int invalidate_inodes(struct super_block * sb)
 	mutex_lock(&iprune_mutex);
 	spin_lock(&inode_lock);
 	inotify_unmount_inodes(&sb->s_inodes);
-	//将引用计数为0的inode加入throw_away链表
+	/* 将引用计数为0的inode加入throw_away链表 */
 	busy = invalidate_list(&sb->s_inodes, &throw_away);
 	spin_unlock(&inode_lock);
 

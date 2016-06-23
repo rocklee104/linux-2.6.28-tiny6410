@@ -243,7 +243,9 @@ static void wait_on_retry_sync_kiocb(struct kiocb *iocb)
  */
 ssize_t do_sync_read(struct file *filp, char __user *buf, size_t len, loff_t *ppos)
 {
+	/* 在read中引入iovec是为了在形式上和readv保持一致 */
 	struct iovec iov = { .iov_base = buf, .iov_len = len };
+	/* 引入kiocb是为了支持异步IO,AIO实现内核和用户之间的异步,内核为了代码重用,并没有真正使用它 */
 	struct kiocb kiocb;
 	ssize_t ret;
 
@@ -275,11 +277,14 @@ ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 
 	if (!(file->f_mode & FMODE_READ))
 		return -EBADF;
+	/* 必须提供read或aio_read之一的操作函数 */
 	if (!file->f_op || (!file->f_op->read && !file->f_op->aio_read))
 		return -EINVAL;
+	/* 该操作需要将数据复制到传入的用户空间缓冲区,验证这段缓冲区可以进行写访问 */
 	if (unlikely(!access_ok(VERIFY_WRITE, buf, count)))
 		return -EFAULT;
 
+	/* 对要访问的文件部分检查是否有锁冲突 */
 	ret = rw_verify_area(READ, file, pos, count);
 	if (ret >= 0) {
 		count = ret;

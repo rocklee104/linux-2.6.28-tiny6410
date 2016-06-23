@@ -552,11 +552,13 @@ static wait_queue_head_t *page_waitqueue(struct page *page)
 	return &zone->wait_table[hash_ptr(page, zone->wait_table_bits)];
 }
 
+/* 数唤醒等待给定页面的某个标志位被清除的线程 */
 static inline void wake_up_page(struct page *page, int bit)
 {
 	__wake_up_bit(page_waitqueue(page), &page->flags, bit);
 }
 
+/* 等待给定页面的某个标志位被清除的线程将会调用这个函数 */
 void wait_on_page_bit(struct page *page, int bit_nr)
 {
 	DEFINE_WAIT_BIT(wait, &page->flags, bit_nr);
@@ -584,6 +586,7 @@ void unlock_page(struct page *page)
 	VM_BUG_ON(!PageLocked(page));
 	clear_bit_unlock(PG_locked, &page->flags);
 	smp_mb__after_clear_bit();
+	/* 唤醒那些等待当前page清除PG_locked位的线程 */
 	wake_up_page(page, PG_locked);
 }
 EXPORT_SYMBOL(unlock_page);
@@ -601,6 +604,7 @@ void end_page_writeback(struct page *page)
 		BUG();
 
 	smp_mb__after_clear_bit();
+	/* 唤醒那些等待当前page清除PG_writeback位的线程 */
 	wake_up_page(page, PG_writeback);
 }
 EXPORT_SYMBOL(end_page_writeback);
@@ -1013,9 +1017,12 @@ static void do_generic_file_read(struct file *filp, loff_t *ppos,
 	struct address_space *mapping = filp->f_mapping;
 	struct inode *inode = mapping->host;
 	struct file_ra_state *ra = &filp->f_ra;
+	/* 当前正在处理的页面在页缓存中的索引 */
 	pgoff_t index;
+	/* 要读取的最后一个页面在页缓存中的索引 */
 	pgoff_t last_index;
 	pgoff_t prev_index;
+	/* 要读取的第一个字节在其所属页面中的偏移 */
 	unsigned long offset;      /* offset into pagecache page */
 	unsigned int prev_offset;
 	int error;
@@ -1023,12 +1030,15 @@ static void do_generic_file_read(struct file *filp, loff_t *ppos,
 	index = *ppos >> PAGE_CACHE_SHIFT;
 	prev_index = ra->prev_pos >> PAGE_CACHE_SHIFT;
 	prev_offset = ra->prev_pos & (PAGE_CACHE_SIZE-1);
-	/* 最后一个page的index */
+	/* 本次读操作最后一个page的index */
 	last_index = (*ppos + desc->count + PAGE_CACHE_SIZE-1) >> PAGE_CACHE_SHIFT;
+	/* 页内偏移 */
 	offset = *ppos & ~PAGE_CACHE_MASK;
 
+	/* 循环退出的条件是所有的数据都已经处理完成,或者过程中出现错误 */
 	for (;;) {
 		struct page *page;
+		/* 文件最后一个页面的索引 */
 		pgoff_t end_index;
 		loff_t isize;
 		unsigned long nr, ret;
@@ -1061,18 +1071,29 @@ find_page:
 					ra, filp, page,
 					index, last_index - index);
 		}
-		/* 虽然page在页缓存中,但其数据未必最新,如果page不是最新的,必须调用mapping->a_ops->readpage再次读取 */
+		/*
+		 * 如果页面存在,但页面描述符的状态不是最新,我们也有可能不需要从磁盘上读取.
+		 * 比如,要读取的数据是部分逻辑块,而页面中这些逻辑块的内容已经是最新的了.
+		 * 具体文件系统通过地址空间操作表中的is_partially_uptodate回调函数检查这种情况.
+		 */
 		if (!PageUptodate(page)) {
+			/*
+			 * 文件逻辑块大小和page大小相同(buffer size=page size),这个时候page不是最新的,
+			 * buffer也一定不是最新的.
+			 */
 			if (inode->i_blkbits == PAGE_CACHE_SHIFT ||
 					!mapping->a_ops->is_partially_uptodate)
 				goto page_not_up_to_date;
+			/* is_partially_uptodate函数调用需要外部对页面加锁 */
 			if (!trylock_page(page))
 				goto page_not_up_to_date;
+			/* 如果is_partially_uptodate回调函数返回0,说明页面不是最新 */
 			if (!mapping->a_ops->is_partially_uptodate(page,
 								desc, offset))
 				goto page_not_up_to_date_locked;
 			unlock_page(page);
 		}
+		/* 函数走到这里,要么page uptodate,要么要读取的那部分逻辑块对应的buffer uptodate */
 page_ok:
 		/*
 		 * i_size must be checked after we know the page is Uptodate.
@@ -1083,6 +1104,7 @@ page_ok:
 		 * another truncate extends the file - this is desired though).
 		 */
 
+		/* 确保本次读操作不会超过文件的末尾 */
 		isize = i_size_read(inode);
 		end_index = (isize - 1) >> PAGE_CACHE_SHIFT;
 		if (unlikely(!isize || index > end_index)) {
@@ -1091,14 +1113,18 @@ page_ok:
 		}
 
 		/* nr is the maximum number of bytes to copy from this page */
+		/* nr表示可以从这个页面复制到用户空间缓冲区的最大字节数,n <= PAGE_SIZE */
 		nr = PAGE_CACHE_SIZE;
 		if (index == end_index) {
+			/* 处理最后一个page,文件长度未以page对齐的情况 */
 			nr = ((isize - 1) & ~PAGE_CACHE_MASK) + 1;
+			/* 最后一个page中offset超过将要复制到用户空间字节数 */
 			if (nr <= offset) {
 				page_cache_release(page);
 				goto out;
 			}
 		}
+		/* 处理第一个page中offset不为0的情况 */
 		nr = nr - offset;
 
 		/* If users can be writing to this page using arbitrary
@@ -1113,8 +1139,9 @@ page_ok:
 		 * only mark it as accessed the first time.
 		 */
 		/*
-		 * 对页的访问必须用mark_page_accessed标记,在需要从物理内存换出数据时,
-		 * 需要判断页的活动程度,这个标记就很重要了.
+		 * 调用mark_page_accessed函数设置PG_referenced或PG_active标志,它表明页面当前正在被使用,
+		 * 不应该被换出.如果同一个页面(或者页面的一部分)在连续执行do_generic_file_read时被多次读取,
+		 * 这一步只在第一次读取时做.
 		 */
 		if (prev_index != index || offset != prev_offset)
 			mark_page_accessed(page);
@@ -1130,17 +1157,28 @@ page_ok:
 		 * "pos" here (the actor routine has to update the user buffer
 		 * pointers and the remaining count).
 		 */
+		/* ret记录copy完的字节数,读取操作中actor为file_read_actor */
 		ret = actor(desc, page, offset, nr);
 		offset += ret;
 		index += offset >> PAGE_CACHE_SHIFT;
+		/* 控制offset在PAGE_SIZE内 */
 		offset &= ~PAGE_CACHE_MASK;
 		prev_offset = offset;
 
+		/* 如果页面描述符减到0,释放这个页面 */
 		page_cache_release(page);
+		/*
+		 * 如果本次内容全部复制到用户空间,并且还有更多的数据需要复制,则继续循环;否则退出.
+		 * 如果本次内容没有全部复制到用户空间,desc->error中会记录错误码,直接退出
+		 */
 		if (ret == nr && desc->count)
 			continue;
 		goto out;
 
+/*
+ * 处理页面存在,但是非最新的情况.
+ * 页面中的数据是无效的,因此必须从磁盘读取,而读取页面又要先对页面进行加锁
+ */
 page_not_up_to_date:
 		/* Get exclusive access to the page ... */
 		error = lock_page_killable(page);
@@ -1149,6 +1187,11 @@ page_not_up_to_date:
 
 page_not_up_to_date_locked:
 		/* Did it get truncated before we got the lock? */
+		/*
+		 * 另一个进程可能就在我们lock page之前已经从页面缓存中删除这个页面;
+		 * 因此,它检查是否页面描述符的mapping域已经为NULL;如果是,调用unlock_page
+		 * 解锁页面,递减其使用计数,继续循环,重新find_get_page获取page.
+		 */
 		if (!page->mapping) {
 			unlock_page(page);
 			page_cache_release(page);
@@ -1156,6 +1199,11 @@ page_not_up_to_date_locked:
 		}
 
 		/* Did somebody else fill it already? */
+		/*
+		 * 在获取锁的过程中,其他进程已经填充了这个页面,再次检查PG_uptodate标志,
+		 * 因为另一个内核控制路径可能已经成功读入数据,设置页面为已更新.跳过读操作,
+		 * 直接进行复制到用户空间的处理
+		 */
 		if (PageUptodate(page)) {
 			unlock_page(page);
 			goto page_ok;
@@ -1163,6 +1211,7 @@ page_not_up_to_date_locked:
 
 readpage:
 		/* Start the actual read. The read will unlock the page. */
+		/* 调用具体文件系统readpage方法,一般是block_read_full_page,最终会unlock page */
 		error = mapping->a_ops->readpage(filp, page);
 
 		if (unlikely(error)) {
@@ -1173,10 +1222,20 @@ readpage:
 			goto readpage_error;
 		}
 
+		/* end_buffer_async_read返回后,page是最新的并且unlocked */
 		if (!PageUptodate(page)) {
+			/*
+			 * 在page_not_up_to_date标签中,页面已经被锁住,这时该进程将进入等待,
+			 * 直到数据被读入后,页面设置为已更新,并被解锁
+			 */
 			error = lock_page_killable(page);
 			if (unlikely(error))
 				goto readpage_error;
+			/*
+			 * 再次获得页面的锁之后,发现页面仍然不是最新状态.有两种可能
+			 * 1.等待锁的过程中另一个进程已经从页面缓存中删除这个页面,这时页面描述符的mapping域应该为NULL.
+			 * 2.从磁盘上读取数据失败
+			 */
 			if (!PageUptodate(page)) {
 				if (page->mapping == NULL) {
 					/*
@@ -1191,6 +1250,7 @@ readpage:
 				error = -EIO;
 				goto readpage_error;
 			}
+			/* 解锁当前if语句中通过lock_page_killable加锁的page */
 			unlock_page(page);
 		}
 
@@ -1214,7 +1274,7 @@ no_cached_page:
 			desc->error = -ENOMEM;
 			goto out;
 		}
-		/* 将该page插入页缓存的LRU链表 */
+		/* 将页面添加到地址空间 */
 		error = add_to_page_cache_lru(page, mapping,
 						index, GFP_KERNEL);
 		if (error) {
@@ -1237,10 +1297,15 @@ out:
 	file_accessed(filp);
 }
 
+/* 将page中的内容拷贝到用户buffer中, */
 int file_read_actor(read_descriptor_t *desc, struct page *page,
 			unsigned long offset, unsigned long size)
 {
 	char *kaddr;
+	/*
+	 * count记录一次传输的字节数, count记录file_read_actor一次处理的字节数,
+	 * do_generic_file_read可能调用多次file_read_actor.
+	 */
 	unsigned long left, count = desc->count;
 
 	if (size > count)
@@ -1260,11 +1325,17 @@ int file_read_actor(read_descriptor_t *desc, struct page *page,
 	}
 
 	/* Do it the slow way */
+	/*
+	 * 如果页面在高端内存,为页面建立一个永久的内核映射.
+	 * 如果页面不在高端内存,直接调用page_address获取虚拟地址.
+	 * In a nut shell,kmap可以从page中获取虚拟地址
+	 */
 	kaddr = kmap(page);
 	/* 将page中的内容拷贝到用户buffer中去 */
 	left = __copy_to_user(desc->arg.buf, kaddr + offset, size);
 	kunmap(page);
 
+	/* 如果数据没有完全copy */
 	if (left) {
 		size -= left;
 		desc->error = -EFAULT;
@@ -1307,6 +1378,7 @@ int generic_segment_checks(const struct iovec *iov,
 		if (seg == 0)
 			return -EFAULT;
 		*nr_segs = seg;
+		/* 当前seg不可用,返回可用的seg个数 */
 		cnt -= iv->iov_len;	/* This segment is no good */
 		break;
 	}
@@ -1338,12 +1410,19 @@ generic_file_aio_read(struct kiocb *iocb, const struct iovec *iov,
 	loff_t *ppos = &iocb->ki_pos;
 
 	count = 0;
-	/* 确认读请求包含的参数有效 */
+	/*
+	 * 对I/O向量进行必要的写检查,例如是否有某个段的长度为负值,是否有无效的用户空间段指针等.
+	 * 如果成功返回0,并通过第二个参数返回段的数目,通过第三个参数返回段的总长度.否则返回负的错误码.
+	 */
 	retval = generic_segment_checks(iov, &nr_segs, &count, VERIFY_WRITE);
 	if (retval)
 		return retval;
 
 	/* coalesce the iovecs and go direct-to-BIO for O_DIRECT */
+	/*
+	 * 有时我们需要绕开页面缓存,在用户缓冲区和磁盘之间直接传输数据.如果数据不会在短期内被再次使用
+	 * (例如,在进行磁盘备份时),或者应用程序有的缓存机制,采用直接I/O反而能够提升性能.
+	 */
 	if (filp->f_flags & O_DIRECT) {
 		loff_t size;
 		struct address_space *mapping;
@@ -1355,12 +1434,18 @@ generic_file_aio_read(struct kiocb *iocb, const struct iovec *iov,
 			goto out; /* skip atime */
 		size = i_size_read(inode);
 		if (pos < size) {
+			/*
+			 * 因为数据有可能保存在页面缓存,还没有来得及写入磁盘.因此,在进行I/O之前需要调用
+			 * filemap_write_and_wait_range将相关数据冲刷到磁盘,并等待其结束.
+			 */
 			retval = filemap_write_and_wait_range(mapping, pos,
 					pos + iov_length(iov, nr_segs) - 1);
 			if (!retval) {
+				/* 尽管需要绕开页面缓存(Page Cache),直接I/O操作还是定义在address_space_operations结构中 */
 				retval = mapping->a_ops->direct_IO(READ, iocb,
 							iov, pos, nr_segs);
 			}
+			/* retval > 0表示direct IO读取数据成功.否则继续buffer IO的方式读取 */
 			if (retval > 0)
 				*ppos = pos + retval;
 			if (retval) {
@@ -1373,7 +1458,7 @@ generic_file_aio_read(struct kiocb *iocb, const struct iovec *iov,
 	for (seg = 0; seg < nr_segs; seg++) {
 		read_descriptor_t desc;
 
-		/* 目前还没有往用户的buffer中写入任何数据 */
+		/* 每个段都需要重新初始化read_descriptor_t结构 */
 		desc.written = 0;
 		desc.arg.buf = iov[seg].iov_base;
 		desc.count = iov[seg].iov_len;

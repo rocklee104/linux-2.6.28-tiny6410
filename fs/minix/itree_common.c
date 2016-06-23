@@ -113,7 +113,10 @@ static int alloc_branch(struct inode *inode,
 		*branch[n].p = branch[n].key;
 		set_buffer_uptodate(bh);
 		unlock_buffer(bh);
-		/* 间接块内容被改变,需要将容纳间接块的buffer标记为dirty */
+		/*
+		 * 1.将buffer标记为dirty.
+		 * 2.将这个buffer和inode关联起来.
+		 */
 		mark_buffer_dirty_inode(bh, inode);
 		parent = nr;
 	}

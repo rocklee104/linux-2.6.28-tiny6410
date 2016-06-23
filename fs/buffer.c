@@ -713,11 +713,13 @@ void write_boundary_block(struct block_device *bdev,
 void mark_buffer_dirty_inode(struct buffer_head *bh, struct inode *inode)
 {
 	struct address_space *mapping = inode->i_mapping;
+	/* buffer所在的地址空间 */
 	struct address_space *buffer_mapping = bh->b_page->mapping;
 
 	mark_buffer_dirty(bh);
 	/* 当文件没有用到间接块,就不会有assoc_mapping */
 	if (!mapping->assoc_mapping) {
+		/* 将inode地址空间和buffer所在的地址空间关联起来 */
 		mapping->assoc_mapping = buffer_mapping;
 	} else {
 		/* 如果inode的assoc_mapping指向buffer所在的地址空间 */
@@ -2401,7 +2403,7 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
      */
 	do {
 		if (buffer_uptodate(bh))
-            /* 如果记录块内容是一致的，就跳过 */
+            /* 如果记录块内容是一致的,就跳过 */
 			continue;
 
 		if (!buffer_mapped(bh)) {
@@ -2413,7 +2415,7 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 				WARN_ON(bh->b_size != blocksize);
                 /*
                  * inode用于获取bdev, iblock指定了block number, bh是一个块缓存.
-                 * get_block用于定位一个块, 即建立映射,调用get_block获取到block no
+                 * get_block用于定位一个块,即建立映射,调用get_block获取到block no
                  */
 				err = get_block(inode, iblock, bh, 0);
 				if (err)

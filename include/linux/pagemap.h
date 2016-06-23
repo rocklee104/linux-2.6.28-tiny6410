@@ -331,6 +331,7 @@ static inline int lock_page_killable(struct page *page)
 {
 	might_sleep();
 	if (!trylock_page(page))
+		/* 如果PG_locked标志已经设置,lock_page挂起当前进程,直到这个位被清除. */
 		return __lock_page_killable(page);
 	return 0;
 }
@@ -359,6 +360,7 @@ extern void wait_on_page_bit(struct page *page, int bit_nr);
  * ie with increased "page->count" so that the page won't
  * go away during the wait..
  */
+/* 等待page中的PG_locked位被清除 */
 static inline void wait_on_page_locked(struct page *page)
 {
 	if (PageLocked(page))
@@ -368,6 +370,7 @@ static inline void wait_on_page_locked(struct page *page)
 /* 
  * Wait for a page to complete writeback
  */
+/* 等待page中的PG_writeback位被清除 */
 static inline void wait_on_page_writeback(struct page *page)
 {
 	if (PageWriteback(page))

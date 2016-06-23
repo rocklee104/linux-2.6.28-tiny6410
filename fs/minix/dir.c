@@ -86,7 +86,7 @@ static struct page * dir_get_page(struct inode *dir, unsigned long n)
 	/* 如果n不在mapping中,也会分配一个page插入mapping中 */
 	struct page *page = read_mapping_page(mapping, n, NULL);
 	if (!IS_ERR(page)) {
-		/* 没看懂什么意思,不使用kmap返回的虚拟地址 */
+		/* 对于某些平台,kmap之后才能用page_address获取page的虚拟地址 */
 		kmap(page);
 		if (!PageUptodate(page))
 			goto fail;

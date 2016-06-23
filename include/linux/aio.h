@@ -85,37 +85,56 @@ struct kioctx;
  */
 /* kernel io control block */
 struct kiocb {
+	/* 异步IO上下文将要重试的IO操作组织成一个链表,异步IO上下文描述符的run_list为此链表的表头,该域为链接件 */
 	struct list_head	ki_run_list;
 	unsigned long		ki_flags;
+	/* 使用计数 */
 	int			ki_users;
+	/* 异步IO操作的标识符,对于同步操作为0xFFFFFFFF */
 	unsigned		ki_key;		/* id of this request */
 
+	/* 指向与当前进行的IO操作相关联的文件对象的指针 */
 	struct file		*ki_filp;
+	/* 指向这个操作的异步IO上下文描述符的指针,对于同步操作,为NULL */
 	struct kioctx		*ki_ctx;	/* may be NULL for sync ops */
+	/* 在取消一个异步IO操作时调用的函数 */
 	int			(*ki_cancel)(struct kiocb *, struct io_event *);
+	/* 在重试一个异步IO操作时调用的函数 */
 	ssize_t			(*ki_retry)(struct kiocb *);
+	/* 在销毁kiocb描述符时调用的函数 */
 	void			(*ki_dtor)(struct kiocb *);
 
 	union {
+		/* 对于异步操作,为指向iocb用户模式数据结构的指针 */
 		void __user		*user;
+		/* 对于同步操作,为指向发起IO操作的进程描述符的指针 */
 		struct task_struct	*tsk;
 	} ki_obj;
 
+	/* 用于完成的用户数据,要返回到用户模式进程的值 */
 	__u64			ki_user_data;	/* user's data for completion */
 	wait_queue_t		ki_wait;
-	/* 文件传输开始的位置 */
+	/* 当前进行的IO操作的文件位置 */
 	loff_t			ki_pos;
 
+	/* 可以被文件系统层自由使用 */
 	void			*private;
 	/* State that we remember to be able to restart/retry  */
+	/* 操作类型,读/写或同步 */
 	unsigned short		ki_opcode;
+	/* 要传输的字节数 */
 	size_t			ki_nbytes; 	/* copy of iocb->aio_nbytes */
+	/* 在用户模式缓冲区中的当前位置 */
 	char 			__user *ki_buf;	/* remaining iocb->aio_buf */
-	/* 传输的字节数 */
+	/* 还需要传输的字节数 */
 	size_t			ki_left; 	/* remaining bytes */
+	/* 一个内嵌iovec,当数目超过时,需要另外分配 */
 	struct iovec		ki_inline_vec;	/* inline vector */
+	/* iovec数组 */
  	struct iovec		*ki_iovec;
+	/* ki_iovec数组中iovec的个数 */
  	unsigned long		ki_nr_segs;
+	/* ki_iovec数组中当前iovec的索引 */
  	unsigned long		ki_cur_seg;
 
 	struct list_head	ki_list;	/* the aio core uses this
@@ -125,6 +144,7 @@ struct kiocb {
 	 * If the aio_resfd field of the userspace iocb is not zero,
 	 * this is the underlying file* to deliver event to.
 	 */
+	/* 如果用户模式iocb结构的aio_resfd不为NULL,则该域可以被用于为每个已完成事件唤醒等待队列上的进程 */
 	struct file		*ki_eventfd;
 };
 

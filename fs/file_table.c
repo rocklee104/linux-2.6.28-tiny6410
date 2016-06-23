@@ -321,23 +321,28 @@ EXPORT_SYMBOL(fget);
  * and a flag is returned to be passed to the corresponding fput_light().
  * There must not be a cloning between an fget_light/fput_light pair.
  */
- //如果没有其他进程访问fd table,file对象的refcnt就不需要增加
+ /* 如果没有其他进程访问fd table,file对象的refcnt就不需要增加 */
+/*
+ * fget_light和fput_light函数是fget和fput的快速版本:内核使用它们的条件是可以确保
+ * 当前进程已经拥有该file描述符,即进程已经在前面递增了file描述符的引用计数.
+ * 例如,它们可以被系统调用的服务例程用在当接收file描述符为参数时,因为file描述符
+ * 的引用计数已经在前面的open系统调用中递增过了.
+ */
 struct file *fget_light(unsigned int fd, int *fput_needed)
 {
 	struct file *file;
 	struct files_struct *files = current->files;
 
 	*fput_needed = 0;
-	//如果file_struct只有一个进程在使用, 不需要RCU.
-	//同一个进程多次读取,这里不会自加1
+	/* 如果file_struct只有一个进程在使用, 不需要RCU.同一个进程多次读取,这里不会自加1 */
 	if (likely((atomic_read(&files->count) == 1))) {
 		file = fcheck_files(files, fd);
-		//如果有多个进程在使用,就加锁访问
+		/* 如果有多个进程在使用,就加锁访问 */
 	} else {
 		rcu_read_lock();
 		file = fcheck_files(files, fd);
 		if (file) {
-			//计数器不为0的时候自加,open过程中f_count初始化为1
+			/* 计数器不为0的时候自加,open过程中f_count初始化为1 */
 			if (atomic_long_inc_not_zero(&file->f_count))
 				*fput_needed = 1;
 			else

@@ -13,9 +13,16 @@
  *		2 of the License, or (at your option) any later version.
  */
 
+/*
+ * read系统调用只读取数据到一个用户空间缓冲区,而另外还有一个系统调用readv
+ * 可以一次性读取数据到多个用户空间缓冲区.为了同时支持着两个系统调用,引入了
+ * 数据结构iovec,字面意思为I/O向量,实际上代表的是一个用户空间缓冲区
+ */
 struct iovec
 {
+	/* 用户缓冲区地址 */
 	void __user *iov_base;	/* BSD uses caddr_t (1003.1g requires void *) */
+	/* 缓冲区长度 */
 	__kernel_size_t iov_len; /* Must be size_t (1003.1g) */
 };
 
