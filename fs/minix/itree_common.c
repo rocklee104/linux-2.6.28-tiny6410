@@ -48,7 +48,7 @@ static inline Indirect *get_branch(struct inode *inode,
 		goto no_block;
 	/* i_data中已经处理掉一个depth */
 	while (--depth) {
-		/* 读取一级间接块 */
+		/* 读取一级间接块, 不可能出现p->key == 0的情况 */
 		bh = sb_bread(sb, block_to_cpu(p->key));
 		if (!bh)
 			goto failure;
@@ -201,6 +201,7 @@ reread:
 	/*
 	 * partial == NULL表示文件结尾的p->key仍然指向有效的block,
 	 * 不需要分配block,这种情况出现在文件截断或者读取文件内容时.
+	 * 也有可能出现在不增加文件大小的情况下,修改文件内容时.
 	 */
 	if (!partial) {
 got_it:
@@ -217,8 +218,10 @@ got_it:
 
 	/* Next simple case - plain lookup or failed read of indirect block */
 	/*
-	 * 当partial不为NULL, 也就是还未达到depth的节点的key==0, 并且在读取过程中.
-	 * 或者是写入过程中get_branch获取bh出错.
+	 * 如下情况可能进入此条件判断:
+	 * 1.读取过程中,调用完get_branch,parital == NULL,可能出现在读取文件空洞的时候,这个时候不需要映射.
+	 * 2.读取过程中,调用完get_branch,sb_bread出现错误.
+	 * 3.写入过程中,调用完get_branch,sb_bread出现错误.
 	 */
 	if (!create || err == -EIO) {
 cleanup:
