@@ -89,7 +89,7 @@ struct buffer_head {
  	void *b_private;		/* reserved for b_end_io */
 	/* 链表成员，链表头是(&inode->i_data)->private_list */
 	struct list_head b_assoc_buffers; /* associated with another mapping */
-	/* 和buffer关联的地址空间 */
+	/* 当作为间接块的buffer时,通过此指针关联到文件的地址空间 */
 	struct address_space *b_assoc_map;	/* mapping this buffer is
 						   associated with */
 	atomic_t b_count;		/* users using this buffer_head */

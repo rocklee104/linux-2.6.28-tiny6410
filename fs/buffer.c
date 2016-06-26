@@ -2427,6 +2427,7 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
              * BH_Uptodate状态。
              */
 			if (!buffer_mapped(bh)) {
+				/* 遇到文件空洞就会出现这种情况 */
 				zero_user(page, i * blocksize, blocksize);
 				if (!err)
 					set_buffer_uptodate(bh);

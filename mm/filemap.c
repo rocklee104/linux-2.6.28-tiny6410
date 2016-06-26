@@ -1019,7 +1019,7 @@ static void do_generic_file_read(struct file *filp, loff_t *ppos,
 	struct file_ra_state *ra = &filp->f_ra;
 	/* 当前正在处理的页面在页缓存中的索引 */
 	pgoff_t index;
-	/* 要读取的最后一个页面在页缓存中的索引 */
+	/* 本次读操作要读取的最后一个页面在页缓存中的索引 */
 	pgoff_t last_index;
 	pgoff_t prev_index;
 	/* 要读取的第一个字节在其所属页面中的偏移 */
@@ -1030,7 +1030,6 @@ static void do_generic_file_read(struct file *filp, loff_t *ppos,
 	index = *ppos >> PAGE_CACHE_SHIFT;
 	prev_index = ra->prev_pos >> PAGE_CACHE_SHIFT;
 	prev_offset = ra->prev_pos & (PAGE_CACHE_SIZE-1);
-	/* 本次读操作最后一个page的index */
 	last_index = (*ppos + desc->count + PAGE_CACHE_SIZE-1) >> PAGE_CACHE_SHIFT;
 	/* 页内偏移 */
 	offset = *ppos & ~PAGE_CACHE_MASK;
@@ -1095,6 +1094,7 @@ find_page:
 		}
 		/* 函数走到这里,要么page uptodate,要么要读取的那部分逻辑块对应的buffer uptodate */
 page_ok:
+		/* 这个标签中page没有上锁 */
 		/*
 		 * i_size must be checked after we know the page is Uptodate.
 		 *
@@ -1274,7 +1274,7 @@ no_cached_page:
 			desc->error = -ENOMEM;
 			goto out;
 		}
-		/* 将页面添加到地址空间 */
+		/* 将页面添加到地址空间,获取到的page是被锁住的  */
 		error = add_to_page_cache_lru(page, mapping,
 						index, GFP_KERNEL);
 		if (error) {
