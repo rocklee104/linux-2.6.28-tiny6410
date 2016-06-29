@@ -391,7 +391,7 @@ static void free_more_memory(void)
  * I/O completion handler for block_read_full_page() - pages
  * which come unlocked at the end of I/O.
  */
-/* uptodate表示本次读是否正确 */
+/* block_read_full_page的完成函数,uptodate表示本次读是否正确 */
 static void end_buffer_async_read(struct buffer_head *bh, int uptodate)
 {
 	unsigned long flags;
@@ -447,7 +447,7 @@ static void end_buffer_async_read(struct buffer_head *bh, int uptodate)
 	 */
 	if (page_uptodate && !PageError(page))
 		SetPageUptodate(page);
-	/* 当磁盘内容完全更新到page的时候,page才可用 */
+	/* 唤醒在do_generic_file_read中readpage标签上等待页面解锁的线程 */
 	unlock_page(page);
 	return;
 
@@ -2370,6 +2370,7 @@ EXPORT_SYMBOL(block_is_partially_uptodate);
  * set/clear_buffer_uptodate() functions propagate buffer state into the
  * page struct once IO has completed.
  */
+ /* 基于缓冲页面构造IO请求 */
 int block_read_full_page(struct page *page, get_block_t *get_block)
 {
 	struct inode *inode = page->mapping->host;
@@ -2389,7 +2390,7 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 
     /* 块起始位置 */
 	iblock = (sector_t)page->index << (PAGE_CACHE_SHIFT - inode->i_blkbits);
-    /* 文件末尾的块 */
+    /* 文件末尾的块,向上以block size对齐 */
 	lblock = (i_size_read(inode)+blocksize-1) >> inode->i_blkbits;
 	bh = head;
 	nr = 0;
@@ -2398,8 +2399,8 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
     /*
      * 需要处理3中情况： 
      * 1.缓冲区的内容是最新的:直接跳过
-     * 2.缓冲区的内容不是最新的，有映射：加入数组
-     * 3.缓冲区的内容没有映射：映射，加入数组
+     * 2.缓冲区的内容不是最新的,有映射:加入数组
+     * 3.缓冲区的内容没有映射:映射,加入数组
      */
 	do {
 		if (buffer_uptodate(bh))
@@ -2414,20 +2415,19 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 			if (iblock < lblock) {
 				WARN_ON(bh->b_size != blocksize);
                 /*
-                 * inode用于获取bdev, iblock指定了block number, bh是一个块缓存.
+                 * inode用于获取bdev,iblock指定了block number, bh是一个块缓存.
                  * get_block用于定位一个块,即建立映射,调用get_block获取到block no
                  */
 				err = get_block(inode, iblock, bh, 0);
 				if (err)
 					SetPageError(page);
 			}
-            /*
-             * 调用get_block后，bh就会置位BH_Mapped,如果bh没有置位BH_Mapped, 
-             * 就说明当前读的位置超过文件尾了，这时需要将内存block填充0，并设置为 
-             * BH_Uptodate状态。
-             */
 			if (!buffer_mapped(bh)) {
-				/* 遇到文件空洞就会出现这种情况 */
+				/*
+				 * 有两种情况会进入这个条件判断中:
+				 * 1.文件存在空洞,iblock < lblock,调用了get_block但是没有获取到映射.
+				 * 2.文件大小未以page size对齐,page中只有部分buffer属于文件. 
+				 */
 				zero_user(page, i * blocksize, blocksize);
 				if (!err)
 					set_buffer_uptodate(bh);
@@ -2438,14 +2438,13 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 			 * synchronously
 			 */
             /*
-             *某些fs会在映射期间读出数据块，将buffer设置成uptodate, 
-             *以这里需要再次检查buffer是否uptodate
-            */
-            /* 据说reiserfs会干这个事情 */
+             * 某些fs会在映射期间读出数据块,将buffer设置成uptodate,
+             * 所以这里需要再次检查buffer是否uptodate.例如reiserfs
+             */ 
 			if (buffer_uptodate(bh))
 				continue;
 		}
-        /* 不是最新的，但是有映射的记录块的buffer_head放到指针数组arr[]中 */
+        /* 不是最新的,但是有映射的记录块的buffer_head放到指针数组arr[]中 */
 		arr[nr++] = bh;
 	} while (i++, iblock++, (bh = bh->b_this_page) != head);
 
@@ -2480,6 +2479,11 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 	for (i = 0; i < nr; i++) {
 		bh = arr[i];
 		 /* 如果buffer中的内容和disk中的一致，unlock page */
+		 /*
+		  * 当前位置调用buffer_uptodate是必要的,因为我们可能在第二阶段对缓冲区
+		  * 调用lock_buffer获取锁的过程中,其他进程已经读出数据,修改了缓冲区的状态.
+		  * 如果是这种情况,我们就没有必要重复提交读请求.
+		  */
 		if (buffer_uptodate(bh))
 			end_buffer_async_read(bh, 1);
 		else

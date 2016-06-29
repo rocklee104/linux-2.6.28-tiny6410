@@ -701,10 +701,12 @@ changed:
 
 int ext2_get_block(struct inode *inode, sector_t iblock, struct buffer_head *bh_result, int create)
 {
+	/* buffer size可能比文件系统的block size要大 */
 	unsigned max_blocks = bh_result->b_size >> inode->i_blkbits;
 	int ret = ext2_get_blocks(inode, iblock, max_blocks,
 			      bh_result, create);
 	if (ret > 0) {
+		/* bh_result映射到了多个文件系统的block */
 		bh_result->b_size = (ret << inode->i_blkbits);
 		ret = 0;
 	}
