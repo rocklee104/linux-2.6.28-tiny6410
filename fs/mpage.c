@@ -213,7 +213,7 @@ do_mpage_readpage(struct bio *bio, struct page *page, unsigned nr_pages,
 	const unsigned blocksize = 1 << blkbits;
 	/* 在文件中逻辑块的编号 */
 	sector_t block_in_file;
-	/* 页面最后一个字节的逻辑块编号 */
+	/* 本次传输的最后一个block */
 	sector_t last_block;
 	/* 文件最后一个逻辑块编号 */
 	sector_t last_block_in_file;
@@ -239,7 +239,6 @@ do_mpage_readpage(struct bio *bio, struct page *page, unsigned nr_pages,
 
     /* 当前中的第一个block number */
 	block_in_file = (sector_t)page->index << (PAGE_CACHE_SHIFT - blkbits);
-    /* 本次传输的最后一个block */
 	last_block = block_in_file + nr_pages * blocks_per_page;
     /* 文件最后一个block */
 	last_block_in_file = (i_size_read(inode) + blocksize - 1) >> blkbits;
@@ -281,18 +280,12 @@ do_mpage_readpage(struct bio *bio, struct page *page, unsigned nr_pages,
 	 * Then do more get_blocks calls until we are done with this page.
 	 */
 	map_bh->b_page = page;
-    /*
-    1、page_block从0开始循环，它表示在这个page内的block index 
-    2、调用get_block 函数查找对应逻辑块的物理块号是多少 
-    3、如果遇到了文件空洞、page上的物理块不连续就会跳转到confused 
-    4、将这个page中每个逻辑块对应的物理块都保存到临时的数组blocks[]中 
-    */ 
 	while (page_block < blocks_per_page) {
 		map_bh->b_state = 0;
 		map_bh->b_size = 0;
 
 		if (block_in_file < last_block) {
-            //如果当前page中第一个block小于本次传输的最后一个block
+            /* 如果当前page中第一个block小于本次传输的最后一个block */
 			map_bh->b_size = (last_block-block_in_file) << blkbits;
 			if (get_block(inode, block_in_file, map_bh, 0))
 				goto confused;
@@ -307,7 +300,7 @@ do_mpage_readpage(struct bio *bio, struct page *page, unsigned nr_pages,
 			*/
 			fully_mapped = 0;
 			if (first_hole == blocks_per_page)
-                //只有第一次调用时会修改first_hole,后续调用不会修改这个值。
+                /* 只有第一次调用时会修改first_hole,后续调用不会修改这个值 */
 				first_hole = page_block;
 			page_block++;
 			block_in_file++;
@@ -346,7 +339,7 @@ do_mpage_readpage(struct bio *bio, struct page *page, unsigned nr_pages,
 		 */
 		if (page_block && blocks[page_block-1] != map_bh->b_blocknr-1)
 			goto confused;
-        //计算出这个buffer_head指向的连续的块的块数
+        /* 计算出这个buffer_head指向的连续的块的个数 */
 		nblocks = map_bh->b_size >> blkbits;
 		/*
 		 * 根据缓冲头的映射信息,记录页面每个逻辑块在磁盘上对应的逻辑块编号.
@@ -423,6 +416,7 @@ alloc_new:
 		goto alloc_new;
 	}
 
+	/* 当一个页面中前部分的逻辑块连续,后部分逻辑块空洞,这种情况提交bio */
 	if (buffer_boundary(map_bh) || (first_hole != blocks_per_page))
 		bio = mpage_bio_submit(READ, bio);
 	else
