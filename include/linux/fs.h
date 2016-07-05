@@ -15,8 +15,8 @@
  * nr_file rlimit, so it's safe to set up a ridiculously high absolute
  * upper limit on files-per-process.
  *
- * Some programs (notably those using select()) may have to be 
- * recompiled to take full advantage of the new limits..  
+ * Some programs (notably those using select()) may have to be
+ * recompiled to take full advantage of the new limits..
  */
 
 /* Fixed constants first: */
@@ -102,7 +102,7 @@ extern int dir_notify_enable;
 
 /* public flags for file_system_type */
 /* 对于需要磁盘的文件系统,需要在file_system_type.flag中赋值FS_REQUIRES_DEV */
-#define FS_REQUIRES_DEV 1 
+#define FS_REQUIRES_DEV 1
 #define FS_BINARY_MOUNTDATA 2
 #define FS_HAS_SUBTYPE 4
 #define FS_REVAL_DOT	16384	/* Check the paths ".", ".." for staleness */
@@ -399,7 +399,7 @@ struct iattr {
  */
 #include <linux/quota.h>
 
-/** 
+/**
  * enum positive_aop_returns - aop return codes with specific semantics
  *
  * @AOP_WRITEPAGE_ACTIVATE: Informs the caller that page writeback has
@@ -409,7 +409,7 @@ struct iattr {
  * 			    be a candidate for writeback again in the near
  * 			    future.  Other callers must be careful to unlock
  * 			    the page if they get this return.  Returned by
- * 			    writepage(); 
+ * 			    writepage();
  *
  * @AOP_TRUNCATED_PAGE: The AOP method that was handed a locked page has
  *  			unlocked it and the page might have been truncated.
@@ -443,10 +443,15 @@ struct page;
 struct address_space;
 struct writeback_control;
 
+/* IO向量迭代器 */
 struct iov_iter {
+	/* 指向剩余IO向量数组的指针 */
 	const struct iovec *iov;
+	/* 剩余IO向量数组的有效项数 */
 	unsigned long nr_segs;
+	/* 在当前IO向量中的偏移 */
 	size_t iov_offset;
+	/* 剩余IO向量数组的有效字节数 */
 	size_t count;
 };
 
@@ -465,6 +470,7 @@ static inline void iov_iter_init(struct iov_iter *i,
 	i->iov = iov;
 	i->nr_segs = nr_segs;
 	i->iov_offset = 0;
+	/* 将count域初始化为所有字节的总数,然后调用iov_iter_advance向前推进,跳过已处理的字节数 */
 	i->count = count + written;
 
 	iov_iter_advance(i, written);
@@ -637,8 +643,8 @@ struct address_space {
 	struct inode		*host;		/* owner: inode, block_device */
 	/* 地址空间页面组织成radix树的形式,page_tree为树根 */
 	struct radix_tree_root	page_tree;	/* radix tree of all pages */
-	/* 
-	 * tree_lock is used to synchronise concurrent access and modification of the 
+	/*
+	 * tree_lock is used to synchronise concurrent access and modification of the
 	 * radix-tree, and to control access to the pagecache in general
 	 */
 	/* 保护radix tree的读写锁 */
@@ -736,7 +742,7 @@ struct block_device {
 	/* number of times partitions within this device have been opened. */
 	/* 当前block_device代表一个磁盘时,这个磁盘中的分区被打开的次数 */
 	unsigned		bd_part_count;
-	/* 
+	/*
 	 * 设置为1时,表示该分区在内核中的信息无效,因为磁盘上的分区已经改变,
 	 * 下一次打开该设备时,将要重新扫描分区表.
 	 */
@@ -801,13 +807,13 @@ struct inode {
 	/* 用于将inode接入hash表中 */
 	struct hlist_node	i_hash;
    /*
-    * i_list用作连接一下3个链表中的一个： 
+    * i_list用作连接一下3个链表中的一个：
     * 1.inode_unused:inode未使用链表,inode是clean的,并且i_count为0,链表头是inode_unused
-    * 2.inode_in_use:inode正在使用链表,inode是clean的,并且i_count>0,链表头是inode_in_use 
-    * 3.dirty链表:dirty的inode链表，链表头是sb->s_dirty 
-    * 
+    * 2.inode_in_use:inode正在使用链表,inode是clean的,并且i_count>0,链表头是inode_in_use
+    * 3.dirty链表:dirty的inode链表，链表头是sb->s_dirty
+    *
     * 4.用于记录整个fs中的inode的链表
-    * i_state的值等于I_DIRTY_SYNC，I_DIRTY_DATASYNC，I_DIRTY_PAGES其中一个， 
+    * i_state的值等于I_DIRTY_SYNC，I_DIRTY_DATASYNC，I_DIRTY_PAGES其中一个，
     * 就表示inode dirty
     */
 	struct list_head	i_list;
@@ -1120,10 +1126,10 @@ static inline int file_check_writeable(struct file *filp)
 
 #define	MAX_NON_LFS	((1UL<<31) - 1)
 
-/* Page cache limit. The filesystems should put that into their s_maxbytes 
-   limits, otherwise bad things can happen in VM. */ 
+/* Page cache limit. The filesystems should put that into their s_maxbytes
+   limits, otherwise bad things can happen in VM. */
 #if BITS_PER_LONG==32
-#define MAX_LFS_FILESIZE	(((u64)PAGE_CACHE_SIZE << (BITS_PER_LONG-1))-1) 
+#define MAX_LFS_FILESIZE	(((u64)PAGE_CACHE_SIZE << (BITS_PER_LONG-1))-1)
 #elif BITS_PER_LONG==64
 #define MAX_LFS_FILESIZE 	0x7fffffffffffffffUL
 #endif
@@ -2112,7 +2118,7 @@ extern int may_open(struct nameidata *, int, int);
 
 extern int kernel_read(struct file *, unsigned long, char *, unsigned long);
 extern struct file * open_exec(const char *);
- 
+
 /* fs/dcache.c -- generic fs support functions */
 extern int is_subdir(struct dentry *, struct dentry *);
 extern ino_t find_inode_number(struct dentry *, struct qstr *);

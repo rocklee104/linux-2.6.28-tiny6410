@@ -95,6 +95,7 @@ struct ext2_sb_info {
 	gid_t s_resgid;
 	unsigned short s_mount_state;
 	unsigned short s_pad;
+	/* 一个block中可以存放多少个块地址(记录其2的指数) */
 	int s_addr_per_block_bits;
 	int s_desc_per_block_bits;
 	int s_inode_size;

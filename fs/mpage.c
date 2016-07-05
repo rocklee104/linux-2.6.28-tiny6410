@@ -123,8 +123,8 @@ mpage_alloc(struct block_device *bdev,
  * them.  So when the buffer is up to date and the page size == block size,
  * this marks the page up to date instead of adding new buffers.
  */
-static void 
-map_buffer_to_page(struct page *page, struct buffer_head *bh, int page_block) 
+static void
+map_buffer_to_page(struct page *page, struct buffer_head *bh, int page_block)
 {
 	struct inode *inode = page->mapping->host;
 	struct buffer_head *page_bh, *head;
@@ -135,13 +135,13 @@ map_buffer_to_page(struct page *page, struct buffer_head *bh, int page_block)
 		 * don't make any buffers if there is only one buffer on
 		 * the page and the page just needs to be set up to date
 		 */
-		if (inode->i_blkbits == PAGE_CACHE_SHIFT && 
+		if (inode->i_blkbits == PAGE_CACHE_SHIFT &&
 		    buffer_uptodate(bh)) {
             /*
-             *如果这个buffer的大小刚好是一个page，并且buffer is uptodate, 
-             *就将这个page设置成uptodate 
+             *如果这个buffer的大小刚好是一个page，并且buffer is uptodate,
+             *就将这个page设置成uptodate
             */
-			SetPageUptodate(page);    
+			SetPageUptodate(page);
 			return;
 		}
 		create_empty_buffers(page, 1 << inode->i_blkbits, 0);
@@ -177,7 +177,7 @@ map_buffer_to_page(struct page *page, struct buffer_head *bh, int page_block)
  * 就是调用文件系统提供的get_block函数,如果不连续,需要调用block_read_full_page
  * 函数采用buffer缓冲区的形式来逐个块获取数据
  */
-/* 
+/*
  * 1、调用get_block函数检查page中是不是所有的物理块都连续
  * 2、如果连续调用mpage_bio_submit函数请求整个page的数据
  * 3、如果不连续调用block_read_full_page逐个block读取
@@ -416,7 +416,11 @@ alloc_new:
 		goto alloc_new;
 	}
 
-	/* 当一个页面中前部分的逻辑块连续,后部分逻辑块空洞,这种情况提交bio */
+	/*
+	 * 一下两种情况,需要马上提交bio.
+	 * 1.map_bh映射的逻辑块已达到最大连续值.后续的逻辑块是一个间接块.
+	 * 2.当一个页面中前部分的逻辑块连续,后部分逻辑块空洞.
+	 */
 	if (buffer_boundary(map_bh) || (first_hole != blocks_per_page))
 		bio = mpage_bio_submit(READ, bio);
 	else
@@ -553,7 +557,7 @@ EXPORT_SYMBOL(mpage_readpage);
  *
  * If all blocks are found to be contiguous then the page can go into the
  * BIO.  Otherwise fall back to the mapping's writepage().
- * 
+ *
  * FIXME: This code wants an estimate of how many pages are still to be
  * written, so it can intelligently allocate a suitably-sized BIO.  For now,
  * just allocate full-size (16-page) BIOs.

@@ -180,7 +180,7 @@ EXPORT_SYMBOL(sync_blockdev);
 int fsync_bdev(struct block_device *bdev)
 {
 	struct super_block *sb = get_super(bdev);
-	/* 
+	/*
 	 * 当插入一个块设备->invalidate_partition->fsync_bdev这个时候
 	 * 当前block device并没有挂载到任何一个fs,sb为NULL
 	 */
@@ -331,7 +331,7 @@ out:
    Thus invalidate_buffers in general usage is not allwowed to trash
    dirty buffers. For example ioctl(FLSBLKBUF) expects dirty data to
    be preserved.  These buffers are simply skipped.
-  
+
    We also skip buffers which are still in use.  For example this can
    happen if a userspace program is reading the block device.
 
@@ -420,8 +420,8 @@ static void end_buffer_async_read(struct buffer_head *bh, int uptodate)
 	 */
 	first = page_buffers(page);
     /*
-     * 这里禁止中断并且加自旋锁是为了防止多个buffer 
-     * 完成io后调用end_buffer_async_read对此page操作 
+     * 这里禁止中断并且加自旋锁是为了防止多个buffer
+     * 完成io后调用end_buffer_async_read对此page操作
      */
 	local_irq_save(flags);
 	bit_spin_lock(BH_Uptodate_Lock, &first->b_state);
@@ -568,7 +568,7 @@ EXPORT_SYMBOL(mark_buffer_async_write);
  * try_to_free_buffers() will be operating against the *blockdev* mapping
  * at the time, not against the S_ISREG file which depends on those buffers.
  * So the locking for private_list is via the private_lock in the address_space
- * which backs the buffers.  Which is different from the address_space 
+ * which backs the buffers.  Which is different from the address_space
  * against which the buffers are listed.  So for a particular address_space,
  * mapping->private_lock does *not* protect mapping->private_list!  In fact,
  * mapping->private_list will always be protected by the backing blockdev's
@@ -840,7 +840,7 @@ EXPORT_SYMBOL(__set_page_dirty_buffers);
  * Do this in two main stages: first we copy dirty buffers to a
  * temporary inode list, queueing the writes as we go.  Then we clean
  * up, waiting for those writes to complete.
- * 
+ *
  * During this second stage, any subsequent updates to the file may end
  * up refiling the buffer on the original inode's dirty list again, so
  * there is a chance we will end up with a buffer queued for write but
@@ -925,7 +925,7 @@ static int fsync_buffers_list(spinlock_t *lock, struct list_head *list)
 		brelse(bh);
 		spin_lock(lock);
 	}
-	
+
 	spin_unlock(lock);
 	/* 处理链表上被再次dirty的buffer */
 	err2 = osync_buffers_list(lock, list);
@@ -1053,12 +1053,12 @@ no_grow:
 	/*
 	 * Return failure for non-async IO requests.  Async IO requests
 	 * are not allowed to fail, so we have to wait until buffer heads
-	 * become available.  But we don't want tasks sleeping with 
+	 * become available.  But we don't want tasks sleeping with
 	 * partially complete buffers, so all were released above.
 	 */
 	/*
-	 *同步io request不经过调度算法直接操作磁盘，可能会失败。异步io request 不能失败， 
-	 *所以需要等待直到获取可用的bufferhead.我们不希望获取一个获取部分可用bh的task 
+	 *同步io request不经过调度算法直接操作磁盘，可能会失败。异步io request 不能失败，
+	 *所以需要等待直到获取可用的bufferhead.我们不希望获取一个获取部分可用bh的task
 	 *睡眠，因为这样会浪费一部分内存空间。所以只要bh没有获取完全，就要将已经获得的bh释放
 	 */
 	if (!retry)
@@ -1068,7 +1068,7 @@ no_grow:
 	/* We're _really_ low on memory. Now we just
 	 * wait for old buffer heads to become free due to
 	 * finishing IO.  Since this is an async request and
-	 * the reserve list is empty, we're sure there are 
+	 * the reserve list is empty, we're sure there are
 	 * async buffer heads in use.
 	 */
 	/* 如果retry为1（当async io request时），如果分配失败，需要继续分配bh */
@@ -1094,7 +1094,7 @@ link_dev_buffers(struct page *page, struct buffer_head *head)
 
 /*
  * Initialise the state of a blockdev page's buffers.
- */ 
+ */
 /* 初始化buffers, 一般调用此函数的buffer均没有被map */
 static void
 init_page_buffers(struct page *page, struct block_device *bdev,
@@ -1159,9 +1159,9 @@ grow_dev_page(struct block_device *bdev, sector_t block,
 	}
 
     /*
-     *如果page没有buffer,那就需要： 
-     *1.分配块缓冲 
-     *2.将块缓冲和page关联起来 
+     *如果page没有buffer,那就需要：
+     *1.分配块缓冲
+     *2.将块缓冲和page关联起来
      *3.设置bh的b_bdev和bh->b_blocknr
     */
 	/*
@@ -1208,7 +1208,7 @@ grow_buffers(struct block_device *bdev, sector_t block, int size)
 	} while ((size << sizebits) < PAGE_SIZE);
 
    /*
-    * size一般小于等于一个页。通过上面那个循环，可以得出2^sizebits个size等于一个页。 
+    * size一般小于等于一个页。通过上面那个循环，可以得出2^sizebits个size等于一个页。
     * 而size一般是一个block size大小。block >> sizebits就可以得到起始页号index。
     */
 	index = block >> sizebits;
@@ -1259,7 +1259,7 @@ __getblk_slow(struct block_device *bdev, sector_t block, int size)
 		int ret;
 
        /*
-        * 1.如果数据不在页缓存中，或虽然在页缓存中，但对应的页没有与之关联的缓冲区，返回NULL。 
+        * 1.如果数据不在页缓存中，或虽然在页缓存中，但对应的页没有与之关联的缓冲区，返回NULL。
         * 2.如果数据在页缓存中，且对应页有相关缓存区，则返回指向所要缓冲头的指针。
         */
 		bh = __find_get_block(bdev, block, size);
@@ -1377,9 +1377,9 @@ static struct buffer_head *__bread_slow(struct buffer_head *bh)
 		submit_bh(READ, bh);
 		wait_on_buffer(bh);
         /*
-         *正常情况下，当数据传输完成，b_end_io被调用，就会unlock_buffer, 
+         *正常情况下，当数据传输完成，b_end_io被调用，就会unlock_buffer,
          *并且buffer uptodate
-        */    
+        */
 		if (buffer_uptodate(bh))
 			return bh;
 	}
@@ -1577,7 +1577,7 @@ EXPORT_SYMBOL(__breadahead);
  *  @bdev: the block_device to read from
  *  @block: number of block
  *  @size: size (in bytes) to read
- * 
+ *
  *  Reads a specified block, and returns buffer head that contains it.
  *  It returns NULL if the block was unreadable.
  */
@@ -1610,7 +1610,7 @@ static void invalidate_bh_lru(void *arg)
 	}
 	put_cpu_var(bh_lrus);
 }
-	
+
 void invalidate_bh_lrus(void)
 {
 	on_each_cpu(invalidate_bh_lru, NULL, 1);
@@ -2100,7 +2100,7 @@ static int __block_prepare_write(struct inode *inode, struct page *page,
 			 */
 			if (!buffer_uptodate(bh))
 				set_buffer_uptodate(bh);
-			continue; 
+			continue;
 		}
 		/* buffer已经map过,但没有uptodate,就需要从磁盘读取数据到buffer */
 		if (!buffer_uptodate(bh) && !buffer_delay(bh) &&
@@ -2202,7 +2202,7 @@ int block_write_begin(struct file *file, struct address_space *mapping,
 	/* 含有写入位置的page */
 	page = *pagep;
 	if (page == NULL) {
-		/* 比如symlink的时候,调用这个函数获取page */
+		/* 用者提供页面,比如symlink的时候,调用这个函数获取page */
 		ownpage = 1;
 		page = grab_cache_page_write_begin(mapping, index, flags);
 		if (!page) {
@@ -2397,7 +2397,7 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 	i = 0;
 
     /*
-     * 需要处理3中情况： 
+     * 需要处理3中情况：
      * 1.缓冲区的内容是最新的:直接跳过
      * 2.缓冲区的内容不是最新的,有映射:加入数组
      * 3.缓冲区的内容没有映射:映射,加入数组
@@ -2426,7 +2426,7 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 				/*
 				 * 有两种情况会进入这个条件判断中:
 				 * 1.文件存在空洞,iblock < lblock,调用了get_block但是没有获取到映射.
-				 * 2.文件大小未以page size对齐,page中只有部分buffer属于文件. 
+				 * 2.文件大小未以page size对齐,page中只有部分buffer属于文件.
 				 */
 				zero_user(page, i * blocksize, blocksize);
 				if (!err)
@@ -2440,7 +2440,7 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
             /*
              * 某些fs会在映射期间读出数据块,将buffer设置成uptodate,
              * 所以这里需要再次检查buffer是否uptodate.例如reiserfs
-             */ 
+             */
 			if (buffer_uptodate(bh))
 				continue;
 		}
@@ -2495,7 +2495,7 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 
 /* utility function for filesystems that need to do work on expanding
  * truncates.  Uses filesystem pagecache writes to allow the filesystem to
- * deal with the hole.  
+ * deal with the hole.
  */
 int generic_cont_expand_simple(struct inode *inode, loff_t size)
 {
@@ -3065,7 +3065,7 @@ int block_truncate_page(struct address_space *mapping,
 	length = blocksize - length;
 	/* 通过页号获取block number */
 	iblock = (sector_t)index << (PAGE_CACHE_SHIFT - inode->i_blkbits);
-	
+
 	page = grab_cache_page(mapping, index);
 	err = -ENOMEM;
 	if (!page)
@@ -3282,7 +3282,7 @@ int submit_bh(int rw, struct buffer_head * bh)
  *
  * ll_rw_block sets b_end_io to simple completion handler that marks
  * the buffer up-to-date (if approriate), unlocks the buffer and wakes
- * any waiters. 
+ * any waiters.
  *
  * All of the buffers must be for the same device, and must also be a
  * multiple of the current approved size for the device.
@@ -3387,7 +3387,7 @@ static inline int buffer_busy(struct buffer_head *bh)
 
 /*
  * 移除与page相关的所有bufferhead,返回首个bh的地址,
- * 后续需要这个地址来释放所有的bh,成功返回1，失败返回0。 
+ * 后续需要这个地址来释放所有的bh,成功返回1，失败返回0。
  */
 static int
 drop_buffers(struct page *page, struct buffer_head **buffers_to_free)
@@ -3560,7 +3560,7 @@ static void recalc_bh_state(void)
 		tot += per_cpu(bh_accounting, i).nr;
 	buffer_heads_over_limit = (tot > max_buffer_heads);
 }
-	
+
 struct buffer_head *alloc_buffer_head(gfp_t gfp_flags)
 {
 	struct buffer_head *ret = kmem_cache_alloc(bh_cachep, gfp_flags);

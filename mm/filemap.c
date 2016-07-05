@@ -1530,7 +1530,7 @@ SYSCALL_ALIAS(sys_readahead, SyS_readahead);
 static int page_cache_read(struct file *file, pgoff_t offset)
 {
 	struct address_space *mapping = file->f_mapping;
-	struct page *page; 
+	struct page *page;
 	int ret;
 
 	do {
@@ -1547,7 +1547,7 @@ static int page_cache_read(struct file *file, pgoff_t offset)
 		page_cache_release(page);
 
 	} while (ret == AOP_TRUNCATED_PAGE);
-		
+
 	return ret;
 }
 
@@ -2300,8 +2300,11 @@ static ssize_t generic_perform_write(struct file *file,
 	struct address_space *mapping = file->f_mapping;
 	const struct address_space_operations *a_ops = mapping->a_ops;
 	long status = 0;
+	/* 记录已写的字节数 */
 	ssize_t written = 0;
 	unsigned int flags = 0;
+	struct inode *inode = mapping->host;
+	struct super_block *sb = inode->i_sb;
 
 	/*
 	 * Copies from kernel address space cannot fail (NFSD is a big user).
@@ -2311,14 +2314,19 @@ static ssize_t generic_perform_write(struct file *file,
 
 	do {
 		struct page *page;
+		/* 当前页面在页缓存中的索引 */
 		pgoff_t index;		/* Pagecache index for current page */
+		/* 页面中的偏移 */
 		unsigned long offset;	/* Offset into pagecache page */
+		/* 要写到页面的字节数 */
 		unsigned long bytes;	/* Bytes to write to page */
+		/* 从用户空间赋值过来的字节数 */
 		size_t copied;		/* Bytes copied from user */
 		void *fsdata;
 
 		offset = (pos & (PAGE_CACHE_SIZE - 1));
 		index = pos >> PAGE_CACHE_SHIFT;
+		/* 要写的剩余字节数,不能超过页面的剩余字节数,也不能超过剩余I/O向量中的有效字节数 */
 		bytes = min_t(unsigned long, PAGE_CACHE_SIZE - offset,
 						iov_iter_count(i));
 
@@ -2339,11 +2347,16 @@ again:
 			break;
 		}
 
+		/* write_begin中分配page */
 		status = a_ops->write_begin(file, mapping, pos, bytes, flags,
 						&page, &fsdata);
 		if (unlikely(status))
 			break;
 
+		/*
+		 * 将数据从用户空间复制到页面中,这个过程需要确保页面一直有效,
+		 * 因此之前调用pagefault_disable禁用,之后调用pagefault_enable启用.
+		 */
 		pagefault_disable();
 		copied = iov_iter_copy_from_user_atomic(page, i, offset, bytes);
 		pagefault_enable();
@@ -2357,6 +2370,7 @@ again:
 
 		cond_resched();
 
+		/* 将I/O向量迭代器向前推进copied个字节 */
 		iov_iter_advance(i, copied);
 		if (unlikely(copied == 0)) {
 			/*
@@ -2366,6 +2380,11 @@ again:
 			 * If we didn't fallback here, we could livelock
 			 * because not all segments in the iov can be copied at
 			 * once without a pagefault.
+			 */
+			/*
+			 * 如果我们根本不能复制任何数据,则必须退回(Fall Back)到单个段长度的写,
+			 * 重新计算要写的字节数,不过这次的条件是,它不能超过页面的剩余字节数,
+			 * 也不能超过第一个段的有效字节数.
 			 */
 			bytes = min_t(unsigned long, PAGE_CACHE_SIZE - offset,
 						iov_iter_single_seg_count(i));
@@ -2381,6 +2400,7 @@ again:
 	return written ? written : status;
 }
 
+/* written表示已处理的字节数 */
 ssize_t
 generic_file_buffered_write(struct kiocb *iocb, const struct iovec *iov,
 		unsigned long nr_segs, loff_t pos, loff_t *ppos,
@@ -2391,6 +2411,10 @@ generic_file_buffered_write(struct kiocb *iocb, const struct iovec *iov,
 	const struct address_space_operations *a_ops = mapping->a_ops;
 	struct inode *inode = mapping->host;
 	ssize_t status;
+	/*
+	 * 请求是基于I/O向量数组的,请求执行过程是一个动态的,逐项处理并向前推进的过程.
+	 * 对于这种应用,一种通用的方法是定义一个针对它的迭代器.
+	 */
 	struct iov_iter i;
 
 	iov_iter_init(&i, iov, nr_segs, count, written);
@@ -2410,7 +2434,7 @@ generic_file_buffered_write(struct kiocb *iocb, const struct iovec *iov,
 						OSYNC_METADATA|OSYNC_DATA);
 		}
   	}
-	
+
 	/*
 	 * If we get here for O_DIRECT writes then we must have fallen through
 	 * to buffered writes (block instantiation inside i_size).  So we sync
@@ -2438,6 +2462,11 @@ __generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 	ssize_t		err;
 
 	ocount = 0;
+	/*
+	 * 对I/O向量进行必要的写检查,例如是否有某个段的长度为负值,
+	 * 是否有无效的用户空间段指针等.如果成功返回0,并通过第二个
+	 * 参数返回段的数目,则通过第三个参数返回段的总长度.否则返回负的错误码
+	 */
 	err = generic_segment_checks(iov, &nr_segs, &ocount, VERIFY_READ);
 	if (err)
 		return err;
@@ -2516,6 +2545,7 @@ __generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 			 */
 		}
 	} else {
+		/* 处理缓冲IO */
 		written = generic_file_buffered_write(iocb, iov, nr_segs,
 				pos, ppos, count, written);
 	}
@@ -2566,6 +2596,7 @@ ssize_t generic_file_aio_write(struct kiocb *iocb, const struct iovec *iov,
 	if (ret > 0 && ((file->f_flags & O_SYNC) || IS_SYNC(inode))) {
 		ssize_t err;
 
+		/* 必要的时候将数据同步到磁盘 */
 		err = sync_page_range(inode, mapping, pos, ret);
 		if (err < 0)
 			ret = err;
