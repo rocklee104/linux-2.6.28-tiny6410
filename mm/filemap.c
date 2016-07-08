@@ -2303,8 +2303,6 @@ static ssize_t generic_perform_write(struct file *file,
 	/* 记录已写的字节数 */
 	ssize_t written = 0;
 	unsigned int flags = 0;
-	struct inode *inode = mapping->host;
-	struct super_block *sb = inode->i_sb;
 
 	/*
 	 * Copies from kernel address space cannot fail (NFSD is a big user).

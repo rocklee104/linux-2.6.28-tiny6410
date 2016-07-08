@@ -129,12 +129,12 @@ static inline int verify_chain(Indirect *from, Indirect *to)
 static int ext2_block_to_path(struct inode *inode,
 			long i_block, int offsets[4], int *boundary)
 {
-    //在ext2中一个block占用多少个整形，及可以存储多少个block的记录
+    /* 一个block中可以存放多少个块记录 */
 	int ptrs = EXT2_ADDR_PER_BLOCK(inode->i_sb);
 	int ptrs_bits = EXT2_ADDR_PER_BLOCK_BITS(inode->i_sb);
-    //直接寻址的block个数
+    /* 直接寻址的block个数 */
 	const long direct_blocks = EXT2_NDIR_BLOCKS,
-        //一级间接寻址的个数
+        /* 一级间接寻址的个数 */
 		indirect_blocks = ptrs,
 		double_blocks = (1 << (ptrs_bits * 2));
 	int n = 0;
@@ -143,22 +143,18 @@ static int ext2_block_to_path(struct inode *inode,
 	if (i_block < 0) {
 		ext2_warning (inode->i_sb, "ext2_block_to_path", "block < 0");
 	} else if (i_block < direct_blocks) {
-        //只有直接索引
 		offsets[n++] = i_block;
 		final = direct_blocks;
 	} else if ( (i_block -= direct_blocks) < indirect_blocks) {
-        //有直接索引，一级间接索引
 		offsets[n++] = EXT2_IND_BLOCK;
 		offsets[n++] = i_block;
 		final = ptrs;
 	} else if ((i_block -= indirect_blocks) < double_blocks) {
-        //有直接索引，一级间接索引，二级间接索引
 		offsets[n++] = EXT2_DIND_BLOCK;
 		offsets[n++] = i_block >> ptrs_bits;
 		offsets[n++] = i_block & (ptrs - 1);
 		final = ptrs;
 	} else if (((i_block -= double_blocks) >> (ptrs_bits * 2)) < ptrs) {
-        //有直接索引，一级间接索引，二级间接索引，三级间接索引
 		offsets[n++] = EXT2_TIND_BLOCK;
 		offsets[n++] = i_block >> (ptrs_bits * 2);
 		offsets[n++] = (i_block >> ptrs_bits) & (ptrs - 1);
@@ -283,7 +279,9 @@ static ext2_fsblk_t ext2_find_near(struct inode *inode, Indirect *ind)
 	 * It is going to be refered from inode itself? OK, just put it into
 	 * the same cylinder group then.
 	 */
+	/* 获取目标group中第一个block */
 	bg_start = ext2_group_first_block_no(inode->i_sb, ei->i_block_group);
+	/* 将一个group分成16 team,pid % 16分在不同的team */
 	colour = (current->pid % 16) *
 			(EXT2_BLOCKS_PER_GROUP(inode->i_sb) / 16);
 	return bg_start + colour;
@@ -349,6 +347,7 @@ ext2_blks_to_allocate(Indirect * branch, int k, unsigned long blks,
 	}
 
 	count++;
+	/* 不需要分配间接块,确保请求的连续逻辑块个数在请求范围内,不会跨越间接块*/
 	while (count < blks && count <= blocks_to_boundary
 		&& le32_to_cpu(*(branch[0].p + count)) == 0) {
 		count++;
@@ -587,10 +586,13 @@ static int ext2_get_blocks(struct inode *inode,
 	Indirect chain[4];
 	Indirect *partial;
 	ext2_fsblk_t goal;
+	/* 需要分配的间接块个数 */
 	int indirect_blks;
+	/* 最多可能的连续逻辑块个数 */
 	int blocks_to_boundary = 0;
 	int depth;
 	struct ext2_inode_info *ei = EXT2_I(inode);
+	/* 连续block的个数 */
 	int count = 0;
 	ext2_fsblk_t first_block = 0;
 
@@ -607,6 +609,7 @@ reread:
 		clear_buffer_new(bh_result); /* What's this do? */
 		count++;
 		/*map more blocks*/
+		/* blocks_to_boundary + 1一般是间接块,数据块和间接块不能一起提交到bio */
 		while (count < maxblocks && count <= blocks_to_boundary) {
 			ext2_fsblk_t blk;
 
@@ -630,6 +633,12 @@ reread:
 	}
 
 	/* Next simple case - plain lookup or failed read of indirect block */
+	/*
+	 * 如下情况可能进入此条件判断:
+	 * 1.读取过程中,调用完get_branch,parital == NULL,可能出现在读取文件空洞的时候,这个时候不需要映射.
+	 * 2.读取过程中,调用完get_branch,sb_bread出现错误.
+	 * 3.写入过程中,调用完get_branch,sb_bread出现错误.
+	 */
 	if (!create || err == -EIO)
 		goto cleanup;
 
@@ -639,6 +648,7 @@ reread:
 	 * Okay, we need to do block allocation.  Lazily initialize the block
 	 * allocation info here if necessary
 	*/
+	/* 第一次为文件分配block时,需要分配预留窗口 */
 	if (S_ISREG(inode->i_mode) && (!ei->i_block_alloc_info))
 		ext2_init_block_alloc_info(inode);
 
@@ -680,8 +690,10 @@ reread:
 	set_buffer_new(bh_result);
 got_it:
 	map_bh(bh_result, inode->i_sb, le32_to_cpu(chain[depth-1].key));
+	/* bh_result已经达到了最大连续block个数 */
 	if (count > blocks_to_boundary)
 		set_buffer_boundary(bh_result);
+	/* 返回连续的block个数 */
 	err = count;
 	/* Clean up and exit */
 	partial = chain + depth - 1;	/* the whole chain */
@@ -991,7 +1003,7 @@ static void ext2_free_branches(struct inode *inode, __le32 *p, __le32 *q, int de
 			/*
 			 * A read failure? Report error and clear slot
 			 * (should be rare).
-			 */ 
+			 */
 			if (!bh) {
 				ext2_error(inode->i_sb, "ext2_free_branches",
 					"Read failure, inode=%ld, block=%ld",
@@ -1309,7 +1321,7 @@ struct inode *ext2_iget (struct super_block *sb, unsigned long ino)
 		if (raw_inode->i_block[0])
 			init_special_inode(inode, inode->i_mode,
 			   old_decode_dev(le32_to_cpu(raw_inode->i_block[0])));
-		else 
+		else
 			init_special_inode(inode, inode->i_mode,
 			   new_decode_dev(le32_to_cpu(raw_inode->i_block[1])));
 	}
@@ -1317,7 +1329,7 @@ struct inode *ext2_iget (struct super_block *sb, unsigned long ino)
 	ext2_set_inode_flags(inode);
 	unlock_new_inode(inode);
 	return inode;
-	
+
 bad_inode:
 	iget_failed(inode);
 	return ERR_PTR(ret);
@@ -1399,7 +1411,7 @@ static int ext2_update_inode(struct inode * inode, int do_sync)
 			}
 		}
 	}
-	
+
 	raw_inode->i_generation = cpu_to_le32(inode->i_generation);
 	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode)) {
 		if (old_valid_dev(inode->i_rdev)) {

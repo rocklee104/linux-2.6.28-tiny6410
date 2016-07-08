@@ -1999,6 +1999,7 @@ void page_zero_new_buffers(struct page *page, unsigned from, unsigned to)
 		block_end = block_start + bh->b_size;
 
 		if (buffer_new(bh)) {
+			/* 当buffer和[frome,to]有交集的情况下 */
 			if (block_end > from && block_start < to) {
 				if (!PageUptodate(page)) {
 					unsigned start, size;
@@ -2006,6 +2007,7 @@ void page_zero_new_buffers(struct page *page, unsigned from, unsigned to)
 					start = max(from, block_start);
 					size = min(to, block_end) - start;
 
+					/* 清除交集部分的数据 */
 					zero_user(page, start, size);
 					set_buffer_uptodate(bh);
 				}
@@ -2070,11 +2072,13 @@ static int __block_prepare_write(struct inode *inode, struct page *page,
 			if (buffer_new(bh)) {
 				/*
 				 * 通过get_block时,在磁盘上新分配了block, b_blocknr指向这个新分配的block,
-				 * 但是bh中还没有这个block的数据,调用unmap_underlying_metadata将这个新分配
-				 * 的block之前使用的buffer清除.
+				 * 但是对于块设备来说,可能也存在一个对应这个逻辑块的缓冲头,并且块设备缓冲头
+				 * 已经是dirty或者正在处理中.文件的标记为New的缓冲头对应的block中数据随时
+				 * 可能改变.既然文件需要写数据,需要将块设备的缓冲头清除dirty及req状态.
 				 */
 				unmap_underlying_metadata(bh->b_bdev,
 							bh->b_blocknr);
+				/* 某些文件系统可能会将页面设置成最新 */
 				if (PageUptodate(page)) {
 					clear_buffer_new(bh);
 					set_buffer_uptodate(bh);
@@ -2106,7 +2110,11 @@ static int __block_prepare_write(struct inode *inode, struct page *page,
 		if (!buffer_uptodate(bh) && !buffer_delay(bh) &&
 		    !buffer_unwritten(bh) &&
 		     (block_start < from || block_end > to)) {
-		    /* Q:如果[block_start, block_end]处于[from, to]中间,就不需要调用ll_rw_block了? */
+		    /*
+		     * 如果[block_start, block_end]处于[from, to]中间,就不需要调用ll_rw_block了.
+		     * 这是因为这种情况下buffer完全被[from,to]使用.如果buffer未完全被[from,to]
+		     * 使用,就需要保证buffer最新,等到回写的时候才不会又把旧数据写入磁盘.
+		     */
 			ll_rw_block(READ, 1, &bh);
 			*wait_bh++=bh;
 		}
@@ -2114,7 +2122,7 @@ static int __block_prepare_write(struct inode *inode, struct page *page,
 	/*
 	 * If we issued read requests - let them complete.
 	 */
-	/* 等待buffer读取完成 */
+	/* 最多有两个buffer需要uptodate */
 	while(wait_bh > wait) {
 		wait_on_buffer(*--wait_bh);
 		if (!buffer_uptodate(*wait_bh))
@@ -2180,6 +2188,7 @@ static int __block_commit_write(struct inode *inode, struct page *page,
  * at *pagep rather than allocating its own. In this case, the page will
  * not be unlocked or deallocated on failure.
  */
+/* 最多写入1个页面 */
 int block_write_begin(struct file *file, struct address_space *mapping,
 			loff_t pos, unsigned len, unsigned flags,
 			struct page **pagep, void **fsdata,
@@ -2198,6 +2207,7 @@ int block_write_begin(struct file *file, struct address_space *mapping,
 	start = pos & (PAGE_CACHE_SIZE - 1);
 	/* 业内写入结束的位置 */
 	end = start + len;
+	struct super_block *sb = inode->i_sb;
 
 	/* 含有写入位置的page */
 	page = *pagep;
