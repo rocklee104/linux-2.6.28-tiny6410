@@ -275,6 +275,7 @@ struct nand_ecc_ctrl {
 	void			(*write_page_raw)(struct mtd_info *mtd,
 						  struct nand_chip *chip,
 						  const uint8_t *buf);
+	/* 一般使用nand_read_page_hwecc */
 	int			(*read_page)(struct mtd_info *mtd,
 					     struct nand_chip *chip,
 					     uint8_t *buf);
@@ -383,6 +384,7 @@ struct nand_chip {
 	void		(*cmd_ctrl)(struct mtd_info *mtd, int dat,
 				    unsigned int ctrl);
 	int		(*dev_ready)(struct mtd_info *mtd);
+	/* 一般使用nand_command_lp */
 	void		(*cmdfunc)(struct mtd_info *mtd, unsigned command, int column, int page_addr);
 	int		(*waitfunc)(struct mtd_info *mtd, struct nand_chip *this);
 	void		(*erase_cmd)(struct mtd_info *mtd, int page);

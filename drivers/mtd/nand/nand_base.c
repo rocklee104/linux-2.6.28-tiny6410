@@ -559,6 +559,7 @@ static void nand_command_lp(struct mtd_info *mtd, unsigned int command,
 	}
 
 	/* Command latch cycle */
+	/* 发送读命令的第一个周期1st cycle命令,即0x0 */
 	chip->cmd_ctrl(mtd, command & 0xff,
 		       NAND_NCE | NAND_CLE | NAND_CTRL_CHANGE);
 
@@ -570,16 +571,21 @@ static void nand_command_lp(struct mtd_info *mtd, unsigned int command,
 			/* Adjust columns for 16 bit buswidth */
 			if (chip->options & NAND_BUSWIDTH_16)
 				column >>= 1;
+			/* 发送column(页内地址) 1 addr */
 			chip->cmd_ctrl(mtd, column, ctrl);
 			ctrl &= ~NAND_CTRL_CHANGE;
+			/* 发送column 2 addr */
 			chip->cmd_ctrl(mtd, column >> 8, ctrl);
 		}
 		if (page_addr != -1) {
+			/* 发送raw(页的index) 1 addr */
 			chip->cmd_ctrl(mtd, page_addr, ctrl);
+			/* 发送raw 2 addr */
 			chip->cmd_ctrl(mtd, page_addr >> 8,
 				       NAND_NCE | NAND_ALE);
 			/* One more address cycle for devices > 128MiB */
 			if (chip->chipsize > (128 << 20))
+				/* 发送raw 3 addr */
 				chip->cmd_ctrl(mtd, page_addr >> 16,
 					       NAND_NCE | NAND_ALE);
 		}
@@ -633,6 +639,7 @@ static void nand_command_lp(struct mtd_info *mtd, unsigned int command,
 		return;
 
 	case NAND_CMD_READ0:
+		/* 第二个周期2nd Cycle的命令,即0x30 */
 		chip->cmd_ctrl(mtd, NAND_CMD_READSTART,
 			       NAND_NCE | NAND_CLE | NAND_CTRL_CHANGE);
 		chip->cmd_ctrl(mtd, NAND_CMD_NONE,
@@ -652,8 +659,10 @@ static void nand_command_lp(struct mtd_info *mtd, unsigned int command,
 
 	/* Apply this short delay always to ensure that we do wait tWB in
 	 * any case on any machine. */
+	/* tWB等待时间 */
 	ndelay(100);
 
+	/* 等待R/B#将命令写入完成.这个时候就能读取io上的数据了 */
 	nand_wait_ready(mtd);
 }
 
@@ -899,6 +908,7 @@ static int nand_read_page_hwecc(struct mtd_info *mtd, struct nand_chip *chip,
 
 	for (i = 0; eccsteps; eccsteps--, i += eccbytes, p += eccsize) {
 		chip->ecc.hwctl(mtd, NAND_ECC_READ);
+		/* 驱动中实现 */
 		chip->read_buf(mtd, p, eccsize);
 		chip->ecc.calculate(mtd, p, &ecc_calc[i]);
 	}
@@ -1068,16 +1078,19 @@ static int nand_do_read_ops(struct mtd_info *mtd, loff_t from,
 			bufpoi = aligned ? buf : chip->buffers->databuf;
 
 			if (likely(sndcmd)) {
+				/* 发送读页命令 */
 				chip->cmdfunc(mtd, NAND_CMD_READ0, 0x00, page);
 				sndcmd = 0;
 			}
 
 			/* Now read the page into the buffer */
+			/* 读取page中的数据到buffer */
 			if (unlikely(ops->mode == MTD_OOB_RAW))
 				ret = chip->ecc.read_page_raw(mtd, chip, bufpoi);
 			else if (!aligned && NAND_SUBPAGE_READ(chip) && !oob)
 				ret = chip->ecc.read_subpage(mtd, chip, col, bytes, bufpoi);
 			else
+				/* 一般使用nand_read_page_hwecc */
 				ret = chip->ecc.read_page(mtd, chip, bufpoi);
 			if (ret < 0)
 				break;
