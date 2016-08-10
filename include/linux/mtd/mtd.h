@@ -94,7 +94,9 @@ struct mtd_oob_ops {
 	size_t		ooblen;
 	size_t		oobretlen;
 	uint32_t	ooboffs;
+	/* 内部的一个buffer,存放一个page+oob大小的数据 */
 	uint8_t		*datbuf;
+	/* 存放一个块使用的oob */
 	uint8_t		*oobbuf;
 };
 
@@ -103,7 +105,7 @@ struct mtd_info {
 	u_int32_t flags;
 	u_int32_t size;	 // Total size of the MTD
 
-	/* "Major" erase size for the device. Naïve users may take this
+	/* "Major" erase size for the device. Na茂ve users may take this
 	 * to be the only erase size available, or may use the more detailed
 	 * information below if they desire
 	 */

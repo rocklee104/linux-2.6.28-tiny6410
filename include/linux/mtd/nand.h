@@ -370,60 +370,97 @@ struct nand_buffers {
  */
 
 struct nand_chip {
+	/* 读取8线io的地址 */
 	void  __iomem	*IO_ADDR_R;
+	/* 写入8线io的地址 */
 	void  __iomem	*IO_ADDR_W;
 
+	/* 读取一个字节 */
 	uint8_t		(*read_byte)(struct mtd_info *mtd);
+	/* 读取一个字长 */
 	u16		(*read_word)(struct mtd_info *mtd);
+	/* 将数据从buffer写到芯片中 */
 	void		(*write_buf)(struct mtd_info *mtd, const uint8_t *buf, int len);
+	/* 将数据从芯片读取buffer */
 	void		(*read_buf)(struct mtd_info *mtd, uint8_t *buf, int len);
+	/* 校验buffer中和chip中的数据 */
 	int		(*verify_buf)(struct mtd_info *mtd, const uint8_t *buf, int len);
 	void		(*select_chip)(struct mtd_info *mtd, int chip);
+	/* 检查block是否是坏块 */
 	int		(*block_bad)(struct mtd_info *mtd, loff_t ofs, int getchip);
+	/* 标记坏块 */
 	int		(*block_markbad)(struct mtd_info *mtd, loff_t ofs);
+	/* 硬件特定函数,用于控制地址锁存,数据锁存,及使能.通常也用作写地址及命令 */
 	void		(*cmd_ctrl)(struct mtd_info *mtd, int dat,
 				    unsigned int ctrl);
+	/* 硬件特定函数,检查r/b线,判断设备是否繁忙 */
 	int		(*dev_ready)(struct mtd_info *mtd);
-	/* 一般使用nand_command_lp */
+	/* 硬件特定函数,一般使用nand_command_lp */
 	void		(*cmdfunc)(struct mtd_info *mtd, unsigned command, int column, int page_addr);
+	/* 硬件特定函数,用作等待设备可用 */
 	int		(*waitfunc)(struct mtd_info *mtd, struct nand_chip *this);
+	/* 用于擦除操作 */
 	void		(*erase_cmd)(struct mtd_info *mtd, int page);
+	/* 扫描bbt */
 	int		(*scan_bbt)(struct mtd_info *mtd);
 	int		(*errstat)(struct mtd_info *mtd, struct nand_chip *this, int state, int status, int page);
+	/* 上层write page的操作函数 */
 	int		(*write_page)(struct mtd_info *mtd, struct nand_chip *chip,
 				      const uint8_t *buf, int page, int cached, int raw);
 
+	/* 从array到read regs的延迟 */
 	int		chip_delay;
 	unsigned int	options;
 
+	/* page大小,用bit位移表示 */
 	int		page_shift;
+	/* block大小,用bit位移表示 */
 	int		phys_erase_shift;
+	/* bbt大小,用bit位移表示 */
 	int		bbt_erase_shift;
+	/* 一个chip上的地址线的个数 */
 	int		chip_shift;
+	/* 物理芯片的数量 */
 	int		numchips;
+	/* 一个chip的大小 */
 	unsigned long	chipsize;
+	/* (pages / chip) - 1 */
 	int		pagemask;
+	/* data_buf中page的数量 */
 	int		pagebuf;
 	int		subpagesize;
+	/* MLC/multichip data from chip ident */
 	uint8_t		cellinfo;
+	/* oob中标记坏块的位置 */
 	int		badblockpos;
 
+	/* NAND device当前的状态 */
 	nand_state_t	state;
 
+	/* poison value buffer */
 	uint8_t		*oob_poi;
+	/* 硬件控制器,多个设备可用共享此数据 */
 	struct nand_hw_control  *controller;
+	/* ecc的布局方案 */
 	struct nand_ecclayout	*ecclayout;
 
+	/* ecc控制结构 */
 	struct nand_ecc_ctrl ecc;
+	/* 用于读写的buffer */
 	struct nand_buffers *buffers;
+	/* 平台特定的硬件控制结构 */
 	struct nand_hw_control hwcontrol;
 
 	struct mtd_oob_ops ops;
 
+	/* 指向bbt */
 	uint8_t		*bbt;
+	/* bbt描述符 */
 	struct nand_bbt_descr	*bbt_td;
+	/* bbt镜像描述符 */
 	struct nand_bbt_descr	*bbt_md;
 
+	/* 坏块扫描模式 */
 	struct nand_bbt_descr	*badblock_pattern;
 
 	void		*priv;

@@ -34,10 +34,21 @@
  * erasesize aligned (e.g. use MTDPART_OFS_NEXTBLK).
  */
 
+/* 注意,可写的分区需要size和offset和擦除的大小对齐 */
 struct mtd_partition {
 	char *name;			/* identifier string */
+	/* 如果被设置成MTDPART_SIZ_FULL,这个分区会拓展到主MTD设备的最后 */
 	u_int32_t size;			/* partition size */
+	/*
+	 * 当前分区在主mtd中的起始位置.
+	 * 如果被定义成MTDPART_OFS_APPEND,这个分区就会从上一个分区结束位置开始.
+	 * 如果被定义成MTDPART_OFS_NXTBLK,这个分区就会从下个block开始
+	*/
 	u_int32_t offset;		/* offset within the master MTD space */
+	/*
+	 * flag掩码,用于从主mtd的flag中去除某些特性.
+	 * 比如,在mask_flags中添加MTD_WRITEABLE,就能将当前分区设置成只读的
+	*/
 	u_int32_t mask_flags;		/* master MTD flags to mask out for this partition */
 	struct nand_ecclayout *ecclayout;	/* out of band layout for this partition (NAND only)*/
 	struct mtd_info **mtdp;		/* pointer to store the MTD object */
