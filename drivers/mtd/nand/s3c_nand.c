@@ -67,10 +67,8 @@
 #include <plat/nand.h>
 
 enum s3c_cpu_type {
-	TYPE_S3C2450,	/* including s3c2416 */
 	TYPE_S3C6400,
 	TYPE_S3C6410,	/* including s3c6430/31 */
-        TYPE_S5PC100,
 };
 
 struct s3c_nand_info {
@@ -177,13 +175,16 @@ static void s3c_nand_hwcontrol(struct mtd_info *mtd, int dat, unsigned int ctrl)
 	void __iomem *regs = s3c_nand.regs;
 
 	if (ctrl & NAND_CTRL_CHANGE) {
+		/* 如果需要将nce拉低 */
 		if (ctrl & NAND_NCE) {
 			if (dat != NAND_CMD_NONE) {
+				/* 读取控制寄存器,然后将Reg_nCE0这个bit拉低 */
 				cur = readl(regs + S3C_NFCONT);
 				cur &= ~S3C_NFCONT_nFCE0;
 				writel(cur, regs + S3C_NFCONT);
 			}
 		} else {
+		/* 将nce拉高 */
 			cur = readl(regs + S3C_NFCONT);
 			cur |= S3C_NFCONT_nFCE0;
 			writel(cur, regs + S3C_NFCONT);
@@ -192,8 +193,10 @@ static void s3c_nand_hwcontrol(struct mtd_info *mtd, int dat, unsigned int ctrl)
 
 	if (dat != NAND_CMD_NONE) {
 		if (ctrl & NAND_CLE)
+			/* 将命令写入命令寄存器 */
 			writeb(dat, regs + S3C_NFCMMD);
 		else if (ctrl & NAND_ALE)
+			/* 将地址写入地址寄存器 */
 			writeb(dat, regs + S3C_NFADDR);
 	}
 }
@@ -704,8 +707,10 @@ static void s3c_nand_write_page_4bit(struct mtd_info *mtd, struct nand_chip *chi
  * it can allocate all necessary resources then calls the
  * nand layer to look for devices
  */
+/* 对应的platform_device是s3c_device_nand */
 static int s3c_nand_probe(struct platform_device *pdev, enum s3c_cpu_type cpu_type)
-{	
+{
+	/* platform_data在smdk6410_machine_init中被初始化为s3c_nand_mtd_part_info */
 	struct s3c_nand_mtd_info *plat_info = pdev->dev.platform_data;
 	struct mtd_partition *partition_info = (struct mtd_partition *)plat_info->partition;
 	struct nand_chip *nand;
@@ -736,6 +741,7 @@ static int s3c_nand_probe(struct platform_device *pdev, enum s3c_cpu_type cpu_ty
 	res  = pdev->resource;
 	size = res->end - res->start + 1;
 
+	/* 申请device资源,pdev->name在smdk6410_map_io由s3c-nand改成s3c6410-nand */
 	s3c_nand.area = request_mem_region(res->start, size, pdev->name);
 
 	if (s3c_nand.area == NULL) {
@@ -746,6 +752,7 @@ static int s3c_nand_probe(struct platform_device *pdev, enum s3c_cpu_type cpu_ty
 
 	s3c_nand.cpu_type   = cpu_type;
 	s3c_nand.device     = &pdev->dev;
+	/* 寄存器资源需要映射以后才能使用 */
 	s3c_nand.regs       = ioremap(res->start, size);
 
 	if (s3c_nand.regs == NULL) {
@@ -763,6 +770,10 @@ static int s3c_nand_probe(struct platform_device *pdev, enum s3c_cpu_type cpu_ty
 	}
 
 	/* Get pointer to private data */
+	/*
+	 * s3c_mtd空间中存放了|mtd_info|nand_chip|两部分数据,&s3c_mtd[1]指向了
+	 * nand_chip的起始地址.
+	 */
 	nand = (struct nand_chip *) (&s3c_mtd[1]);
 
 	/* Initialize structures */
@@ -770,9 +781,11 @@ static int s3c_nand_probe(struct platform_device *pdev, enum s3c_cpu_type cpu_ty
 	memset((char *) nand, 0, sizeof(struct nand_chip));
 
 	/* Link the private data with the MTD structure */
+	/* nand_chip作为私有数据存放 */
 	s3c_mtd->priv = nand;
 
 	for (i = 0; i < plat_info->chip_nr; i++) {
+		/* 读写都要操作数据寄存器 */
 		nand->IO_ADDR_R		= (char *)(s3c_nand.regs + S3C_NFDATA);
 		nand->IO_ADDR_W		= (char *)(s3c_nand.regs + S3C_NFDATA);
 		nand->cmd_ctrl		= s3c_nand_hwcontrol;
@@ -789,9 +802,12 @@ static int s3c_nand_probe(struct platform_device *pdev, enum s3c_cpu_type cpu_ty
 		nand->ecc.hwctl		= s3c_nand_enable_hwecc;
 		nand->ecc.calculate	= s3c_nand_calculate_ecc;
 		nand->ecc.correct	= s3c_nand_correct_data;
-		
+
+		/* 需要将NCE拉低,将读取id的命令字写入命令寄存器 */
 		s3c_nand_hwcontrol(0, NAND_CMD_READID, NAND_NCE | NAND_CLE | NAND_CTRL_CHANGE);
+		/* 将NCE拉低,将00写入地址寄存器 */
 		s3c_nand_hwcontrol(0, 0x00, NAND_CTRL_CHANGE | NAND_NCE | NAND_ALE);
+		/* 应该是为了延时,不需要修改NAND_NCE的状态 */
 		s3c_nand_hwcontrol(0, 0x00, NAND_NCE | NAND_ALE);
 		s3c_nand_hwcontrol(0, NAND_CMD_NONE, NAND_NCE | NAND_CTRL_CHANGE);
 		s3c_nand_device_ready(0);
@@ -810,11 +826,12 @@ static int s3c_nand_probe(struct platform_device *pdev, enum s3c_cpu_type cpu_ty
 			printk("Unknown NAND Device.\n");
 			goto exit_error;
 		}
-		
+
 		nand->cellinfo = readb(nand->IO_ADDR_R);	/* the 3rd byte */
 		tmp = readb(nand->IO_ADDR_R);			/* the 4th byte */
 
 		if (!type->pagesize) {
+			/* pagesize为0的时候才会去判断是SLC还是MLC */
 			if (((nand->cellinfo >> 2) & 0x3) == 0 || 1) {
 				nand_type = S3C_NAND_TYPE_SLC;				
 				nand->ecc.size = 512;
@@ -857,6 +874,7 @@ static int s3c_nand_probe(struct platform_device *pdev, enum s3c_cpu_type cpu_ty
 		}
 
 		/* Register the partitions */
+		/* 每一个chip都添加s3c_mtd一次 */
 		add_mtd_partitions(s3c_mtd, partition_info, plat_info->mtd_part_nr);
 	}
 
@@ -869,11 +887,6 @@ exit_error:
 	return ret;
 }
 
-static int s3c2450_nand_probe(struct platform_device *dev)
-{
-	return s3c_nand_probe(dev, TYPE_S3C2450);
-}
-
 static int s3c6400_nand_probe(struct platform_device *dev)
 {
 	return s3c_nand_probe(dev, TYPE_S3C6400);
@@ -882,11 +895,6 @@ static int s3c6400_nand_probe(struct platform_device *dev)
 static int s3c6410_nand_probe(struct platform_device *dev)
 {
 	return s3c_nand_probe(dev, TYPE_S3C6410);
-}
-
-static int s5pc100_nand_probe(struct platform_device *dev)
-{
-        return s3c_nand_probe(dev, TYPE_S5PC100);
 }
 
 /* PM Support */
@@ -918,17 +926,6 @@ static int s3c_nand_remove(struct platform_device *dev)
 	return 0;
 }
 
-static struct platform_driver s3c2450_nand_driver = {
-	.probe		= s3c2450_nand_probe,
-	.remove		= s3c_nand_remove,
-	.suspend	= s3c_nand_suspend,
-	.resume		= s3c_nand_resume,
-	.driver		= {
-		.name	= "s3c2450-nand",
-		.owner	= THIS_MODULE,
-	},
-};
-
 static struct platform_driver s3c6400_nand_driver = {
 	.probe		= s3c6400_nand_probe,
 	.remove		= s3c_nand_remove,
@@ -951,33 +948,18 @@ static struct platform_driver s3c6410_nand_driver = {
 	},
 };
 
-static struct platform_driver s5pc100_nand_driver = {
-        .probe          = s5pc100_nand_probe,
-        .remove         = s3c_nand_remove,
-        .suspend        = s3c_nand_suspend,
-        .resume         = s3c_nand_resume,
-        .driver         = {
-                .name   = "s5pc100-nand",
-                .owner  = THIS_MODULE,
-        },
-};
-
 static int __init s3c_nand_init(void)
 {
 	printk("S3C NAND Driver, (c) 2008 Samsung Electronics\n");
 
-	platform_driver_register(&s3c2450_nand_driver);
 	platform_driver_register(&s3c6400_nand_driver);
-        platform_driver_register(&s3c6410_nand_driver);
-        return platform_driver_register(&s5pc100_nand_driver);
+    return platform_driver_register(&s3c6410_nand_driver);
 }
 
 static void __exit s3c_nand_exit(void)
 {
-	platform_driver_unregister(&s3c2450_nand_driver);
 	platform_driver_unregister(&s3c6400_nand_driver);
 	platform_driver_unregister(&s3c6410_nand_driver);
-	platform_driver_unregister(&s5pc100_nand_driver);
 }
 
 module_init(s3c_nand_init);

@@ -429,7 +429,7 @@ struct nand_chip {
 	/* data_buf中page的数量 */
 	int		pagebuf;
 	int		subpagesize;
-	/* MLC/multichip data from chip ident */
+	/* 判断是SLC,MLC,TLC */
 	uint8_t		cellinfo;
 	/* oob中标记坏块的位置 */
 	int		badblockpos;

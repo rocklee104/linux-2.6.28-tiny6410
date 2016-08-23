@@ -101,14 +101,18 @@ struct mtd_oob_ops {
 };
 
 struct mtd_info {
+	/* MTD类型,包括MTD_NORFLASH,MTD_NANDFLASH等(可参考mtd-abi.h) */
 	u_char type;
+	/* MTD属性标志，MTD_WRITEABLE,MTD_NO_ERASE等(可参考mtd-abi.h) */
 	u_int32_t flags;
+	/* mtd设备的大小 */
 	u_int32_t size;	 // Total size of the MTD
 
 	/* "Major" erase size for the device. Na茂ve users may take this
 	 * to be the only erase size available, or may use the more detailed
 	 * information below if they desire
 	 */
+	/* MTD设备的擦除单元大小,对于NandFlash来说就是Block的大小 */
 	u_int32_t erasesize;
 	/* Minimal writable flash unit size. In case of NOR flash it is 1 (even
 	 * though individual bits can be cleared), in case of NAND flash it is
@@ -117,13 +121,17 @@ struct mtd_info {
 	 * Any driver registering a struct mtd_info must ensure a writesize of
 	 * 1 or larger.
 	 */
+	/* 写大小,对于norFlash是字节,对nandFlash为一页 */
 	u_int32_t writesize;
 
+	/* OOB字节数 */
 	u_int32_t oobsize;   // Amount of OOB data per block (e.g. 16)
+	/* 可用的OOB字节数 */
 	u_int32_t oobavail;  // Available OOB bytes per block
 
 	// Kernel-only stuff starts here.
 	const char *name;
+	 /* 索引号,不重要 */
 	int index;
 
 	/* ecc layout structure pointer - read only ! */
@@ -132,7 +140,9 @@ struct mtd_info {
 	/* Data for variable erase regions. If numeraseregions is zero,
 	 * it means that the whole device has erasesize as given above.
 	 */
+	/* 通常为1 */
 	int numeraseregions;
+	/* 可变擦除区域 */
 	struct mtd_erase_region_info *eraseregions;
 
 	/*
@@ -165,6 +175,7 @@ struct mtd_info {
 
 	int (*panic_write) (struct mtd_info *mtd, loff_t to, size_t len, size_t *retlen, const u_char *buf);
 
+	 /* 带oob读写Flash函数 */
 	int (*read_oob) (struct mtd_info *mtd, loff_t from,
 			 struct mtd_oob_ops *ops);
 	int (*write_oob) (struct mtd_info *mtd, loff_t to,
@@ -196,10 +207,12 @@ struct mtd_info {
 	int (*unlock) (struct mtd_info *mtd, loff_t ofs, size_t len);
 
 	/* Power Management functions */
+	/* 电源管理函数 */
 	int (*suspend) (struct mtd_info *mtd);
 	void (*resume) (struct mtd_info *mtd);
 
 	/* Bad block management functions */
+	/* 坏块管理函数 */
 	int (*block_isbad) (struct mtd_info *mtd, loff_t ofs);
 	int (*block_markbad) (struct mtd_info *mtd, loff_t ofs);
 

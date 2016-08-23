@@ -23,6 +23,7 @@
 */
 struct nand_flash_dev nand_flash_ids[] = {
 
+/* 	name, id, pagesize, chipsize, erasesize, options */
 #ifdef CONFIG_MTD_NAND_MUSEUM_IDS
 	{"NAND 1MiB 5V 8-bit",		0x6e, 256, 1, 0x1000, 0},
 	{"NAND 2MiB 5V 8-bit",		0x64, 256, 2, 0x1000, 0},

@@ -48,6 +48,7 @@ struct s3c2410_platform_nand {
 					       int chip);
 };
 
+/* 分区总体信息 */
 struct s3c_nand_mtd_info {
 	uint chip_nr;
 	/* 存放分区信息 */

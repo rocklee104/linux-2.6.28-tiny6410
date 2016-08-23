@@ -134,6 +134,7 @@
 #define S3C_SZ_MFC		SZ_4K
     
 /* NAND flash controller */
+/* 寄存器起始地址和大小与s3c6410x数据手册对应 */
 #define S3C64XX_PA_NAND	   	(0x70200000)
 #define S3C64XX_SZ_NAND	   	SZ_1M
 
